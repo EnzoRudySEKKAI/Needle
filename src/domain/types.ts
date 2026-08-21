@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4 as const
+export const SCHEMA_VERSION = 5 as const
 
 export type GridPoint = { gx: number; gy: number }
 export type Footprint = GridPoint & { w: number; d: number }
@@ -33,9 +33,7 @@ export type OntologyNode = {
   id: string
   code: string
   name: string
-  role: string
   groupId: string
-  kind: string
   whatItDoes: string
   howItsBuilt: string
   size: BuildingSize

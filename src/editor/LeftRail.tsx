@@ -22,7 +22,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
     const name = 'New concept'
     const code = codeFromName(name, new Set(document.nodes.map((node) => node.code)))
     const position = nextFreePosition(document.nodes, groupId)
-    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, role: 'an undefined role', groupId, kind: 'concept', whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
+    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, groupId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
     setSelection({ kind: 'node', id })
   }
 

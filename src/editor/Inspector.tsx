@@ -114,13 +114,12 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
 function NodeInspector({ node, editable, commit, document, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; onStartConnection: (sourceId: string) => void }) {
   const patch = (value: Partial<OntologyNode>) => commit((current) => updateNode(current, node.id, value))
   return <>
-    <span className="eyebrow">{node.code} · {node.kind}</span>
+    <span className="eyebrow">{node.code}</span>
     <h2>{node.name}</h2>
-    <p className="lede">{node.size.toUpperCase()} · {node.role}</p>
+    <p className="lede">{node.size.toUpperCase()}</p>
     {editable ? <div className="form-stack">
-      <div className="field-pair"><Field label="Code" value={node.code} onChange={(value) => patch({ code: value.toUpperCase().slice(0, 3) })} /><Field label="Kind" value={node.kind} onChange={(value) => patch({ kind: value })} /></div>
+      <Field label="Code" value={node.code} onChange={(value) => patch({ code: value.toUpperCase().slice(0, 3) })} />
       <Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} />
-      <Field label="Role in a flow" value={node.role} onChange={(value) => patch({ role: value })} />
       <label className="field"><span>Size</span><select value={node.size} onChange={(event) => patch({ size: event.target.value as BuildingSize })}>{(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label>
       <label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <BuildingAppearancePicker archetype={node.archetypeOverride} texture={node.faceTexture} onArchetype={(value) => patch({ archetypeOverride: value })} onTexture={(value) => patch({ faceTexture: value })} />
