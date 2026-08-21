@@ -230,10 +230,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .structure-view-button.is-active { background: var(--accent); color: #fff; }
 
 /* Structure view */
-.structure-view { position: absolute; inset: 0; overflow: hidden; background: var(--surface); }
+.structure-view { --structure-occluder: var(--surface); position: absolute; inset: 0; overflow: hidden; background: var(--surface); }
 .structure-view-svg { position: relative; z-index: 1; width: 100%; height: 100%; overflow: visible; }
 .structure-silhouette { isolation: isolate; }
-.structure-shell { pointer-events: none; }
+.structure-paint, .structure-paint-layer, .structure-occluders, .structure-layer-ink { pointer-events: none; }
+.structure-face { fill: var(--structure-occluder, var(--surface)); stroke: none; opacity: 1; pointer-events: none; }
 .structure-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: opacity 170ms ease, stroke 170ms ease, filter 170ms ease; }
 .structure-stroke.weight-primary { stroke: var(--ink-2); stroke-width: 1.2; opacity: .88; }
 .structure-stroke.weight-secondary { stroke: var(--structure); stroke-width: .86; opacity: .72; }
@@ -241,12 +242,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .structure-floor-slot { cursor: pointer; outline: none; }
 .structure-floor-slot:focus, .structure-floor-slot:focus-visible { outline: none; }
 .structure-floor-hit { fill: transparent; stroke: transparent; pointer-events: all; }
-.structure-floor-visual { pointer-events: none; transition: opacity 170ms ease, filter 170ms ease; }
-.structure-silhouette.has-preview .structure-floor-slot:not(.is-previewed) .structure-floor-visual, .structure-silhouette.has-preview .structure-shell { opacity: .24; }
-.structure-floor-slot.is-previewed .structure-floor-visual, .structure-floor-slot:focus-visible .structure-floor-visual { filter: drop-shadow(0 3px 5px color-mix(in srgb, var(--accent) 18%, transparent)); }
-.structure-floor-slot.is-previewed .structure-stroke, .structure-floor-slot:focus-visible .structure-stroke { stroke: var(--accent); opacity: 1; }
-.structure-floor-slot.is-previewed .weight-primary, .structure-floor-slot:focus-visible .weight-primary { stroke-width: 1.7; }
-.structure-floor-slot.is-current:not(.is-previewed) .weight-primary { stroke: var(--accent); }
+.structure-layer-ink { transition: opacity 170ms ease, filter 170ms ease; }
+.structure-silhouette.has-preview .structure-paint-layer:not(.is-previewed) .structure-layer-ink { opacity: .24; }
+.structure-paint-layer.is-previewed .structure-layer-ink { filter: drop-shadow(0 3px 5px color-mix(in srgb, var(--accent) 18%, transparent)); }
+.structure-paint-layer.is-previewed .structure-stroke { stroke: var(--accent); opacity: 1; }
+.structure-paint-layer.is-previewed .weight-primary { stroke-width: 1.7; }
+.structure-paint-layer.is-current:not(.is-previewed) .weight-primary { stroke: var(--accent); }
 .structure-preview, .structure-rest-copy { pointer-events: none; animation: structure-preview-in 180ms ease both; }
 .structure-preview-index { fill: var(--accent); font: 500 10px var(--mono); letter-spacing: .7px; text-transform: uppercase; }
 .structure-preview-name { fill: var(--ink); font: 590 21px var(--body); letter-spacing: -.5px; }
@@ -292,9 +293,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .structure-type-picker { margin: 2px 0 0; padding: 0; border: 0; }
 .structure-type-picker legend { margin-bottom: 7px; color: var(--ink-3); font: 9px var(--mono); letter-spacing: .5px; text-transform: uppercase; }
 .structure-type-picker > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.structure-type-picker button { min-width: 0; height: 86px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 4px; padding: 7px 5px 8px; border: 0; border-radius: 5px; background: var(--surface-soft); color: var(--ink-3); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--structure) 16%, transparent); transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
-.structure-type-picker button:hover { color: var(--ink); background: color-mix(in srgb, var(--surface-soft) 80%, var(--accent-wash)); transform: translateY(-1px); }
-.structure-type-picker button.is-selected { color: var(--accent); background: var(--accent-wash); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent), 0 7px 18px color-mix(in srgb, var(--accent) 10%, transparent); }
+.structure-type-picker button { --structure-occluder: var(--surface-soft); min-width: 0; height: 86px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 4px; padding: 7px 5px 8px; border: 0; border-radius: 5px; background: var(--surface-soft); color: var(--ink-3); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--structure) 16%, transparent); transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.structure-type-picker button:hover { --structure-occluder: color-mix(in srgb, var(--surface-soft) 80%, var(--accent-wash)); color: var(--ink); background: var(--structure-occluder); transform: translateY(-1px); }
+.structure-type-picker button.is-selected { --structure-occluder: var(--accent-wash); color: var(--accent); background: var(--structure-occluder); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent), 0 7px 18px color-mix(in srgb, var(--accent) 10%, transparent); }
 .structure-type-picker svg { width: 100%; height: 60px; overflow: visible; pointer-events: none; }
 .structure-type-picker .structure-stroke.weight-primary { stroke: currentColor; stroke-width: 2; }
 .structure-type-picker .structure-stroke.weight-secondary { stroke: currentColor; stroke-width: 1.5; }

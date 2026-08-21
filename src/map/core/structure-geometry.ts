@@ -8,11 +8,19 @@ export type StructureStroke = {
   weight: StructureStrokeWeight
 }
 
+export type StructureLayerOwner = { kind: 'shell' } | { kind: 'floor'; index: number }
+
+export type StructurePaintLayer = {
+  key: string
+  owner: StructureLayerOwner
+  faces: string[]
+  strokes: StructureStroke[]
+}
+
 export type StructureFloorSlot = {
   index: number
   centerY: number
-  paths: StructureStroke[]
-  hitArea: string
+  hitAreas: string[]
 }
 
 export type StructureGeometry = {
@@ -21,13 +29,16 @@ export type StructureGeometry = {
   viewBox: { x: number; y: number; width: number; height: number }
   previewX: number
   floors: StructureFloorSlot[]
-  shell: StructureStroke[]
+  layers: StructurePaintLayer[]
 }
 
 type PlanRect = { x: number; y: number; w: number; d: number }
 type Project = (x: number, y: number, elevation: number) => ScreenPoint
 
+const shellOwner: StructureLayerOwner = { kind: 'shell' }
+const floorOwner = (index: number): StructureLayerOwner => ({ kind: 'floor', index })
 const path = (d: string, weight: StructureStrokeWeight = 'secondary'): StructureStroke => ({ d, weight })
+const layer = (key: string, owner: StructureLayerOwner, faces: string[], strokes: StructureStroke[]): StructurePaintLayer => ({ key, owner, faces, strokes })
 const number = (value: number) => value.toFixed(2)
 const move = (point: ScreenPoint) => `M ${number(point.x)} ${number(point.y)}`
 const line = (point: ScreenPoint) => `L ${number(point.x)} ${number(point.y)}`
@@ -44,6 +55,10 @@ function interpolate(a: ScreenPoint, b: ScreenPoint, ratio: number): ScreenPoint
   return { x: a.x + (b.x - a.x) * ratio, y: a.y + (b.y - a.y) * ratio }
 }
 
+function sameRect(a: PlanRect, b: PlanRect): boolean {
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.d === b.d
+}
+
 function contour(rect: PlanRect, elevation: number, project: Project): ScreenPoint[] {
   return [
     project(rect.x, rect.y, elevation),
@@ -51,6 +66,27 @@ function contour(rect: PlanRect, elevation: number, project: Project): ScreenPoi
     project(rect.x + rect.w, rect.y + rect.d, elevation),
     project(rect.x, rect.y + rect.d, elevation),
   ]
+}
+
+function rectFaces(bottom: readonly ScreenPoint[], top: readonly ScreenPoint[]): string[] {
+  return [
+    closed(top),
+    closed([top[1]!, top[2]!, bottom[2]!, bottom[1]!]),
+    closed([top[2]!, top[3]!, bottom[3]!, bottom[2]!]),
+  ]
+}
+
+function rectVolume(rect: PlanRect, bottomElevation: number, topElevation: number, project: Project, weight: StructureStrokeWeight = 'secondary'): { faces: string[]; strokes: StructureStroke[] } {
+  const bottom = contour(rect, bottomElevation, project)
+  const top = contour(rect, topElevation, project)
+  return {
+    faces: rectFaces(bottom, top),
+    strokes: [
+      path(closed(top), weight),
+      path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, weight),
+      path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'detail'),
+    ],
+  }
 }
 
 function facadeGrid(rect: PlanRect, bottomElevation: number, topElevation: number, project: Project, bayWidth = 28): StructureStroke[] {
@@ -63,30 +99,16 @@ function facadeGrid(rect: PlanRect, bottomElevation: number, topElevation: numbe
     const bays = Math.max(2, Math.round(span / bayWidth))
     for (let bay = 1; bay < bays; bay += 1) {
       const ratio = bay / bays
-      const topPoint = interpolate(top[startIndex]!, top[endIndex]!, ratio)
-      const bottomPoint = interpolate(bottom[startIndex]!, bottom[endIndex]!, ratio)
-      result.push(path(`${move(topPoint)} ${line(bottomPoint)}`, 'detail'))
+      result.push(path(`${move(interpolate(top[startIndex]!, top[endIndex]!, ratio))} ${line(interpolate(bottom[startIndex]!, bottom[endIndex]!, ratio))}`, 'detail'))
     }
 
     const rows = Math.max(1, Math.round((topElevation - bottomElevation) / 26))
     for (let row = 1; row <= rows; row += 1) {
       const ratio = row / (rows + 1)
-      const a = interpolate(bottom[startIndex]!, top[startIndex]!, ratio)
-      const b = interpolate(bottom[endIndex]!, top[endIndex]!, ratio)
-      result.push(path(`${move(a)} ${line(b)}`, 'detail'))
+      result.push(path(`${move(interpolate(bottom[startIndex]!, top[startIndex]!, ratio))} ${line(interpolate(bottom[endIndex]!, top[endIndex]!, ratio))}`, 'detail'))
     }
   }
   return result
-}
-
-function prism(rect: PlanRect, bottomElevation: number, topElevation: number, project: Project): StructureStroke[] {
-  const bottom = contour(rect, bottomElevation, project)
-  const top = contour(rect, topElevation, project)
-  return [
-    path(closed(top), 'secondary'),
-    path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, 'secondary'),
-    path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'detail'),
-  ]
 }
 
 const towerProject: Project = (x, y, elevation) => ({ x: (x - y) * .82, y: (x + y) * .35 - elevation })
@@ -102,35 +124,53 @@ function towerPlan(index: number, count: number): PlanRect {
 function towerGeometry(count: number): StructureGeometry {
   const totalHeight = 356
   const floorHeight = totalHeight / count
-  const floors = Array.from({ length: count }, (_, index): StructureFloorSlot => {
+  const floors: StructureFloorSlot[] = []
+  const layers: StructurePaintLayer[] = [layer('tower-site', shellOwner, [], [
+    path(open([towerProject(-174, -112, 0), towerProject(174, -112, 0), towerProject(174, 112, 0), towerProject(-174, 112, 0), towerProject(-174, -112, 0)]), 'secondary'),
+    path(open([towerProject(-178, 116, 0), towerProject(178, 116, 0)]), 'primary'),
+    path(open([towerProject(-124, 104, 1), towerProject(-70, 104, 1), towerProject(-70, 114, 1), towerProject(-124, 114, 1)]), 'detail'),
+    path(open([towerProject(70, 104, 1), towerProject(124, 104, 1), towerProject(124, 114, 1), towerProject(70, 114, 1)]), 'detail'),
+  ])]
+
+  for (let index = 0; index < count; index += 1) {
     const rect = towerPlan(index, count)
+    const nextRect = index + 1 < count ? towerPlan(index + 1, count) : null
     const bottomElevation = index * floorHeight
     const topElevation = (index + 1) * floorHeight
     const bottom = contour(rect, bottomElevation, towerProject)
     const top = contour(rect, topElevation, towerProject)
-    const visibleFace = [top[1]!, top[2]!, top[3]!, bottom[3]!, bottom[2]!, bottom[1]!]
+    const faces = rectFaces(bottom, top)
+    const visiblePoints = [top[1]!, top[2]!, top[3]!, bottom[3]!, bottom[2]!, bottom[1]!]
+    const topOutline = !nextRect || !sameRect(rect, nextRect) ? closed(top) : open([top[1]!, top[2]!, top[3]!])
 
-    return {
+    floors.push({
       index,
-      centerY: (Math.min(...visibleFace.map((point) => point.y)) + Math.max(...visibleFace.map((point) => point.y))) / 2,
-      paths: [
-        path(closed(top), 'primary'),
-        path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, 'secondary'),
-        path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'primary'),
-        ...facadeGrid(rect, bottomElevation, topElevation, towerProject, 24),
-      ],
-      hitArea: `${move({ x: Math.min(...visibleFace.map((point) => point.x)) - 10, y: Math.min(...visibleFace.map((point) => point.y)) - 8 })} H ${number(Math.max(...visibleFace.map((point) => point.x)) + 10)} V ${number(Math.max(...visibleFace.map((point) => point.y)) + 8)} H ${number(Math.min(...visibleFace.map((point) => point.x)) - 10)} Z`,
-    }
-  })
+      centerY: (Math.min(...visiblePoints.map((point) => point.y)) + Math.max(...visiblePoints.map((point) => point.y))) / 2,
+      hitAreas: faces,
+    })
+    layers.push(layer(`tower-floor-${index}`, floorOwner(index), faces, [
+      path(topOutline, 'primary'),
+      path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, 'secondary'),
+      path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'primary'),
+      ...facadeGrid(rect, bottomElevation, topElevation, towerProject, 24),
+    ]))
+  }
 
-  const roofRect = towerPlan(count - 1, count)
-  const roof = contour(roofRect, totalHeight, towerProject)
-  const podiumTop = count > 2 ? floorHeight : 0
-  const terrace = contour({ x: -154, y: -92, w: 308, d: 184 }, podiumTop, towerProject)
   const crownRect = { x: -34, y: -30, w: 68, d: 60 }
-  const crown = prism(crownRect, totalHeight, totalHeight + 24, towerProject)
+  const crown = rectVolume(crownRect, totalHeight, totalHeight + 24, towerProject)
   const crownTop = contour(crownRect, totalHeight + 24, towerProject)
   const mastBase = towerProject(0, 0, totalHeight + 24)
+  layers.push(layer('tower-crown', shellOwner, crown.faces, [
+    ...crown.strokes,
+    path(`${move(interpolate(crownTop[0]!, crownTop[1]!, .2))} ${line(interpolate(crownTop[3]!, crownTop[2]!, .2))}`, 'detail'),
+    path(`${move(interpolate(crownTop[0]!, crownTop[1]!, .8))} ${line(interpolate(crownTop[3]!, crownTop[2]!, .8))}`, 'detail'),
+  ]))
+  layers.push(layer('tower-mast', shellOwner, [], [
+    path(`M ${number(mastBase.x)} ${number(mastBase.y)} V ${number(mastBase.y - 58)}`, 'primary'),
+    path(`M ${number(mastBase.x - 18)} ${number(mastBase.y - 38)} H ${number(mastBase.x + 18)} M ${number(mastBase.x - 11)} ${number(mastBase.y - 49)} H ${number(mastBase.x + 11)}`, 'detail'),
+  ]))
+  const entrance = rectVolume({ x: -48, y: 92, w: 96, d: 20 }, 0, 11, towerProject)
+  layers.push(layer('tower-entrance', shellOwner, entrance.faces, entrance.strokes))
 
   return {
     type: 'tower',
@@ -138,20 +178,7 @@ function towerGeometry(count: number): StructureGeometry {
     viewBox: { x: -440, y: -440, width: 1280, height: 760 },
     previewX: 290,
     floors,
-    shell: [
-      path(closed(terrace), 'primary'),
-      path(closed(roof), 'primary'),
-      ...crown,
-      path(`${move(interpolate(crownTop[0]!, crownTop[1]!, .2))} ${line(interpolate(crownTop[3]!, crownTop[2]!, .2))}`, 'detail'),
-      path(`${move(interpolate(crownTop[0]!, crownTop[1]!, .8))} ${line(interpolate(crownTop[3]!, crownTop[2]!, .8))}`, 'detail'),
-      path(`M ${number(mastBase.x)} ${number(mastBase.y)} V ${number(mastBase.y - 58)}`, 'primary'),
-      path(`M ${number(mastBase.x - 18)} ${number(mastBase.y - 38)} H ${number(mastBase.x + 18)} M ${number(mastBase.x - 11)} ${number(mastBase.y - 49)} H ${number(mastBase.x + 11)}`, 'detail'),
-      path(open([towerProject(-174, -112, 0), towerProject(174, -112, 0), towerProject(174, 112, 0), towerProject(-174, 112, 0), towerProject(-174, -112, 0)]), 'secondary'),
-      path(open([towerProject(-178, 116, 0), towerProject(178, 116, 0)]), 'primary'),
-      ...prism({ x: -48, y: 92, w: 96, d: 20 }, 0, 11, towerProject),
-      path(open([towerProject(-124, 104, 1), towerProject(-70, 104, 1), towerProject(-70, 114, 1), towerProject(-124, 114, 1)]), 'detail'),
-      path(open([towerProject(70, 104, 1), towerProject(124, 104, 1), towerProject(124, 114, 1), towerProject(70, 114, 1)]), 'detail'),
-    ],
+    layers,
   }
 }
 
@@ -165,40 +192,72 @@ function campusGeometry(count: number): StructureGeometry {
   ]
   const totalHeight = 148
   const floorHeight = totalHeight / count
-  const floors = Array.from({ length: count }, (_, index): StructureFloorSlot => {
-    const bottomElevation = index * floorHeight
-    const topElevation = (index + 1) * floorHeight
-    const floorPaths = wings.flatMap((wing) => {
-      const bottom = contour(wing, bottomElevation, campusProject)
-      const top = contour(wing, topElevation, campusProject)
-      return [
-        path(closed(top), 'primary'),
-        path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, 'secondary'),
-        path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'primary'),
-        ...facadeGrid(wing, bottomElevation, topElevation, campusProject, 30),
-      ]
-    })
-    const center = campusProject(0, 20, (bottomElevation + topElevation) / 2)
-
-    return {
-      index,
-      centerY: center.y,
-      paths: floorPaths,
-      hitArea: `M -330 ${number(-topElevation - 92)} H 330 V ${number(150 - bottomElevation)} H -330 Z`,
-    }
-  })
-
   const courtyard = { x: -72, y: -22, w: 144, d: 190 }
   const courtOuter = contour(courtyard, 1, campusProject)
   const courtInner = contour({ x: -56, y: -4, w: 112, d: 150 }, 1, campusProject)
-  const roofPaths = wings.flatMap((wing) => [path(closed(contour(wing, totalHeight, campusProject)), 'primary')])
+  const floors: StructureFloorSlot[] = Array.from({ length: count }, (_, index) => ({
+    index,
+    centerY: campusProject(0, 20, (index + .5) * floorHeight).y,
+    hitAreas: [],
+  }))
+  const layers: StructurePaintLayer[] = [layer('campus-site', shellOwner, [], [
+    path(closed(contour({ x: -198, y: -136, w: 396, d: 340 }, 0, campusProject)), 'secondary'),
+    path(closed(courtOuter), 'secondary'),
+    path(closed(courtInner), 'detail'),
+    path(`${move(interpolate(courtOuter[0]!, courtOuter[1]!, .5))} ${line(interpolate(courtInner[0]!, courtInner[1]!, .5))}`, 'detail'),
+    path(`${move(interpolate(courtOuter[2]!, courtOuter[3]!, .5))} ${line(interpolate(courtInner[2]!, courtInner[3]!, .5))}`, 'detail'),
+    path(`M -38 59 c -9 -8 -9 -18 0 -26 c 9 8 9 18 0 26 Z M 38 85 c -9 -8 -9 -18 0 -26 c 9 8 9 18 0 26 Z`, 'detail'),
+  ])]
+  const atoms: Array<{ depth: number; paint: StructurePaintLayer }> = []
+
+  for (let index = 0; index < count; index += 1) {
+    const bottomElevation = index * floorHeight
+    const topElevation = (index + 1) * floorHeight
+    wings.forEach((wing, wingIndex) => {
+      const bottom = contour(wing, bottomElevation, campusProject)
+      const top = contour(wing, topElevation, campusProject)
+      const faces = rectFaces(bottom, top)
+      floors[index]!.hitAreas.push(...faces)
+      atoms.push({
+        depth: wing.x + wing.w / 2 + wing.y + wing.d / 2 + .68 * (bottomElevation + topElevation) / 2,
+        paint: layer(`campus-floor-${index}-wing-${wingIndex}`, floorOwner(index), faces, [
+          path(index === count - 1 ? closed(top) : open([top[1]!, top[2]!, top[3]!]), 'primary'),
+          path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, 'secondary'),
+          path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'primary'),
+          ...facadeGrid(wing, bottomElevation, topElevation, campusProject, 30),
+        ]),
+      })
+    })
+  }
+
   const bridgeRect = { x: -80, y: 76, w: 160, d: 30 }
+  const bridgeBottom = totalHeight * .53
+  const bridgeTop = totalHeight * .69
+  const bridge = rectVolume(bridgeRect, bridgeBottom, bridgeTop, campusProject)
+  atoms.push({
+    depth: bridgeRect.x + bridgeRect.w / 2 + bridgeRect.y + bridgeRect.d / 2 + .68 * (bridgeBottom + bridgeTop) / 2,
+    paint: layer('campus-bridge', shellOwner, bridge.faces, bridge.strokes),
+  })
+  layers.push(...atoms.sort((a, b) => a.depth - b.depth).map((atom) => atom.paint))
+
   const skylights: PlanRect[] = [
     { x: -124, y: -89, w: 76, d: 28 },
     { x: 48, y: -89, w: 76, d: 28 },
     { x: -145, y: 38, w: 38, d: 74 },
     { x: 107, y: 38, w: 38, d: 74 },
   ]
+  skylights
+    .map((rect, index) => ({ rect, index, depth: rect.x + rect.w / 2 + rect.y + rect.d / 2 }))
+    .sort((a, b) => a.depth - b.depth)
+    .forEach(({ rect, index }) => {
+      const skylight = rectVolume(rect, totalHeight, totalHeight + 10, campusProject)
+      layers.push(layer(`campus-skylight-${index}`, shellOwner, skylight.faces, skylight.strokes))
+    })
+  const entrance = rectVolume({ x: -60, y: 154, w: 120, d: 28 }, 0, 13, campusProject)
+  layers.push(layer('campus-entrance', shellOwner, entrance.faces, [
+    ...entrance.strokes,
+    path(open([campusProject(-184, 193, 0), campusProject(184, 193, 0)]), 'primary'),
+  ]))
 
   return {
     type: 'campus',
@@ -206,19 +265,7 @@ function campusGeometry(count: number): StructureGeometry {
     viewBox: { x: -470, y: -300, width: 1360, height: 660 },
     previewX: 385,
     floors,
-    shell: [
-      path(closed(contour({ x: -198, y: -136, w: 396, d: 340 }, 0, campusProject)), 'secondary'),
-      ...roofPaths,
-      path(closed(courtOuter), 'secondary'),
-      path(closed(courtInner), 'detail'),
-      path(`${move(interpolate(courtOuter[0]!, courtOuter[1]!, .5))} ${line(interpolate(courtInner[0]!, courtInner[1]!, .5))}`, 'detail'),
-      path(`${move(interpolate(courtOuter[2]!, courtOuter[3]!, .5))} ${line(interpolate(courtInner[2]!, courtInner[3]!, .5))}`, 'detail'),
-      ...prism(bridgeRect, totalHeight * .53, totalHeight * .69, campusProject),
-      ...skylights.flatMap((skylight) => prism(skylight, totalHeight, totalHeight + 10, campusProject)),
-      ...prism({ x: -60, y: 154, w: 120, d: 28 }, 0, 13, campusProject),
-      path(open([campusProject(-184, 193, 0), campusProject(184, 193, 0)]), 'primary'),
-      path(`M -38 59 c -9 -8 -9 -18 0 -26 c 9 8 9 18 0 26 Z M 38 85 c -9 -8 -9 -18 0 -26 c 9 8 9 18 0 26 Z`, 'detail'),
-    ],
+    layers,
   }
 }
 
@@ -243,6 +290,15 @@ function shipContour(plan: ShipPlan, elevation: number): ScreenPoint[] {
   ]
 }
 
+function shipFaces(bottom: readonly ScreenPoint[], top: readonly ScreenPoint[]): string[] {
+  return [
+    closed(top),
+    closed([top[2]!, top[3]!, bottom[3]!, bottom[2]!]),
+    closed([top[3]!, top[4]!, bottom[4]!, bottom[3]!]),
+    closed([top[4]!, top[5]!, bottom[5]!, bottom[4]!]),
+  ]
+}
+
 function shipFacadeGrid(plan: ShipPlan, bottomElevation: number, topElevation: number): StructureStroke[] {
   const bottom = shipContour(plan, bottomElevation)
   const top = shipContour(plan, topElevation)
@@ -264,32 +320,6 @@ function shipFacadeGrid(plan: ShipPlan, bottomElevation: number, topElevation: n
 function shipGeometry(count: number): StructureGeometry {
   const totalHeight = 184
   const floorHeight = totalHeight / count
-  const floors = Array.from({ length: count }, (_, index): StructureFloorSlot => {
-    const plan = shipPlan(index, count)
-    const bottomElevation = index * floorHeight
-    const topElevation = (index + 1) * floorHeight
-    const bottom = shipContour(plan, bottomElevation)
-    const top = shipContour(plan, topElevation)
-    const points = [...bottom, ...top]
-    const left = Math.min(...points.map((point) => point.x))
-    const right = Math.max(...points.map((point) => point.x))
-    const topY = Math.min(...points.map((point) => point.y))
-    const bottomY = Math.max(...points.map((point) => point.y))
-
-    return {
-      index,
-      centerY: (topY + bottomY) / 2,
-      paths: [
-        path(closed(top), 'primary'),
-        path(`${move(top[2]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(bottom[4]!)} ${line(bottom[5]!)} ${line(top[5]!)}`, 'secondary'),
-        path(`${move(top[3]!)} ${line(bottom[3]!)}`, 'primary'),
-        path(`${move(top[4]!)} ${line(bottom[4]!)}`, 'secondary'),
-        ...shipFacadeGrid(plan, bottomElevation, topElevation),
-      ],
-      hitArea: `M ${number(left - 12)} ${number(topY - 10)} H ${number(right + 12)} V ${number(bottomY + 10)} H ${number(left - 12)} Z`,
-    }
-  })
-
   const mainPlan = shipPlan(0, count)
   const hullTop = shipContour(mainPlan, 0)
   const keel = [
@@ -298,23 +328,75 @@ function shipGeometry(count: number): StructureGeometry {
     shipProject(mainPlan.stern + 28, mainPlan.width * .58, -40),
     shipProject(mainPlan.stern - 16, 0, -24),
   ]
-  const roofPlan = shipPlan(count - 1, count)
-  const roof = shipContour(roofPlan, totalHeight)
-  const bridgeRect = { x: 74, y: -44, w: 122, d: 88 }
-  const bridgeTop = contour(bridgeRect, totalHeight + 32, shipProject)
-  const lifeboats = Array.from({ length: 7 }, (_, index) => {
-    const boat = contour({ x: -184 + index * 62, y: 54, w: 42, d: 10 }, totalHeight * .39, shipProject)
-    return path(closed(boat), 'secondary')
-  })
-  const railPosts = Array.from({ length: 16 }, (_, index) => {
-    const point = shipProject(-210 + index * 29, roofPlan.width, totalHeight + 2)
-    return path(`M ${number(point.x)} ${number(point.y)} v -11`, 'detail')
-  })
   const portholes = Array.from({ length: 17 }, (_, index) => {
     const point = shipProject(-225 + index * 31, mainPlan.width, 15)
     return path(`M ${number(point.x - 2.5)} ${number(point.y)} a 2.5 2.5 0 1 0 5 0 a 2.5 2.5 0 1 0 -5 0`, 'detail')
   })
+  const layers: StructurePaintLayer[] = [layer('ship-hull', shellOwner, [
+    closed([hullTop[2]!, keel[0]!, keel[1]!, hullTop[3]!]),
+    closed([hullTop[3]!, keel[1]!, keel[2]!, hullTop[4]!]),
+    closed([hullTop[4]!, keel[2]!, keel[3]!, hullTop[5]!]),
+  ], [
+    path(`${move(hullTop[2]!)} ${line(keel[0]!)} ${line(keel[1]!)} ${line(keel[2]!)} ${line(keel[3]!)} ${line(hullTop[5]!)}`, 'primary'),
+    path(`${move(hullTop[3]!)} ${line(keel[1]!)} ${line(hullTop[4]!)}`, 'secondary'),
+    path(open([shipProject(-245, mainPlan.width, -17), shipProject(240, mainPlan.width, -17)]), 'detail'),
+    path(`${move(shipProject(mainPlan.bow + 23, mainPlan.width * .32, -15))} l 18 -2 l -10 15 Z`, 'secondary'),
+  ])]
+  const floors: StructureFloorSlot[] = []
+  const lifeboatElevation = totalHeight * .39
+  const lifeboatFloor = Math.min(count - 1, Math.max(0, Math.ceil(lifeboatElevation / floorHeight) - 1))
+
+  for (let index = 0; index < count; index += 1) {
+    const plan = shipPlan(index, count)
+    const bottomElevation = index * floorHeight
+    const topElevation = (index + 1) * floorHeight
+    const bottom = shipContour(plan, bottomElevation)
+    const top = shipContour(plan, topElevation)
+    const faces = shipFaces(bottom, top)
+    const strokes = [
+      path(closed(top), 'primary'),
+      path(`${move(top[2]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(bottom[4]!)} ${line(bottom[5]!)} ${line(top[5]!)}`, 'secondary'),
+      path(`${move(top[3]!)} ${line(bottom[3]!)}`, 'primary'),
+      path(`${move(top[4]!)} ${line(bottom[4]!)}`, 'secondary'),
+      ...shipFacadeGrid(plan, bottomElevation, topElevation),
+      ...(index === 0 ? portholes : []),
+    ]
+    floors.push({ index, centerY: (top[3]!.y + bottom[4]!.y) / 2, hitAreas: faces })
+    layers.push(layer(`ship-floor-${index}`, floorOwner(index), faces, strokes))
+
+    if (index === lifeboatFloor) {
+      const boats = Array.from({ length: 7 }, (_, boatIndex) => contour({ x: -184 + boatIndex * 62, y: 54, w: 42, d: 10 }, lifeboatElevation, shipProject))
+      layers.push(layer('ship-lifeboats', shellOwner, boats.map(closed), boats.map((boat) => path(closed(boat), 'secondary'))))
+    }
+  }
+
+  const roofPlan = shipPlan(count - 1, count)
+  const railPosts = Array.from({ length: 16 }, (_, index) => {
+    const point = shipProject(-210 + index * 29, roofPlan.width, totalHeight + 2)
+    return path(`M ${number(point.x)} ${number(point.y)} v -11`, 'detail')
+  })
+  layers.push(layer('ship-rails', shellOwner, [], [
+    ...railPosts,
+    path(open([shipProject(-220, roofPlan.width, totalHeight + 13), shipProject(226, roofPlan.width, totalHeight + 13)]), 'detail'),
+  ]))
+
+  const lounge = rectVolume({ x: -142, y: -40, w: 98, d: 80 }, totalHeight, totalHeight + 22, shipProject)
+  layers.push(layer('ship-lounge', shellOwner, lounge.faces, lounge.strokes))
+  const bridgeRect = { x: 74, y: -44, w: 122, d: 88 }
+  const bridge = rectVolume(bridgeRect, totalHeight, totalHeight + 32, shipProject)
+  const bridgeTop = contour(bridgeRect, totalHeight + 32, shipProject)
+  layers.push(layer('ship-bridge', shellOwner, bridge.faces, [
+    ...bridge.strokes,
+    path(`${move(interpolate(bridgeTop[1]!, bridgeTop[2]!, .18))} ${line(interpolate(bridgeTop[1]!, bridgeTop[2]!, .82))}`, 'detail'),
+    path(`${move(interpolate(bridgeTop[2]!, bridgeTop[3]!, .12))} ${line(interpolate(bridgeTop[2]!, bridgeTop[3]!, .88))}`, 'detail'),
+  ]))
+  const funnel = rectVolume({ x: -28, y: -23, w: 48, d: 46 }, totalHeight + 22, totalHeight + 69, shipProject)
+  layers.push(layer('ship-funnel', shellOwner, funnel.faces, funnel.strokes))
   const mast = shipProject(154, 0, totalHeight + 32)
+  layers.push(layer('ship-mast', shellOwner, [], [
+    path(`M ${number(mast.x)} ${number(mast.y)} v -57`, 'primary'),
+    path(`M ${number(mast.x - 18)} ${number(mast.y - 38)} h 36 M ${number(mast.x - 11)} ${number(mast.y - 48)} h 22`, 'detail'),
+  ]))
 
   return {
     type: 'cruise-ship',
@@ -322,24 +404,7 @@ function shipGeometry(count: number): StructureGeometry {
     viewBox: { x: -500, y: -330, width: 1500, height: 700 },
     previewX: 455,
     floors,
-    shell: [
-      path(`${move(hullTop[2]!)} ${line(keel[0]!)} ${line(keel[1]!)} ${line(keel[2]!)} ${line(keel[3]!)} ${line(hullTop[5]!)}`, 'primary'),
-      path(`${move(hullTop[3]!)} ${line(keel[1]!)} ${line(hullTop[4]!)}`, 'secondary'),
-      path(closed(roof), 'primary'),
-      ...prism({ x: -142, y: -40, w: 98, d: 80 }, totalHeight, totalHeight + 22, shipProject),
-      ...prism(bridgeRect, totalHeight, totalHeight + 32, shipProject),
-      path(`${move(interpolate(bridgeTop[1]!, bridgeTop[2]!, .18))} ${line(interpolate(bridgeTop[1]!, bridgeTop[2]!, .82))}`, 'detail'),
-      path(`${move(interpolate(bridgeTop[2]!, bridgeTop[3]!, .12))} ${line(interpolate(bridgeTop[2]!, bridgeTop[3]!, .88))}`, 'detail'),
-      ...prism({ x: -28, y: -23, w: 48, d: 46 }, totalHeight + 22, totalHeight + 69, shipProject),
-      path(`M ${number(mast.x)} ${number(mast.y)} v -57`, 'primary'),
-      path(`M ${number(mast.x - 18)} ${number(mast.y - 38)} h 36 M ${number(mast.x - 11)} ${number(mast.y - 48)} h 22`, 'detail'),
-      ...railPosts,
-      path(open([shipProject(-220, roofPlan.width, totalHeight + 13), shipProject(226, roofPlan.width, totalHeight + 13)]), 'detail'),
-      ...lifeboats,
-      ...portholes,
-      path(open([shipProject(-245, mainPlan.width, -17), shipProject(240, mainPlan.width, -17)]), 'detail'),
-      path(`${move(shipProject(mainPlan.bow + 23, mainPlan.width * .32, -15))} l 18 -2 l -10 15 Z`, 'secondary'),
-    ],
+    layers,
   }
 }
 
