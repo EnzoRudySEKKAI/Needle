@@ -105,7 +105,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
   const flowNodeIds = program ? new Set(program.nodeIds) : null
   const activeParts = activeClockKey.split(':')
   const activeNodeSet = program && activeParts[0] === program.id
-    ? nodeIdsForStageState(program, Number(activeParts[1]), activeParts[2] === 'source' ? 'travel' : activeParts[2] as 'travel' | 'target')
+    ? nodeIdsForStageState(program, Number(activeParts[1]), 'travel')
     : new Set<string>()
   const measureFlag = (id: string, width: number) => setFlagWidths((current) => {
     if (Math.abs((current.get(id) ?? 0) - width) < 0.5) return current

@@ -251,8 +251,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .form-stack > .relation-candidate-picker > .relation-candidate-trigger { border: 1px solid var(--border); }
 .relation-candidate-trigger:disabled { opacity: .45; cursor: default; }
 .relation-candidate-list { position: absolute; left: 0; right: 0; z-index: 12; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); background: var(--surface-raised); box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 14%, transparent); outline: none; }
-.relation-candidate-list [role='option'] { padding: 9px 10px; color: var(--ink-2); font-size: 10px; line-height: 1.35; cursor: pointer; }
-.relation-candidate-list [role='option'].is-active { background: var(--accent-wash); color: var(--accent); }
+.relation-candidate-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; color: var(--ink-2); }
+.relation-candidate-row.is-active { background: var(--accent-wash); color: var(--accent); }
+.relation-candidate-choice { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; border: 0; background: transparent; color: inherit; text-align: left; }
+.relation-candidate-choice span { overflow: hidden; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.relation-candidate-choice b { color: var(--accent); font-weight: 500; }
+.relation-candidate-choice small { overflow: hidden; color: var(--ink-3); font: 8px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.relation-candidate-direction { margin: 6px; border: 0; border-radius: 3px; background: color-mix(in srgb, var(--surface) 72%, transparent); color: var(--accent); font: 14px var(--mono); }
+.relation-candidate-direction:hover { background: var(--surface); }
 
 /* SVG scene */
 .floor-grid line { stroke: var(--grid); stroke-width: 1; }

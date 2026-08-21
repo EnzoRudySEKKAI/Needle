@@ -1,55 +1,28 @@
 import { resolveTraversal } from '../domain/flows'
 import { makeId } from '../domain/id'
-import type { FlowDirection, OntologyDocument, OntologyFlow, OntologyRelation } from '../domain/types'
+import type { OntologyDocument, OntologyFlow, OntologyRelation } from '../domain/types'
 import { RelationCandidatePicker, type RelationCandidateOption, type RelationPreview } from './RelationCandidatePicker'
 
 type Commit = (transform: (document: OntologyDocument) => OntologyDocument) => void
-type TraversalCandidate = { relation: OntologyRelation; direction: FlowDirection }
-
-function traversalCandidates(relations: readonly OntologyRelation[]): TraversalCandidate[] {
-  return relations.flatMap((relation) => {
-    return [{ relation, direction: 'forward' as const }, { relation, direction: 'reverse' as const }]
-  })
-}
-
-function candidateValue(candidate: TraversalCandidate): string {
-  return `${candidate.relation.id}|${candidate.direction}`
-}
-
-function parseCandidate(value: string, relations: readonly OntologyRelation[]): TraversalCandidate | null {
-  const separator = value.lastIndexOf('|')
-  const relation = relations.find((item) => item.id === value.slice(0, separator))
-  const direction = value.slice(separator + 1)
-  return relation && (direction === 'forward' || direction === 'reverse') ? { relation, direction } : null
-}
 
 export function ScenarioInspector({ flow, document, commit, editable, onRelationPreview }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean; onRelationPreview: (preview: RelationPreview | null) => void }) {
   const patch = (value: Partial<OntologyFlow>) => commit((current) => ({ ...current, flows: current.flows.map((item) => item.id === flow.id ? { ...item, ...value } : item) }))
   const nodeById = new Map(document.nodes.map((node) => [node.id, node]))
   const relationById = new Map(document.relations.map((relation) => [relation.id, relation]))
 
-  const appendStage = (value: string) => {
-    const candidate = parseCandidate(value, document.relations)
-    if (!candidate) return
-    patch({ stages: [...flow.stages, { id: makeId('stage'), traversals: [{ id: makeId('traversal'), relationId: candidate.relation.id, direction: candidate.direction }] }] })
+  const appendStage = (selection: RelationPreview) => {
+    patch({ stages: [...flow.stages, { id: makeId('stage'), traversals: [{ id: makeId('traversal'), relationId: selection.relationId, direction: selection.direction }] }] })
   }
 
-  const addBranch = (stageIndex: number, value: string) => {
-    const candidate = parseCandidate(value, document.relations)
-    if (!candidate) return
-    patch({ stages: flow.stages.map((stage, index) => index === stageIndex ? { ...stage, traversals: [...stage.traversals, { id: makeId('traversal'), relationId: candidate.relation.id, direction: candidate.direction }] } : stage) })
+  const addBranch = (stageIndex: number, selection: RelationPreview) => {
+    patch({ stages: flow.stages.map((stage, index) => index === stageIndex ? { ...stage, traversals: [...stage.traversals, { id: makeId('traversal'), relationId: selection.relationId, direction: selection.direction }] } : stage) })
   }
 
-  const candidateLabel = ({ relation, direction }: TraversalCandidate): string => {
-    const sourceId = direction === 'forward' ? relation.from : relation.to
-    const targetId = direction === 'forward' ? relation.to : relation.from
-    return `${nodeById.get(sourceId)?.name} → ${nodeById.get(targetId)?.name} · ${relation.label}`
-  }
-  const optionFor = (candidate: TraversalCandidate): RelationCandidateOption => ({ id: candidateValue(candidate), relationId: candidate.relation.id, direction: candidate.direction, label: candidateLabel(candidate) })
+  const optionFor = (relation: OntologyRelation): RelationCandidateOption => ({ relationId: relation.id, fromLabel: nodeById.get(relation.from)?.name ?? relation.from, toLabel: nodeById.get(relation.to)?.name ?? relation.to, label: relation.label })
 
   if (!editable) return <><span className="eyebrow">Animated scenario</span><h2>{flow.name}</h2><p className="lede">{flow.stages.length} steps · {flow.payload}</p><p>{flow.summary}</p></>
 
-  const nextStageCandidates = traversalCandidates(document.relations)
+  const nextStageCandidates = document.relations
 
   return <>
     <span className="eyebrow">Animated scenario</span>
@@ -61,8 +34,8 @@ export function ScenarioInspector({ flow, document, commit, editable, onRelation
       <label className="field"><span>Outcome</span><textarea rows={3} value={flow.summary} onChange={(event) => patch({ summary: event.target.value })} /></label>
       <div className="scenario-stages">
         {flow.stages.map((stage, stageIndex) => {
-          const usedCandidates = new Set(stage.traversals.map((traversal) => `${traversal.relationId}|${traversal.direction}`))
-          const candidates = traversalCandidates(document.relations).filter((candidate) => !usedCandidates.has(candidateValue(candidate)))
+          const usedRelationIds = new Set(stage.traversals.map((traversal) => traversal.relationId))
+          const candidates = document.relations.filter((relation) => !usedRelationIds.has(relation.id))
           const moveUp = [...flow.stages]
           if (stageIndex > 0) [moveUp[stageIndex - 1], moveUp[stageIndex]] = [moveUp[stageIndex]!, moveUp[stageIndex - 1]!]
           const moveDown = [...flow.stages]
@@ -77,11 +50,11 @@ export function ScenarioInspector({ flow, document, commit, editable, onRelation
               const removed = flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.filter((candidate) => candidate.id !== traversal.id) } : item).filter((item) => item.traversals.length > 0)
               return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><button type="button" className="branch-direction" title="Reverse in this scenario" onClick={() => patch({ stages: flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.map((candidate) => candidate.id === traversal.id ? { ...candidate, direction: candidate.direction === 'forward' ? 'reverse' : 'forward' } : candidate) } : item) })}>→</button><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span><button type="button" className="branch-remove" onClick={() => patch({ stages: removed })}>×</button><small>{relation.label}</small></div>
             })}
-            <RelationCandidatePicker label="+ Add parallel branch" options={candidates.map(optionFor)} onSelect={(option) => addBranch(stageIndex, option.id)} onPreview={onRelationPreview} />
+            <RelationCandidatePicker label="+ Add parallel branch" options={candidates.map(optionFor)} onSelect={(selection) => addBranch(stageIndex, selection)} onPreview={onRelationPreview} />
           </section>
         })}
       </div>
-      <RelationCandidatePicker label="+ Add next step" options={nextStageCandidates.map(optionFor)} onSelect={(option) => appendStage(option.id)} onPreview={onRelationPreview} />
+      <RelationCandidatePicker label="+ Add next step" options={nextStageCandidates.map(optionFor)} onSelect={appendStage} onPreview={onRelationPreview} />
     </div>
   </>
 }
