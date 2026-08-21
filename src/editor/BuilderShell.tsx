@@ -11,7 +11,7 @@ import type { ConnectionDraft } from './connection'
 import type { RelationPreview } from './RelationCandidatePicker'
 
 export function BuilderShell({ presentation = false, onExport }: { presentation?: boolean; onExport?: () => void }) {
-  const { document, selection, setSelection, commit } = useDocumentStore()
+  const { document, selection, setSelection, commit, persistenceError, syncReady } = useDocumentStore()
   const appRef = useRef<HTMLDivElement | null>(null)
   const [editable, setEditable] = useState(!presentation)
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null)
@@ -87,7 +87,10 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
     setConnectionDraft(null)
   }
 
+  if (!syncReady) return <main className="map-load-state"><span>Connecting to the shared workspace…</span></main>
+
   return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${selection || connectionDraft ? 'has-inspector' : ''}`}>
+    {persistenceError ? <div className="sync-error" role="alert">{persistenceError}</div> : null}
     <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditable} onExport={onExport} />
     <main className="map-workspace">
       <LeftRail activeFlowId={activeFlowId} onActiveFlow={setActiveFlowId} editable={editable} />

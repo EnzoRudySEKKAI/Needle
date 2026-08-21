@@ -84,9 +84,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .card-actions button:first-child { border-color: var(--accent); color: var(--accent); }
 .card-actions .delete-map-button { color: var(--danger); }
 .library-empty { width: 100%; margin: 0; padding: 36px 0; color: var(--ink-3); font-size: 13px; }
+.library-error { margin: 0 0 18px; color: var(--danger); font-size: 13px; }
+.publish-local-button { margin: 0 0 24px; border: 0; border-radius: 4px; background: var(--accent-wash); color: var(--accent); padding: 11px 14px; font: 500 10px var(--mono); text-transform: uppercase; }
+.map-load-state { min-height: 100vh; display: grid; place-content: center; gap: 8px; text-align: center; color: var(--ink-2); background: var(--surface); }
+.map-load-state strong { color: var(--ink); }
 
 /* Map shell */
-.map-app { height: 100vh; min-width: 900px; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+.map-app { position: relative; height: 100vh; min-width: 900px; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+.sync-error { position: absolute; top: 66px; left: 50%; z-index: 20; max-width: min(520px, calc(100% - 32px)); transform: translateX(-50%); border-radius: 5px; background: var(--danger); color: #fff; padding: 9px 12px; box-shadow: 0 8px 24px color-mix(in srgb, var(--danger) 25%, transparent); font-size: 12px; }
 .map-header { height: 58px; flex: 0 0 58px; display: flex; align-items: stretch; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 94%, transparent); z-index: 10; }
 .map-header > .brand { width: 184px; padding: 0 18px; flex-shrink: 0; }
 .header-cell { min-width: 84px; padding: 0 13px; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid var(--border); }
