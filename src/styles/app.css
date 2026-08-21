@@ -122,8 +122,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .payload-key { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 
 /* Rail */
+.rail-tabs { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px; gap: 3px; background: var(--surface); }
+.rail-tabs button { min-width: 0; padding: 8px 3px; border: 0; border-radius: 3px; background: transparent; color: var(--ink-3); font: 500 8px var(--mono); text-transform: uppercase; }
+.rail-tabs button.is-active { background: var(--accent-wash); color: var(--accent); }
 .rail-section { padding: 16px 14px 0; }
-.rail-flows { position: sticky; top: 0; z-index: 2; padding-bottom: 15px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.rail-flows { padding-bottom: 15px; background: var(--surface); }
 .rail-heading { display: flex; align-items: center; justify-content: space-between; color: var(--ink-3); font: 10px var(--mono); text-transform: uppercase; letter-spacing: .7px; }
 .rail-heading button { width: 24px; height: 24px; padding: 0; border: 1px solid var(--border); background: transparent; }
 .flow-list { margin-top: 8px; }
@@ -202,7 +205,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .route-builder button span { color: var(--ink-3); font: 9px var(--mono); }
 .route-builder button.is-selected { color: var(--accent); background: var(--accent-wash); }
 .flow-steps { padding-left: 20px; color: var(--ink-2); font-size: 12px; line-height: 1.9; }
-.rail-relations { max-height: 210px; overflow-y: auto; border-bottom: 1px solid var(--border); }
+.rail-relations { padding-bottom: 15px; }
 .relation-list { display: flex; flex-direction: column; gap: 3px; }
 .relation-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px; }
 .relation-row > button:first-child { min-width: 0; display: grid; grid-template-columns: 25px minmax(0, 1fr) 25px; align-items: center; gap: 5px; padding: 7px 5px; border: 0; background: transparent; text-align: left; }
@@ -346,11 +349,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .header-actions { padding-right: 8px; }
   .map-workspace { position: relative; display: block; }
   .stage-column { height: 100%; }
-  .left-rail { position: absolute; left: 8px; right: 8px; bottom: 40px; height: 158px; z-index: 8; display: flex; overflow-x: auto; border: 1px solid var(--border); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
-  .rail-flows { width: 164px; flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--border); border-bottom: 0; }
-  .rail-relations { min-width: 210px; max-height: none; flex-shrink: 0; border-right: 1px solid var(--border); border-bottom: 0; }
-  .rail-neighborhoods { display: flex; flex-shrink: 0; overflow: visible; }
-  .rail-neighborhoods .rail-section { min-width: 180px; }
+  .left-rail { position: absolute; left: 8px; right: 8px; bottom: 40px; height: 190px; z-index: 8; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
+  .rail-tabs { padding: 6px; }
+  .rail-neighborhoods { padding-bottom: 12px; }
   .inspector { display: none; }
   .map-app.has-inspector .left-rail { display: none; }
   .map-app.has-inspector .inspector { position: absolute; right: 8px; bottom: 40px; left: 8px; z-index: 9; display: block; width: auto; max-height: min(46vh, 390px); border: 1px solid var(--border); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }

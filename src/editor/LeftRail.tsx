@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { codeFromName, makeId } from '../domain/id'
 import { deleteRelationsCascade } from '../domain/commands'
 import type { Selection } from '../domain/types'
@@ -6,6 +7,13 @@ import { useDocumentStore } from './document-store'
 
 export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; editable: boolean }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
+  const [activeTab, setActiveTab] = useState<'scenarios' | 'relations' | 'concepts'>('scenarios')
+
+  useEffect(() => {
+    if (selection?.kind === 'flow') setActiveTab('scenarios')
+    else if (selection?.kind === 'relation') setActiveTab('relations')
+    else if (selection?.kind === 'node' || selection?.kind === 'group') setActiveTab('concepts')
+  }, [selection])
 
   const addGroup = () => {
     const id = makeId('group')
@@ -42,7 +50,10 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
 
   return (
     <aside className="left-rail">
-      <section className="rail-section rail-flows">
+      <div className="rail-tabs" role="tablist" aria-label="Map content">
+        {(['scenarios', 'relations', 'concepts'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setActiveTab(tab)}>{tab}</button>)}
+      </div>
+      {activeTab === 'scenarios' ? <section className="rail-section rail-flows" role="tabpanel">
         <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario">+</button> : null}</div>
         <div className="flow-list">
           {document.flows.map((flow, index) => (
@@ -52,8 +63,8 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
           ))}
           {document.flows.length === 0 ? <p className="rail-empty">No scenario yet.</p> : null}
         </div>
-      </section>
-      <section className="rail-section rail-relations">
+      </section> : null}
+      {activeTab === 'relations' ? <section className="rail-section rail-relations" role="tabpanel">
         <div className="rail-heading"><span>Relations</span><span>{document.relations.length}</span></div>
         <div className="relation-list">
           {document.relations.map((relation) => {
@@ -63,8 +74,8 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
           })}
           {document.relations.length === 0 ? <p className="rail-empty">No relation yet.</p> : null}
         </div>
-      </section>
-      <div className="rail-neighborhoods">
+      </section> : null}
+      {activeTab === 'concepts' ? <div className="rail-neighborhoods" role="tabpanel">
         {document.groups.map((group) => (
           <section className="rail-section" key={group.id}>
             <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id).length}</span></button>
@@ -77,7 +88,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
           </section>
         ))}
         {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
-      </div>
+      </div> : null}
     </aside>
   )
 }

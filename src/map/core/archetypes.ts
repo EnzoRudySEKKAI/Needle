@@ -19,6 +19,14 @@ function boxFaces(footprint: Footprint, z0: number, z1: number, hatch = false): 
   ]
 }
 
+function verticalFace(a: { gx: number; gy: number }, b: { gx: number; gy: number }, z0: number, z1: number, shade: 'left' | 'right', hatch = false): Face {
+  return { points: [toScreen(a.gx, a.gy, z1), toScreen(b.gx, b.gy, z1), toScreen(b.gx, b.gy, z0), toScreen(a.gx, a.gy, z0)], shade, hatch }
+}
+
+function topFace(points: { gx: number; gy: number }[], height: number): Face {
+  return { points: points.map((point) => toScreen(point.gx, point.gy, height)), shade: 'top' }
+}
+
 export function buildingFaces(archetype: Archetype, footprint: Footprint, height: number, propertyCount: number): Face[] {
   if (archetype === 'tower') return boxFaces(footprint, 0, height, true)
   if (archetype === 'slab-stack') {
@@ -55,23 +63,63 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     ]
   }
   if (archetype === 'courtyard') {
-    const wing = Math.min(1, footprint.w * 0.23, footprint.d * 0.23)
-    const wallHeight = Math.max(0.9, height * 0.52)
+    const { gx, gy, w, d } = footprint
+    const wing = Math.min(w * 0.27, d * 0.27)
+    const innerLeft = gx + wing
+    const innerRight = gx + w - wing
+    const innerBack = gy + d - wing
     return [
-      ...boxFaces({ gx: footprint.gx, gy: footprint.gy, w: wing, d: footprint.d }, 0, wallHeight),
-      ...boxFaces({ gx: footprint.gx + footprint.w - wing, gy: footprint.gy, w: wing, d: footprint.d }, 0, wallHeight),
-      ...boxFaces({ gx: footprint.gx + wing, gy: footprint.gy + footprint.d - wing, w: footprint.w - wing * 2, d: wing }, 0, wallHeight),
+      verticalFace({ gx, gy: gy + d }, { gx: gx + w, gy: gy + d }, 0, height, 'left'),
+      verticalFace({ gx: gx + w, gy }, { gx: gx + w, gy: gy + d }, 0, height, 'right'),
+      verticalFace({ gx: innerLeft, gy }, { gx: innerLeft, gy: innerBack }, 0, height, 'right'),
+      verticalFace({ gx: innerLeft, gy: innerBack }, { gx: innerRight, gy: innerBack }, 0, height, 'left'),
+      verticalFace({ gx, gy }, { gx: innerLeft, gy }, 0, height, 'left'),
+      verticalFace({ gx: innerRight, gy }, { gx: gx + w, gy }, 0, height, 'left'),
+      topFace([
+        { gx, gy },
+        { gx: innerLeft, gy },
+        { gx: innerLeft, gy: innerBack },
+        { gx: innerRight, gy: innerBack },
+        { gx: innerRight, gy },
+        { gx: gx + w, gy },
+        { gx: gx + w, gy: gy + d },
+        { gx, gy: gy + d },
+      ], height),
     ]
   }
   if (archetype === 'bridge') {
-    const towerWidth = footprint.w * 0.27
-    const towerHeight = Math.max(1.6, height)
-    const deckBottom = towerHeight * 0.48
-    const deckTop = towerHeight * 0.66
+    const { gx, gy, w, d } = footprint
+    const support = w * 0.24
+    const openingLeft = gx + support
+    const openingRight = gx + w - support
+    const beamBottom = height * 0.64
     return [
-      ...boxFaces({ ...footprint, w: towerWidth }, 0, towerHeight, true),
-      ...boxFaces({ gx: footprint.gx + footprint.w - towerWidth, gy: footprint.gy, w: towerWidth, d: footprint.d }, 0, towerHeight, true),
-      ...boxFaces({ gx: footprint.gx + towerWidth, gy: footprint.gy + footprint.d * 0.22, w: footprint.w - towerWidth * 2, d: footprint.d * 0.56 }, deckBottom, deckTop),
+      {
+        points: [
+          toScreen(gx, gy + d, height),
+          toScreen(gx + w, gy + d, height),
+          toScreen(gx + w, gy + d, 0),
+          toScreen(openingRight, gy + d, 0),
+          toScreen(openingRight, gy + d, beamBottom),
+          toScreen(openingLeft, gy + d, beamBottom),
+          toScreen(openingLeft, gy + d, 0),
+          toScreen(gx, gy + d, 0),
+        ],
+        shade: 'left',
+        hatch: true,
+      },
+      verticalFace({ gx: gx + w, gy }, { gx: gx + w, gy: gy + d }, 0, height, 'right', true),
+      verticalFace({ gx: openingLeft, gy }, { gx: openingLeft, gy: gy + d }, 0, beamBottom, 'right', true),
+      {
+        points: [
+          toScreen(openingLeft, gy, beamBottom),
+          toScreen(openingRight, gy, beamBottom),
+          toScreen(openingRight, gy + d, beamBottom),
+          toScreen(openingLeft, gy + d, beamBottom),
+        ],
+        shade: 'left',
+      },
+      topFace([{ gx, gy }, { gx: gx + w, gy }, { gx: gx + w, gy: gy + d }, { gx, gy: gy + d }], height),
     ]
   }
   if (archetype === 'stepped-pyramid') {
