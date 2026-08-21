@@ -127,7 +127,6 @@ function towerGeometry(count: number): StructureGeometry {
   const floors: StructureFloorSlot[] = []
   const layers: StructurePaintLayer[] = [layer('tower-site', shellOwner, [], [
     path(open([towerProject(-174, -112, 0), towerProject(174, -112, 0), towerProject(174, 112, 0), towerProject(-174, 112, 0), towerProject(-174, -112, 0)]), 'secondary'),
-    path(open([towerProject(-178, 116, 0), towerProject(178, 116, 0)]), 'primary'),
     path(open([towerProject(-124, 104, 1), towerProject(-70, 104, 1), towerProject(-70, 114, 1), towerProject(-124, 114, 1)]), 'detail'),
     path(open([towerProject(70, 104, 1), towerProject(124, 104, 1), towerProject(124, 114, 1), towerProject(70, 114, 1)]), 'detail'),
   ])]
@@ -169,8 +168,6 @@ function towerGeometry(count: number): StructureGeometry {
     path(`M ${number(mastBase.x)} ${number(mastBase.y)} V ${number(mastBase.y - 58)}`, 'primary'),
     path(`M ${number(mastBase.x - 18)} ${number(mastBase.y - 38)} H ${number(mastBase.x + 18)} M ${number(mastBase.x - 11)} ${number(mastBase.y - 49)} H ${number(mastBase.x + 11)}`, 'detail'),
   ]))
-  const entrance = rectVolume({ x: -48, y: 92, w: 96, d: 20 }, 0, 11, towerProject)
-  layers.push(layer('tower-entrance', shellOwner, entrance.faces, entrance.strokes))
 
   return {
     type: 'tower',
@@ -253,12 +250,6 @@ function campusGeometry(count: number): StructureGeometry {
       const skylight = rectVolume(rect, totalHeight, totalHeight + 10, campusProject)
       layers.push(layer(`campus-skylight-${index}`, shellOwner, skylight.faces, skylight.strokes))
     })
-  const entrance = rectVolume({ x: -60, y: 154, w: 120, d: 28 }, 0, 13, campusProject)
-  layers.push(layer('campus-entrance', shellOwner, entrance.faces, [
-    ...entrance.strokes,
-    path(open([campusProject(-184, 193, 0), campusProject(184, 193, 0)]), 'primary'),
-  ]))
-
   return {
     type: 'campus',
     structureBounds: { x: -330, y: -250, width: 660, height: 420 },
@@ -338,8 +329,6 @@ function shipGeometry(count: number): StructureGeometry {
     closed([hullTop[4]!, keel[2]!, keel[3]!, hullTop[5]!]),
   ], [
     path(`${move(hullTop[2]!)} ${line(keel[0]!)} ${line(keel[1]!)} ${line(keel[2]!)} ${line(keel[3]!)} ${line(hullTop[5]!)}`, 'primary'),
-    path(`${move(hullTop[3]!)} ${line(keel[1]!)} ${line(hullTop[4]!)}`, 'secondary'),
-    path(open([shipProject(-245, mainPlan.width, -17), shipProject(240, mainPlan.width, -17)]), 'detail'),
     path(`${move(shipProject(mainPlan.bow + 23, mainPlan.width * .32, -15))} l 18 -2 l -10 15 Z`, 'secondary'),
   ])]
   const floors: StructureFloorSlot[] = []
@@ -380,19 +369,7 @@ function shipGeometry(count: number): StructureGeometry {
     path(open([shipProject(-220, roofPlan.width, totalHeight + 13), shipProject(226, roofPlan.width, totalHeight + 13)]), 'detail'),
   ]))
 
-  const lounge = rectVolume({ x: -142, y: -40, w: 98, d: 80 }, totalHeight, totalHeight + 22, shipProject)
-  layers.push(layer('ship-lounge', shellOwner, lounge.faces, lounge.strokes))
-  const bridgeRect = { x: 74, y: -44, w: 122, d: 88 }
-  const bridge = rectVolume(bridgeRect, totalHeight, totalHeight + 32, shipProject)
-  const bridgeTop = contour(bridgeRect, totalHeight + 32, shipProject)
-  layers.push(layer('ship-bridge', shellOwner, bridge.faces, [
-    ...bridge.strokes,
-    path(`${move(interpolate(bridgeTop[1]!, bridgeTop[2]!, .18))} ${line(interpolate(bridgeTop[1]!, bridgeTop[2]!, .82))}`, 'detail'),
-    path(`${move(interpolate(bridgeTop[2]!, bridgeTop[3]!, .12))} ${line(interpolate(bridgeTop[2]!, bridgeTop[3]!, .88))}`, 'detail'),
-  ]))
-  const funnel = rectVolume({ x: -28, y: -23, w: 48, d: 46 }, totalHeight + 22, totalHeight + 69, shipProject)
-  layers.push(layer('ship-funnel', shellOwner, funnel.faces, funnel.strokes))
-  const mast = shipProject(154, 0, totalHeight + 32)
+  const mast = shipProject(154, 0, totalHeight)
   layers.push(layer('ship-mast', shellOwner, [], [
     path(`M ${number(mast.x)} ${number(mast.y)} v -57`, 'primary'),
     path(`M ${number(mast.x - 18)} ${number(mast.y - 38)} h 36 M ${number(mast.x - 11)} ${number(mast.y - 48)} h 22`, 'detail'),
