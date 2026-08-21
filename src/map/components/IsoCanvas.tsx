@@ -72,9 +72,9 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, relatio
   const camera = cameraOverride ?? fitted
 
   useEffect(() => {
-    configureFlow(program, true)
+    configureFlow(program, !editable)
     return () => configureFlow(null)
-  }, [program])
+  }, [editable, program])
 
   useEffect(() => {
     const committed = committedDrag.current

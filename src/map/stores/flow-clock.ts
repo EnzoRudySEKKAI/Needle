@@ -70,7 +70,7 @@ export function useClockState() {
 
 export function useClockActiveKey(): string {
   return useSyncExternalStore(subscribe, () => {
-    if (!state.program) return 'none'
+    if (!state.program || !state.playing) return 'none'
     const active = activeStageState(state.program, state.time)
     return `${state.program.id}:${active.index}:${active.phase}`
   }, () => 'none')
