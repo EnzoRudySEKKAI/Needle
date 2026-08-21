@@ -35,11 +35,24 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
   if (isOntologyDocument(value)) return value
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
-  if (legacy.schemaVersion !== 1 || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
+  if (![1, 2].includes(legacy.schemaVersion as number) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
   const migrated = {
     ...legacy,
     schemaVersion: SCHEMA_VERSION,
-    nodes: legacy.nodes.map((node) => ({ ...(node as object), faceTexture: 'auto' })),
+    nodes: legacy.nodes.map((node) => ({ faceTexture: 'auto', ...(node as object) })),
+    flows: legacy.flows.map((flow, flowIndex) => {
+      const legacyFlow = flow as Record<string, unknown>
+      const relationIds = Array.isArray(legacyFlow.relationIds) ? legacyFlow.relationIds : []
+      const rest = { ...legacyFlow }
+      delete rest.relationIds
+      return {
+        ...rest,
+        stages: relationIds.map((relationId, stageIndex) => ({
+          id: `migrated-${flowIndex}-${stageIndex}`,
+          traversals: [{ id: `migrated-${flowIndex}-${stageIndex}-a`, relationId, direction: 'forward' }],
+        })),
+      }
+    }),
   }
   return isOntologyDocument(migrated) ? migrated : null
 }

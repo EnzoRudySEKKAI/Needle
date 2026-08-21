@@ -90,6 +90,13 @@ export function chipAnchor(footprint: Footprint, height: number): ScreenPoint {
   return toScreen(footprint.gx + footprint.w / 2, footprint.gy + footprint.d / 2, height)
 }
 
-export function portAnchor(footprint: Footprint): { gx: number; gy: number } {
-  return { gx: footprint.gx + footprint.w / 2, gy: footprint.gy + footprint.d }
+export type PortSide = 'north' | 'east' | 'south' | 'west'
+
+export function portAnchors(footprint: Footprint): Record<PortSide, { gx: number; gy: number }> {
+  return {
+    north: { gx: footprint.gx + footprint.w / 2, gy: footprint.gy },
+    east: { gx: footprint.gx + footprint.w, gy: footprint.gy + footprint.d / 2 },
+    south: { gx: footprint.gx + footprint.w / 2, gy: footprint.gy + footprint.d },
+    west: { gx: footprint.gx, gy: footprint.gy + footprint.d / 2 },
+  }
 }

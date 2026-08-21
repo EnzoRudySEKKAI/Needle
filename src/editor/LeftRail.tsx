@@ -23,7 +23,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
 
   const addFlow = () => {
     const id = makeId('flow')
-    commit((current) => ({ ...current, flows: [...current.flows, { id, name: 'New scenario', payload: 'payload', summary: 'Explain what this journey accomplishes.', relationIds: [] }] }))
+    commit((current) => ({ ...current, flows: [...current.flows, { id, name: 'New scenario', payload: 'payload', summary: 'Explain what this journey accomplishes.', stages: [] }] }))
     setSelection({ kind: 'flow', id })
     onActiveFlow(id)
   }

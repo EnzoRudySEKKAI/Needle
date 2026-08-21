@@ -12,9 +12,12 @@ type BuildingProps = {
   onSelect: () => void
   onMove: (gx: number, gy: number) => void
   cameraScale: number
+  connectionSource?: boolean
+  connectionTarget?: boolean
+  connectionMode?: boolean
 }
 
-function BuildingInner({ node, selected, dimmed, active, editable, onSelect, onMove, cameraScale }: BuildingProps) {
+function BuildingInner({ node, selected, dimmed, active, editable, onSelect, onMove, cameraScale, connectionSource = false, connectionTarget = false, connectionMode = false }: BuildingProps) {
   const faces = buildingFaces(node.archetype, node.footprint, node.height, node.properties.length)
   const chip = chipAnchor(node.footprint, node.height)
   const label = selected || active ? `${node.code} · ${node.name}` : node.code
@@ -22,7 +25,7 @@ function BuildingInner({ node, selected, dimmed, active, editable, onSelect, onM
 
   return (
     <g
-      className={`building ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''}`}
+      className={`building ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${connectionSource ? 'is-connect-source' : ''} ${connectionTarget ? 'is-connect-target' : ''}`}
       opacity={dimmed ? 0.28 : 1}
       role="button"
       tabIndex={0}
@@ -30,7 +33,9 @@ function BuildingInner({ node, selected, dimmed, active, editable, onSelect, onM
       onClick={(event) => { event.stopPropagation(); onSelect() }}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect() }}
       onPointerDown={(event) => {
-        if (!editable || event.button !== 0) return
+        if (event.button !== 0) return
+        if (connectionMode) { event.stopPropagation(); return }
+        if (!editable) return
         event.stopPropagation()
         const target = event.currentTarget
         target.setPointerCapture(event.pointerId)

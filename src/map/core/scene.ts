@@ -13,12 +13,12 @@ export type District = {
 export type Scene = { key: string; shapes: VisualNode[]; districts: District[]; grid: { key: string; a: ScreenPoint; b: ScreenPoint }[]; bounds: ReturnType<typeof sceneBounds> }
 export type Camera = { x: number; y: number; k: number }
 
-function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNode[]): District[] {
+function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], flagWidths: ReadonlyMap<string, number>): District[] {
   return groups.flatMap((group) => {
     const members = nodes.filter((node) => node.groupId === group.id)
     if (members.length === 0) return []
-    const displayName = group.name.length > 24 ? `${group.name.slice(0, 23)}…` : group.name
-    const labelWidth = Math.min(180, Math.max(68, displayName.length * 6.2 + 12))
+    const displayName = group.name
+    const labelWidth = flagWidths.get(group.id) ?? Math.max(24, displayName.length * 4.9 + 12)
     const frontPadding = Math.max(3.2, labelWidth / 24 + 1.5)
     const gx0 = Math.min(...members.map((node) => node.footprint.gx)) - 1.2
     const gy0 = Math.min(...members.map((node) => node.footprint.gy)) - 1.2
@@ -37,9 +37,9 @@ function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNo
   })
 }
 
-export function buildScene(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], key: string): Scene {
+export function buildScene(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], key: string, flagWidths: ReadonlyMap<string, number> = new Map()): Scene {
   const shapes = [...nodes].sort((a, b) => depthKey(a.footprint) - depthKey(b.footprint))
-  const districts = districtsFor(groups, nodes)
+  const districts = districtsFor(groups, nodes, flagWidths)
   const extents = [...shapes.map((node) => ({ footprint: node.footprint, height: node.height })), ...districts.map((district) => ({ footprint: district.rect, height: 0 }))]
   const bounds = sceneBounds(extents)
   if (extents.length === 0) return { key, shapes, districts, grid: [], bounds }

@@ -38,9 +38,9 @@ export const SAMPLE_MAP: OntologyDocument = {
     { id: 'habitat-observer', from: 'habitat', to: 'observer', kind: 'retry', label: 'new observation', via: [{ gx: 22, gy: 2 }, { gx: 7, gy: -2 }] },
   ],
   flows: [
-    { id: 'raise-alert', name: 'Raise an alert', payload: 'evidence', summary: 'Carries a field report from observation to a local response.', relationIds: ['ob-intake', 'intake-correlation', 'correlation-review', 'review-dispatch', 'dispatch-steward'] },
-    { id: 'sense-change', name: 'Sense a change', payload: 'telemetry', summary: 'Turns ambient readings into a pattern ready for expert review.', relationIds: ['sn-intake', 'intake-correlation', 'correlation-review'] },
-    { id: 'close-loop', name: 'Close the loop', payload: 'field outcome', summary: 'Follows a verified alert through action and back into observation.', relationIds: ['review-dispatch', 'dispatch-steward', 'steward-habitat', 'habitat-observer', 'ob-intake'] },
+    { id: 'raise-alert', name: 'Raise an alert', payload: 'evidence', summary: 'Carries a field report from observation to a local response.', stages: ['ob-intake', 'intake-correlation', 'correlation-review', 'review-dispatch', 'dispatch-steward'].map((relationId, index) => ({ id: `raise-${index}`, traversals: [{ id: `raise-${index}-a`, relationId, direction: 'forward' as const }] })) },
+    { id: 'sense-change', name: 'Sense a change', payload: 'telemetry', summary: 'Turns ambient readings into a pattern ready for expert review.', stages: ['sn-intake', 'intake-correlation', 'correlation-review'].map((relationId, index) => ({ id: `sense-${index}`, traversals: [{ id: `sense-${index}-a`, relationId, direction: 'forward' as const }] })) },
+    { id: 'close-loop', name: 'Close the loop', payload: 'field outcome', summary: 'Follows a verified alert through action and back into observation.', stages: ['review-dispatch', 'dispatch-steward', 'steward-habitat', 'habitat-observer', 'ob-intake'].map((relationId, index) => ({ id: `close-${index}`, traversals: [{ id: `close-${index}-a`, relationId, direction: 'forward' as const }] })) },
   ],
 }
 

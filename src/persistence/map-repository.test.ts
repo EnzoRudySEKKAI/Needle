@@ -6,13 +6,20 @@ describe('map migrations', () => {
   it('adds automatic face texture to version 1 documents', () => {
     const legacy = structuredClone(cloneSample()) as unknown as Record<string, unknown>
     legacy.schemaVersion = 1
+    legacy.flows = (legacy.flows as Record<string, unknown>[]).map((flow) => {
+      const copy = { ...flow }
+      copy.relationIds = (copy.stages as { traversals: { relationId: string }[] }[]).flatMap((stage) => stage.traversals.map((traversal) => traversal.relationId))
+      delete copy.stages
+      return copy
+    })
     legacy.nodes = (legacy.nodes as Record<string, unknown>[]).map((node) => {
       const copy = { ...node }
       delete copy.faceTexture
       return copy
     })
     const migrated = migrateDocument(legacy)
-    expect(migrated?.schemaVersion).toBe(2)
+    expect(migrated?.schemaVersion).toBe(3)
     expect(migrated?.nodes.every((node) => node.faceTexture === 'auto')).toBe(true)
+    expect(migrated?.flows[0]?.stages.length).toBeGreaterThan(0)
   })
 })

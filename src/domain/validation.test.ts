@@ -9,8 +9,8 @@ describe('ontology validation', () => {
 
   it('reports a discontinuous scenario', () => {
     const document = cloneSample()
-    document.flows[0]!.relationIds = ['ob-intake', 'review-dispatch']
-    expect(validateDocument(document)).toContainEqual(expect.objectContaining({ message: 'Raise an alert is not a continuous path.' }))
+    document.flows[0]!.stages = [document.flows[0]!.stages[0]!, document.flows[0]!.stages[3]!]
+    expect(validateDocument(document)).toContainEqual(expect.objectContaining({ message: 'Raise an alert has a branch disconnected from the previous step.' }))
   })
 
   it('reports a relation to a missing concept', () => {

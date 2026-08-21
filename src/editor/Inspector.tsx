@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { deleteGroupCascade } from '../domain/commands'
+import { canAppendFlowFrom, flowRelationIds } from '../domain/flows'
 import { makeId } from '../domain/id'
-import type { OntologyDocument, OntologyFlow, OntologyGroup, OntologyNode, OntologyRelation, Selection } from '../domain/types'
+import type { OntologyDocument, OntologyGroup, OntologyNode, OntologyRelation, Selection } from '../domain/types'
 import { validateDocument } from '../domain/validation'
 import { useDocumentStore } from './document-store'
 import { BuildingAppearancePicker } from './BuildingAppearancePicker'
+import type { ConnectionDraft } from './connection'
+import { ScenarioInspector } from './ScenarioInspector'
 
 function Field({ label, value, onChange, multiline = false, type = 'text' }: { label: string; value: string | number; onChange: (value: string) => void; multiline?: boolean; type?: string }) {
   return <label className="field"><span>{label}</span>{multiline ? <textarea value={value} rows={4} onChange={(event) => onChange(event.target.value)} /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />}</label>
@@ -22,11 +25,7 @@ function updateRelation(document: OntologyDocument, id: string, patch: Partial<O
   return { ...document, relations: document.relations.map((relation) => relation.id === id ? { ...relation, ...patch } : relation) }
 }
 
-function updateFlow(document: OntologyDocument, id: string, patch: Partial<OntologyFlow>): OntologyDocument {
-  return { ...document, flows: document.flows.map((flow) => flow.id === id ? { ...flow, ...patch } : flow) }
-}
-
-export function Inspector({ editable, onActiveFlow }: { editable: boolean; onActiveFlow: (id: string | null) => void }) {
+export function Inspector({ editable, onActiveFlow, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; onActiveFlow: (id: string | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
   const diagnostics = validateDocument(document)
   const node = selection?.kind === 'node' ? document.nodes.find((item) => item.id === selection.id) : null
@@ -36,14 +35,19 @@ export function Inspector({ editable, onActiveFlow }: { editable: boolean; onAct
   const [pendingGroupDelete, setPendingGroupDelete] = useState<OntologyGroup | null>(null)
   const remove = (selection: Selection) => {
     commit((current) => {
-      if (selection.kind === 'node') return { ...current, nodes: current.nodes.filter((item) => item.id !== selection.id), relations: current.relations.filter((item) => item.from !== selection.id && item.to !== selection.id), flows: current.flows.map((item) => ({ ...item, relationIds: item.relationIds.filter((id) => current.relations.some((relation) => relation.id === id && relation.from !== selection.id && relation.to !== selection.id)) })) }
-      if (selection.kind === 'relation') return { ...current, relations: current.relations.filter((item) => item.id !== selection.id), flows: current.flows.map((item) => ({ ...item, relationIds: item.relationIds.filter((id) => id !== selection.id) })) }
+      if (selection.kind === 'node') {
+        const removedRelationIds = new Set(current.relations.filter((item) => item.from === selection.id || item.to === selection.id).map((item) => item.id))
+        return { ...current, nodes: current.nodes.filter((item) => item.id !== selection.id), relations: current.relations.filter((item) => !removedRelationIds.has(item.id)), flows: current.flows.map((item) => ({ ...item, stages: item.stages.map((stage) => ({ ...stage, traversals: stage.traversals.filter((traversal) => !removedRelationIds.has(traversal.relationId)) })).filter((stage) => stage.traversals.length > 0) })) }
+      }
+      if (selection.kind === 'relation') return { ...current, relations: current.relations.filter((item) => item.id !== selection.id), flows: current.flows.map((item) => ({ ...item, stages: item.stages.map((stage) => ({ ...stage, traversals: stage.traversals.filter((traversal) => traversal.relationId !== selection.id) })).filter((stage) => stage.traversals.length > 0) })) }
       if (selection.kind === 'flow') return { ...current, flows: current.flows.filter((item) => item.id !== selection.id) }
       return deleteGroupCascade(current, selection.id)
     })
     setSelection(null)
     onActiveFlow(null)
   }
+
+  if (connectionDraft) return <aside key="connection" className="inspector"><ConnectionInspector draft={connectionDraft} document={document} onUpdate={onUpdateConnection} onCancel={onCancelConnection} onCommit={onCommitConnection} /></aside>
 
   if (!selection) return (
     <aside className="inspector intro-panel">
@@ -60,11 +64,11 @@ export function Inspector({ editable, onActiveFlow }: { editable: boolean; onAct
   )
 
   return <>
-    <aside className="inspector">
-      {node ? <NodeInspector node={node} editable={editable} commit={commit} setSelection={setSelection} document={document} /> : null}
+    <aside key={`${selection.kind}:${selection.id}`} className="inspector">
+      {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} onStartConnection={onStartConnection} /> : null}
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}
-      {flow ? <FlowInspector flow={flow} editable={editable} commit={commit} document={document} /> : null}
+      {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} /> : null}
       {editable ? <button type="button" className="danger-button" onClick={() => selection.kind === 'group' && group ? setPendingGroupDelete(group) : remove(selection)}>Delete {selection.kind}</button> : null}
     </aside>
     {pendingGroupDelete ? <GroupDeleteDialog group={pendingGroupDelete} document={document} onCancel={() => setPendingGroupDelete(null)} onConfirm={() => { remove({ kind: 'group', id: pendingGroupDelete.id }); setPendingGroupDelete(null) }} /> : null}
@@ -74,22 +78,21 @@ export function Inspector({ editable, onActiveFlow }: { editable: boolean; onAct
 function GroupDeleteDialog({ group, document, onCancel, onConfirm }: { group: OntologyGroup; document: OntologyDocument; onCancel: () => void; onConfirm: () => void }) {
   const nodeIds = new Set(document.nodes.filter((node) => node.groupId === group.id).map((node) => node.id))
   const relationIds = new Set(document.relations.filter((relation) => nodeIds.has(relation.from) || nodeIds.has(relation.to)).map((relation) => relation.id))
-  const stepCount = document.flows.reduce((count, flow) => count + flow.relationIds.filter((id) => relationIds.has(id)).length, 0)
+  const stepCount = document.flows.reduce((count, flow) => count + flowRelationIds(flow).filter((id) => relationIds.has(id)).length, 0)
   return <div className="dialog-backdrop" role="presentation" onMouseDown={onCancel}><section className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-group-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Destructive action</span><h2 id="delete-group-title">Delete “{group.name}”?</h2><p>{nodeIds.size} concepts, {relationIds.size} relations and {stepCount} scenario steps will be removed. Undo can restore the complete neighborhood during this session.</p><div><button type="button" onClick={onCancel}>Cancel</button><button type="button" className="confirm-delete" onClick={onConfirm}>Delete neighborhood</button></div></section></div>
 }
 
-function NodeInspector({ node, editable, commit, setSelection, document }: { node: OntologyNode; editable: boolean; commit: ReturnType<typeof useDocumentStore>['commit']; setSelection: (selection: Selection | null) => void; document: OntologyDocument }) {
+function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: { draft: ConnectionDraft; document: OntologyDocument; onUpdate: (draft: ConnectionDraft | null) => void; onCancel: () => void; onCommit: () => void }) {
+  const source = document.nodes.find((node) => node.id === draft.sourceId)
+  const compatibleFlows = document.flows.filter((flow) => canAppendFlowFrom(flow, document.relations, draft.sourceId))
+  return <><span className="eyebrow">Connection mode</span><h2>From {source?.name}</h2><p className="lede">Choose one or more concepts on the map. The nearest pair of anchors is selected automatically.</p><div className="connection-targets">{draft.targets.length === 0 ? <p>Nothing selected yet.</p> : draft.targets.map((target) => { const node = document.nodes.find((item) => item.id === target.nodeId); const outbound = target.direction === 'outbound'; return <div key={target.nodeId}><span className="node-code">{outbound ? source?.code : node?.code}</span><strong>{outbound ? source?.name : node?.name}</strong><button type="button" title="Reverse connection" onClick={() => onUpdate({ ...draft, targets: draft.targets.map((item) => item.nodeId === target.nodeId ? { ...item, direction: item.direction === 'outbound' ? 'inbound' : 'outbound' } : item) })}>→</button><span className="node-code">{outbound ? node?.code : source?.code}</span><strong>{outbound ? node?.name : source?.name}</strong><button type="button" aria-label={`Remove ${node?.name}`} onClick={() => onUpdate({ ...draft, targets: draft.targets.filter((item) => item.nodeId !== target.nodeId) })}>×</button></div> })}</div><div className="form-stack"><Field label="Relation label" value={draft.label} onChange={(label) => onUpdate({ ...draft, label })} /><label className="field"><span>Relation kind</span><select value={draft.kind} onChange={(event) => onUpdate({ ...draft, kind: event.target.value as ConnectionDraft['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label><label className="field"><span>Add as one parallel step</span><select value={draft.flowId ?? ''} onChange={(event) => onUpdate({ ...draft, flowId: event.target.value || null })}><option value="">No scenario</option>{compatibleFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label></div><div className="connection-actions"><button type="button" onClick={onCancel}>Cancel</button><button type="button" className="primary-action" disabled={draft.targets.length === 0} onClick={onCommit}>Create {draft.targets.length || ''} connection{draft.targets.length === 1 ? '' : 's'}</button></div></>
+}
+
+function NodeInspector({ node, editable, commit, document, onStartConnection }: { node: OntologyNode; editable: boolean; commit: ReturnType<typeof useDocumentStore>['commit']; document: OntologyDocument; onStartConnection: (sourceId: string) => void }) {
   const patch = (value: Partial<OntologyNode>) => commit((current) => updateNode(current, node.id, value))
-  const [firstTarget] = document.nodes.filter((item) => item.id !== node.id)
-  const addRelation = () => {
-    if (!firstTarget) return
-    const id = makeId('relation')
-    commit((current) => ({ ...current, relations: [...current.relations, { id, from: node.id, to: firstTarget.id, kind: 'flow', label: 'new relation' }] }))
-    setSelection({ kind: 'relation', id })
-  }
   return <>
     <span className="eyebrow">{node.code} · {node.kind}</span><h2>{node.name}</h2><p className="lede">{node.metric} {node.unit} · {node.role}</p>
-    {editable ? <div className="form-stack"><div className="field-pair"><Field label="Code" value={node.code} onChange={(value) => patch({ code: value.toUpperCase().slice(0, 3) })} /><Field label="Kind" value={node.kind} onChange={(value) => patch({ kind: value })} /></div><Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} /><Field label="Role in a flow" value={node.role} onChange={(value) => patch({ role: value })} /><div className="field-pair"><Field label="Weight" type="number" value={node.metric} onChange={(value) => patch({ metric: Math.max(0, Number(value)) })} /><Field label="Unit" value={node.unit} onChange={(value) => patch({ unit: value })} /></div><label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><BuildingAppearancePicker archetype={node.archetypeOverride} texture={node.faceTexture} onArchetype={(value) => patch({ archetypeOverride: value })} onTexture={(value) => patch({ faceTexture: value })} /><Field label="What it does" value={node.whatItDoes} multiline onChange={(value) => patch({ whatItDoes: value })} /><Field label="Why it is shaped this way" value={node.howItsBuilt} multiline onChange={(value) => patch({ howItsBuilt: value })} /><fieldset className="property-editor"><legend>Properties</legend>{node.properties.map((property) => <div key={property.id}><input aria-label="Property name" value={property.key} onChange={(event) => patch({ properties: node.properties.map((item) => item.id === property.id ? { ...item, key: event.target.value } : item) })} /><input aria-label="Property value" value={property.value} onChange={(event) => patch({ properties: node.properties.map((item) => item.id === property.id ? { ...item, value: event.target.value } : item) })} /><button type="button" aria-label="Remove property" onClick={() => patch({ properties: node.properties.filter((item) => item.id !== property.id) })}>×</button></div>)}<button type="button" onClick={() => patch({ properties: [...node.properties, { id: makeId('property'), key: 'attribute', value: 'value' }] })}>+ Add property</button></fieldset><button type="button" className="secondary-button" onClick={addRelation} disabled={!firstTarget}>Connect from this concept</button></div> : <><p>{node.whatItDoes}</p><p>{node.howItsBuilt}</p>{node.properties.length ? <dl className="node-properties">{node.properties.map((property) => <div key={property.id}><dt>{property.key}</dt><dd>{property.value}</dd></div>)}</dl> : null}</>}
+    {editable ? <div className="form-stack"><div className="field-pair"><Field label="Code" value={node.code} onChange={(value) => patch({ code: value.toUpperCase().slice(0, 3) })} /><Field label="Kind" value={node.kind} onChange={(value) => patch({ kind: value })} /></div><Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} /><Field label="Role in a flow" value={node.role} onChange={(value) => patch({ role: value })} /><div className="field-pair"><Field label="Weight" type="number" value={node.metric} onChange={(value) => patch({ metric: Math.max(0, Number(value)) })} /><Field label="Unit" value={node.unit} onChange={(value) => patch({ unit: value })} /></div><label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><BuildingAppearancePicker archetype={node.archetypeOverride} texture={node.faceTexture} onArchetype={(value) => patch({ archetypeOverride: value })} onTexture={(value) => patch({ faceTexture: value })} /><Field label="What it does" value={node.whatItDoes} multiline onChange={(value) => patch({ whatItDoes: value })} /><Field label="Why it is shaped this way" value={node.howItsBuilt} multiline onChange={(value) => patch({ howItsBuilt: value })} /><fieldset className="property-editor"><legend>Properties</legend>{node.properties.map((property) => <div key={property.id}><input aria-label="Property name" value={property.key} onChange={(event) => patch({ properties: node.properties.map((item) => item.id === property.id ? { ...item, key: event.target.value } : item) })} /><input aria-label="Property value" value={property.value} onChange={(event) => patch({ properties: node.properties.map((item) => item.id === property.id ? { ...item, value: event.target.value } : item) })} /><button type="button" aria-label="Remove property" onClick={() => patch({ properties: node.properties.filter((item) => item.id !== property.id) })}>×</button></div>)}<button type="button" onClick={() => patch({ properties: [...node.properties, { id: makeId('property'), key: 'attribute', value: 'value' }] })}>+ Add property</button></fieldset><button type="button" className="secondary-button connect-button" onClick={() => onStartConnection(node.id)} disabled={document.nodes.length < 2}>Connect from {node.name}</button></div> : <><p>{node.whatItDoes}</p><p>{node.howItsBuilt}</p>{node.properties.length ? <dl className="node-properties">{node.properties.map((property) => <div key={property.id}><dt>{property.key}</dt><dd>{property.value}</dd></div>)}</dl> : null}</>}
   </>
 }
 
@@ -97,15 +100,10 @@ function RelationInspector({ relation, editable, commit, document }: { relation:
   const patch = (value: Partial<OntologyRelation>) => commit((current) => updateRelation(current, relation.id, value))
   const from = document.nodes.find((node) => node.id === relation.from)?.name
   const to = document.nodes.find((node) => node.id === relation.to)?.name
-  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><p className="lede">{from} → {to}</p>{editable ? <div className="form-stack"><Field label="Label" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
+  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><strong>{from}</strong><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><strong>{to}</strong></div>{editable ? <div className="form-stack"><Field label="Label" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
 }
 
 function GroupInspector({ group, editable, commit, document }: { group: OntologyGroup; editable: boolean; commit: ReturnType<typeof useDocumentStore>['commit']; document: OntologyDocument }) {
   const patch = (value: Partial<OntologyGroup>) => commit((current) => updateGroup(current, group.id, value))
   return <><span className="eyebrow">Neighborhood</span><h2>{group.name}</h2><p className="lede">{document.nodes.filter((node) => node.groupId === group.id).length} concepts</p>{editable ? <div className="form-stack"><Field label="Name" value={group.name} onChange={(value) => patch({ name: value })} /><Field label="Purpose" value={group.description} multiline onChange={(value) => patch({ description: value })} /></div> : <p>{group.description}</p>}</>
-}
-
-function FlowInspector({ flow, editable, commit, document }: { flow: OntologyFlow; editable: boolean; commit: ReturnType<typeof useDocumentStore>['commit']; document: OntologyDocument }) {
-  const patch = (value: Partial<OntologyFlow>) => commit((current) => updateFlow(current, flow.id, value))
-  return <><span className="eyebrow">Animated scenario</span><h2>{flow.name}</h2><p className="lede">{flow.relationIds.length} steps · {flow.payload}</p>{editable ? <div className="form-stack"><Field label="Name" value={flow.name} onChange={(value) => patch({ name: value })} /><Field label="Payload" value={flow.payload} onChange={(value) => patch({ payload: value })} /><Field label="Outcome" value={flow.summary} multiline onChange={(value) => patch({ summary: value })} /><fieldset className="route-builder"><legend>Route · choose in order</legend>{document.relations.map((relation) => { const selected = flow.relationIds.includes(relation.id); return <button type="button" key={relation.id} className={selected ? 'is-selected' : ''} onClick={() => patch({ relationIds: selected ? flow.relationIds.filter((id) => id !== relation.id) : [...flow.relationIds, relation.id] })}><span>{selected ? flow.relationIds.indexOf(relation.id) + 1 : '+'}</span>{relation.label}</button> })}</fieldset></div> : <><p>{flow.summary}</p><ol className="flow-steps">{flow.relationIds.map((id) => <li key={id}>{document.relations.find((relation) => relation.id === id)?.label ?? 'Missing relation'}</li>)}</ol></>}</>
 }
