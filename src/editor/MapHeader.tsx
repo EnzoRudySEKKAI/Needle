@@ -9,7 +9,7 @@ function toggleTheme() {
   localStorage.setItem('needle:theme', dark ? 'light' : 'dark')
 }
 
-export function MapHeader({ activeFlowId, editable, onEditable, onExport }: { activeFlowId: string | null; editable: boolean; onEditable?: (editable: boolean) => void; onExport?: () => void }) {
+export function MapHeader({ activeFlowId, editable, fullscreen, fullscreenError, onFullscreen, onEditable, onExport }: { activeFlowId: string | null; editable: boolean; fullscreen: boolean; fullscreenError: string | null; onFullscreen: () => void; onEditable?: (editable: boolean) => void; onExport?: () => void }) {
   const { document, selection, undo, redo, canUndo, canRedo } = useDocumentStore()
   const clock = useClockState()
   const selected = selection?.kind === 'node' ? document.nodes.find((node) => node.id === selection.id)?.name : selection?.kind ?? 'none'
@@ -27,6 +27,7 @@ export function MapHeader({ activeFlowId, editable, onEditable, onExport }: { ac
       <button type="button" disabled={!activeFlowId} onClick={stepFlow}>Step</button>
       <div className="speed-control">{[0.5, 1, 2].map((speed) => <button type="button" key={speed} className={clock.speed === speed ? 'is-active' : ''} onClick={() => setFlowSpeed(speed)}>{speed}×</button>)}</div>
       <button type="button" onClick={toggleTheme} title="Toggle theme">◐</button>
+      <button type="button" className="fullscreen-button" onClick={onFullscreen} title={fullscreenError ?? (fullscreen ? 'Exit fullscreen' : 'Enter fullscreen')}>{fullscreen ? 'Exit full' : 'Fullscreen'}</button>
       {onExport ? <button type="button" className="export-button" onClick={onExport}>Export</button> : null}
     </div>
   </header>

@@ -241,8 +241,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .scenario-branch .branch-direction { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
 .scenario-branch small { grid-column: 2 / -1; color: var(--ink-3); font: 8px var(--mono); }
 .scenario-branch.is-missing { color: var(--danger); font-size: 10px; }
-.add-branch-select, .add-stage-select { width: 100%; border: 0; background: var(--surface); color: var(--ink-3); padding: 8px; font: 8px var(--mono); text-transform: uppercase; }
-.add-stage-select { border: 1px solid var(--border); }
+.relation-candidate-picker { position: relative; }
+.relation-candidate-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; border: 0; background: var(--surface); color: var(--ink-3); padding: 8px; font: 8px var(--mono); text-align: left; text-transform: uppercase; }
+.form-stack > .relation-candidate-picker > .relation-candidate-trigger { border: 1px solid var(--border); }
+.relation-candidate-trigger:disabled { opacity: .45; cursor: default; }
+.relation-candidate-list { position: absolute; left: 0; right: 0; z-index: 12; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); background: var(--surface-raised); box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 14%, transparent); outline: none; }
+.relation-candidate-list [role='option'] { padding: 9px 10px; color: var(--ink-2); font-size: 10px; line-height: 1.35; cursor: pointer; }
+.relation-candidate-list [role='option'].is-active { background: var(--accent-wash); color: var(--accent); }
 
 /* SVG scene */
 .floor-grid line { stroke: var(--grid); stroke-width: 1; }
@@ -301,6 +306,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .payload-dot { fill: var(--accent); }
 .payload-halo { fill: var(--accent); opacity: .22; }
 .connection-preview { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 6 5; opacity: .8; animation: dash-march .55s linear infinite; }
+.candidate-relation-preview polyline { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 7 5; opacity: .95; animation: dash-march .55s linear infinite; }
+.candidate-relation-preview path { fill: var(--accent); }
 .connection-ports circle { fill: var(--surface); stroke: var(--structure); stroke-width: 1; cursor: crosshair; }
 .connection-ports .is-source, .connection-ports .is-target { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
 @keyframes dash-march { to { stroke-dashoffset: -16; } }
@@ -345,7 +352,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .map-app { min-width: 0; height: 100dvh; }
   .map-header { height: 54px; flex-basis: 54px; }
   .map-header > .brand { width: auto; padding: 0 12px; }
-  .map-header .brand span, .repository-cell, .header-actions > button:not(.export-button), .speed-control { display: none; }
+  .map-header .brand span, .repository-cell, .header-actions > button:not(.export-button):not(.fullscreen-button), .speed-control { display: none; }
   .header-actions { padding-right: 8px; }
   .map-workspace { position: relative; display: block; }
   .stage-column { height: 100%; }

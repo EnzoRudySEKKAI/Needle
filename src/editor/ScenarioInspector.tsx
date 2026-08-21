@@ -1,6 +1,7 @@
 import { resolveTraversal } from '../domain/flows'
 import { makeId } from '../domain/id'
 import type { FlowDirection, OntologyDocument, OntologyFlow, OntologyRelation } from '../domain/types'
+import { RelationCandidatePicker, type RelationCandidateOption, type RelationPreview } from './RelationCandidatePicker'
 
 type Commit = (transform: (document: OntologyDocument) => OntologyDocument) => void
 type TraversalCandidate = { relation: OntologyRelation; direction: FlowDirection }
@@ -22,7 +23,7 @@ function parseCandidate(value: string, relations: readonly OntologyRelation[]): 
   return relation && (direction === 'forward' || direction === 'reverse') ? { relation, direction } : null
 }
 
-export function ScenarioInspector({ flow, document, commit, editable }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean }) {
+export function ScenarioInspector({ flow, document, commit, editable, onRelationPreview }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean; onRelationPreview: (preview: RelationPreview | null) => void }) {
   const patch = (value: Partial<OntologyFlow>) => commit((current) => ({ ...current, flows: current.flows.map((item) => item.id === flow.id ? { ...item, ...value } : item) }))
   const nodeById = new Map(document.nodes.map((node) => [node.id, node]))
   const relationById = new Map(document.relations.map((relation) => [relation.id, relation]))
@@ -44,6 +45,7 @@ export function ScenarioInspector({ flow, document, commit, editable }: { flow: 
     const targetId = direction === 'forward' ? relation.to : relation.from
     return `${nodeById.get(sourceId)?.name} → ${nodeById.get(targetId)?.name} · ${relation.label}`
   }
+  const optionFor = (candidate: TraversalCandidate): RelationCandidateOption => ({ id: candidateValue(candidate), relationId: candidate.relation.id, direction: candidate.direction, label: candidateLabel(candidate) })
 
   if (!editable) return <><span className="eyebrow">Animated scenario</span><h2>{flow.name}</h2><p className="lede">{flow.stages.length} steps · {flow.payload}</p><p>{flow.summary}</p></>
 
@@ -75,11 +77,11 @@ export function ScenarioInspector({ flow, document, commit, editable }: { flow: 
               const removed = flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.filter((candidate) => candidate.id !== traversal.id) } : item).filter((item) => item.traversals.length > 0)
               return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><button type="button" className="branch-direction" title="Reverse in this scenario" onClick={() => patch({ stages: flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.map((candidate) => candidate.id === traversal.id ? { ...candidate, direction: candidate.direction === 'forward' ? 'reverse' : 'forward' } : candidate) } : item) })}>→</button><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span><button type="button" className="branch-remove" onClick={() => patch({ stages: removed })}>×</button><small>{relation.label}</small></div>
             })}
-            <select className="add-branch-select" value="" onChange={(event) => { if (event.target.value) addBranch(stageIndex, event.target.value) }}><option value="">+ Add parallel branch</option>{candidates.map((candidate) => <option key={candidateValue(candidate)} value={candidateValue(candidate)}>{candidateLabel(candidate)}</option>)}</select>
+            <RelationCandidatePicker label="+ Add parallel branch" options={candidates.map(optionFor)} onSelect={(option) => addBranch(stageIndex, option.id)} onPreview={onRelationPreview} />
           </section>
         })}
       </div>
-      <select className="add-stage-select" value="" onChange={(event) => { if (event.target.value) appendStage(event.target.value) }}><option value="">+ Add next step</option>{nextStageCandidates.map((candidate) => <option key={candidateValue(candidate)} value={candidateValue(candidate)}>{candidateLabel(candidate)}</option>)}</select>
+      <RelationCandidatePicker label="+ Add next step" options={nextStageCandidates.map(optionFor)} onSelect={(option) => appendStage(option.id)} onPreview={onRelationPreview} />
     </div>
   </>
 }

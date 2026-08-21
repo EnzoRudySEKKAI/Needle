@@ -8,6 +8,7 @@ import { BuildingAppearancePicker } from './BuildingAppearancePicker'
 import type { ConnectionDraft } from './connection'
 import { useDocumentStore } from './document-store'
 import { ScenarioInspector } from './ScenarioInspector'
+import type { RelationPreview } from './RelationCandidatePicker'
 
 type Commit = ReturnType<typeof useDocumentStore>['commit']
 
@@ -27,7 +28,7 @@ function updateRelation(document: OntologyDocument, id: string, patch: Partial<O
   return { ...document, relations: document.relations.map((relation) => relation.id === id ? { ...relation, ...patch } : relation) }
 }
 
-export function Inspector({ editable, onActiveFlow, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; onActiveFlow: (id: string | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
+export function Inspector({ editable, onActiveFlow, onRelationPreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; onActiveFlow: (id: string | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
   const diagnostics = validateDocument(document)
   const node = selection?.kind === 'node' ? document.nodes.find((item) => item.id === selection.id) : null
@@ -72,7 +73,7 @@ export function Inspector({ editable, onActiveFlow, connectionDraft, onStartConn
       {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} onStartConnection={onStartConnection} /> : null}
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}
-      {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} /> : null}
+      {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} onRelationPreview={onRelationPreview} /> : null}
       {editable ? <button type="button" className="danger-button" onClick={() => selection.kind === 'group' && group ? setPendingGroupDelete(group) : remove(selection)}>Delete {selection.kind}</button> : null}
     </aside>
     {pendingGroupDelete ? <GroupDeleteDialog group={pendingGroupDelete} document={document} onCancel={() => setPendingGroupDelete(null)} onConfirm={() => { remove({ kind: 'group', id: pendingGroupDelete.id }); setPendingGroupDelete(null) }} /> : null}
