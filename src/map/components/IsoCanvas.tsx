@@ -8,6 +8,7 @@ import { buildFlowProgram } from '../core/program'
 import { nodeIdsForStageState } from '../core/program'
 import { buildRelationGeometry } from '../core/routes'
 import { buildScene, fitCamera, zoomAbout, type Camera, type District } from '../core/scene'
+import type { StepDisplayMode } from '../core/step-display'
 import { pointsAttribute, toScreen } from '../core/iso'
 import { configureFlow, useClockActiveKey } from '../stores/flow-clock'
 import { Building } from './Building'
@@ -18,6 +19,7 @@ type Props = {
   selection: Selection | null
   activeFlowId: string | null
   editable: boolean
+  stepDisplayMode: StepDisplayMode
   relationPreview: RelationPreview | null
   onSelect: (selection: Selection | null) => void
   onMoveNode: (id: string, gx: number, gy: number) => void
@@ -45,7 +47,7 @@ function DistrictFlag({ district, selected, onSelect, onMeasure }: { district: D
   return <g className={selected ? 'is-selected' : ''} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
 }
 
-export function IsoCanvas({ document, selection, activeFlowId, editable, relationPreview, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
+export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -275,7 +277,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, relatio
               if (connectionDraft) onToggleConnectionTarget(node.id)
               else onSelect({ kind: 'node', id: node.id })
             }} onDragStart={(event) => startNodeDrag(event, node)} />)}
-            {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} editable={editable} /> : null}
+            {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} /> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
             <g className="district-flags">
               {scene.districts.map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} onSelect={() => onSelect({ kind: 'group', id: district.id })} onMeasure={measureFlag} />)}

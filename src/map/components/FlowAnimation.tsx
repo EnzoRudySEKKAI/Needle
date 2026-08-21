@@ -1,14 +1,14 @@
 import type { OntologyFlow } from '../../domain/types'
 import { activeStageState, flowPositions, type FlowProgram } from '../core/program'
 import { pointAtLength, pointsAttribute } from '../core/iso'
+import type { StepDisplayMode } from '../core/step-display'
 import { useClockState } from '../stores/flow-clock'
 
-export function FlowAnimation({ program, flow, editable }: { program: FlowProgram; flow: OntologyFlow; editable: boolean }) {
+export function FlowAnimation({ program, flow, stepDisplayMode }: { program: FlowProgram; flow: OntologyFlow; stepDisplayMode: StepDisplayMode }) {
   const clock = useClockState()
   const time = clock.program?.id === program.id ? clock.time : 0
   const positions = flowPositions(program, time)
   const activeIndex = activeStageState(program, time).index
-  const showAllSteps = editable || clock.program?.id !== program.id || !clock.playing
   const markers = program.stages.flatMap((stage, stageIndex) => stage.branches.map((branch, branchIndex) => ({
     branch,
     branchIndex,
@@ -30,7 +30,7 @@ export function FlowAnimation({ program, flow, editable }: { program: FlowProgra
           <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" className="flow-arrow" transform={`translate(${branch.geometry.points[branch.geometry.points.length - 1]!.x} ${branch.geometry.points[branch.geometry.points.length - 1]!.y}) rotate(${Math.atan2(branch.geometry.points[branch.geometry.points.length - 1]!.y - (branch.geometry.points[branch.geometry.points.length - 2] ?? branch.geometry.points[branch.geometry.points.length - 1]!).y, branch.geometry.points[branch.geometry.points.length - 1]!.x - (branch.geometry.points[branch.geometry.points.length - 2] ?? branch.geometry.points[branch.geometry.points.length - 1]!).x) * 180 / Math.PI})`} />
         </g>
       )))}
-      {markers.filter((marker) => showAllSteps || marker.stageIndex === activeIndex).map((marker) => {
+      {markers.filter((marker) => stepDisplayMode === 'all' || (stepDisplayMode === 'current' && marker.stageIndex === activeIndex)).map((marker) => {
         const related = markersByRelation.get(marker.branch.relationId)!
         const slot = related.indexOf(marker)
         const route = related[0]!.branch.geometry

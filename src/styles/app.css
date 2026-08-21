@@ -95,6 +95,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .header-actions { min-width: 0; margin-left: auto; padding: 0 10px; display: flex; align-items: center; gap: 6px; overflow-x: auto; }
 .header-actions > button, .segmented button, .speed-control button { white-space: nowrap; border: 1px solid var(--border); background: var(--surface); padding: 7px 9px; border-radius: 4px; font: 500 9px var(--mono); text-transform: uppercase; }
 .header-actions button:disabled { opacity: .35; cursor: default; }
+.step-display-control { height: 29px; display: flex; align-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); overflow: hidden; }
+.step-display-control > span { padding-left: 8px; color: var(--ink-3); font: 500 8px var(--mono); text-transform: uppercase; }
+.step-display-control select { height: 100%; min-width: 70px; border: 0; background: transparent; padding: 0 6px; font: 500 9px var(--mono); text-transform: uppercase; outline: none; }
+.step-display-control:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.step-display-control:has(select:disabled) { opacity: .35; }
 .segmented, .speed-control { display: flex; }
 .segmented button, .speed-control button { border-radius: 0; margin-left: -1px; }
 .segmented button:first-child, .speed-control button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
@@ -354,6 +359,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .map-header > .brand { width: auto; padding: 0 12px; }
   .map-header .brand span, .repository-cell, .header-actions > button:not(.export-button):not(.fullscreen-button), .speed-control { display: none; }
   .header-actions { padding-right: 8px; }
+  .step-display-control > span { display: none; }
+  .step-display-control select { min-width: 64px; }
   .map-workspace { position: relative; display: block; }
   .stage-column { height: 100%; }
   .left-rail { position: absolute; left: 8px; right: 8px; bottom: 40px; height: 190px; z-index: 8; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
