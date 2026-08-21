@@ -54,11 +54,12 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
 export function isOntologyDocument(value: unknown): value is OntologyDocument {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<OntologyDocument>
-  if (candidate.schemaVersion !== 5 || typeof candidate.id !== 'string' || !Array.isArray(candidate.groups) || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.relations) || !Array.isArray(candidate.flows)) return false
+  if (candidate.schemaVersion !== 6 || typeof candidate.id !== 'string' || !Array.isArray(candidate.groups) || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.relations) || !Array.isArray(candidate.flows)) return false
   if ('metricLabel' in candidate) return false
-  return candidate.nodes.every((value) => {
+  const nodesValid = candidate.nodes.every((value) => {
     if (!value || typeof value !== 'object') return false
     const node = value as unknown as Record<string, unknown>
     return typeof node.id === 'string' && BUILDING_SIZES.has(node.size as BuildingSize) && Array.isArray(node.properties) && !('metric' in node) && !('unit' in node) && !('role' in node) && !('kind' in node)
   })
+  return nodesValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value)))
 }

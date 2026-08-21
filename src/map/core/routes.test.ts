@@ -18,10 +18,4 @@ describe('dynamic relation anchors', () => {
     expect(pair.fromSide).toBe('south')
     expect(pair.toSide).toBe('north')
   })
-
-  it('chooses ports nearest authored waypoints', () => {
-    const pair = closestAnchorPair(node('a', 0, 0), node('b', 6, 0), [{ gx: 1, gy: -4 }, { gx: 7, gy: -4 }])
-    expect(pair.fromSide).toBe('north')
-    expect(pair.toSide).toBe('north')
-  })
 })

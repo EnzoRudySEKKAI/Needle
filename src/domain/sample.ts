@@ -30,11 +30,11 @@ export const SAMPLE_MAP: OntologyDocument = {
     { id: 'ob-intake', from: 'observer', to: 'intake', kind: 'data', label: 'field report' },
     { id: 'sn-intake', from: 'sensor', to: 'intake', kind: 'data', label: 'telemetry' },
     { id: 'intake-correlation', from: 'intake', to: 'correlation', kind: 'flow', label: 'normalized evidence' },
-    { id: 'correlation-review', from: 'correlation', to: 'review', kind: 'flow', label: 'candidate pattern', via: [{ gx: 8, gy: 9 }] },
+    { id: 'correlation-review', from: 'correlation', to: 'review', kind: 'flow', label: 'candidate pattern' },
     { id: 'review-dispatch', from: 'review', to: 'dispatch', kind: 'flow', label: 'verified alert' },
     { id: 'dispatch-steward', from: 'dispatch', to: 'steward', kind: 'flow', label: 'response brief' },
     { id: 'steward-habitat', from: 'steward', to: 'habitat', kind: 'flow', label: 'field action' },
-    { id: 'habitat-observer', from: 'habitat', to: 'observer', kind: 'retry', label: 'new observation', via: [{ gx: 22, gy: 2 }, { gx: 7, gy: -2 }] },
+    { id: 'habitat-observer', from: 'habitat', to: 'observer', kind: 'retry', label: 'new observation' },
   ],
   flows: [
     { id: 'raise-alert', name: 'Raise an alert', payload: 'evidence', summary: 'Carries a field report from observation to a local response.', stages: ['ob-intake', 'intake-correlation', 'correlation-review', 'review-dispatch', 'dispatch-steward'].map((relationId, index) => ({ id: `raise-${index}`, traversals: [{ id: `raise-${index}-a`, relationId, direction: 'forward' as const }] })) },

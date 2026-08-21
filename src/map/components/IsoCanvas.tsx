@@ -31,6 +31,10 @@ type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera
 type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
 type InteractionSession = PanSession | NodeDragSession
 
+function snapGridPoint(point: GridPoint): GridPoint {
+  return { gx: Math.round(point.gx * 2) / 2, gy: Math.round(point.gy * 2) / 2 }
+}
+
 function DistrictFlag({ district, selected, hovered, onSelect, onHover, onMeasure }: { district: District; selected: boolean; hovered: boolean; onSelect: () => void; onHover: (id: string | null) => void; onMeasure: (id: string, width: number) => void }) {
   const textRef = useRef<SVGTextElement | null>(null)
   useLayoutEffect(() => {
@@ -57,7 +61,6 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
   const [hoveredDistrictId, setHoveredDistrictId] = useState<string | null>(null)
   const interaction = useRef<InteractionSession | null>(null)
-  const committedDrag = useRef<{ id: string; position: GridPoint } | null>(null)
   const suppressCanvasClick = useRef(false)
   const clickSuppressionTimer = useRef(0)
   const positionedNodes = useMemo(() => document.nodes.map((node) => dragPositions.has(node.id) ? { ...node, position: dragPositions.get(node.id)! } : node), [document.nodes, dragPositions])
@@ -78,20 +81,6 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     configureFlow(program, !editable)
     return () => configureFlow(null)
   }, [editable, program])
-
-  useEffect(() => {
-    const committed = committedDrag.current
-    if (!committed) return
-    const node = document.nodes.find((item) => item.id === committed.id)
-    if (!node || node.position.gx !== committed.position.gx || node.position.gy !== committed.position.gy) return
-    committedDrag.current = null
-    setDragPositions((current) => {
-      if (!current.has(committed.id)) return current
-      const next = new Map(current)
-      next.delete(committed.id)
-      return next
-    })
-  }, [document.nodes])
 
   useLayoutEffect(() => {
     const element = containerRef.current
@@ -115,6 +104,8 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     return next
   })
   const previewNodePosition = (id: string, gx: number, gy: number) => setDragPositions((current) => {
+    const existing = current.get(id)
+    if (existing?.gx === gx && existing.gy === gy) return current
     const next = new Map(current)
     next.set(id, { gx, gy })
     return next
@@ -154,9 +145,8 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
       }
       return
     }
-    const position = { gx: Math.round(session.pending.gx * 2) / 2, gy: Math.round(session.pending.gy * 2) / 2 }
-    previewNodePosition(session.nodeId, position.gx, position.gy)
-    committedDrag.current = { id: session.nodeId, position }
+    const position = session.pending
+    cancelNodePosition(session.nodeId)
     suppressNextClick()
     onMoveNode(session.nodeId, position.gx, position.gy)
   }
@@ -233,7 +223,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
           const dy = (event.clientY - session.startY) / session.camera.k
           session.moved ||= Math.hypot(event.clientX - session.startX, event.clientY - session.startY) > 4
           if (!session.moved) return
-          session.pending = { gx: session.start.gx + dx / 48 + dy / 24, gy: session.start.gy + dy / 24 - dx / 48 }
+          session.pending = snapGridPoint({ gx: session.start.gx + dx / 48 + dy / 24, gy: session.start.gy + dy / 24 - dx / 48 })
           if (!session.frame) session.frame = requestAnimationFrame(() => {
             if (interaction.current !== session) return
             session.frame = 0

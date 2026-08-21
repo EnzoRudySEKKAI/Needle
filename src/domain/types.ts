@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 5 as const
+export const SCHEMA_VERSION = 6 as const
 
 export type GridPoint = { gx: number; gy: number }
 export type Footprint = GridPoint & { w: number; d: number }
@@ -49,7 +49,6 @@ export type OntologyRelation = {
   to: string
   kind: RelationKind
   label: string
-  via?: GridPoint[]
 }
 
 export type FlowDirection = 'forward' | 'reverse'

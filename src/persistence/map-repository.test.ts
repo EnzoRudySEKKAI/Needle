@@ -21,7 +21,7 @@ describe('map migrations', () => {
       return copy
     })
     const migrated = migrateDocument(legacy)
-    expect(migrated?.schemaVersion).toBe(5)
+    expect(migrated?.schemaVersion).toBe(6)
     expect(migrated?.nodes.every((node) => node.faceTexture === 'auto')).toBe(true)
     expect(migrated?.nodes.every((node) => node.size === 's' && !('metric' in node) && !('unit' in node))).toBe(true)
     expect(migrated?.flows[0]?.stages.length).toBeGreaterThan(0)

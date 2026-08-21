@@ -37,7 +37,7 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
   const legacyVersion = legacy.schemaVersion as number
-  if (![1, 2, 3, 4].includes(legacyVersion) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
+  if (![1, 2, 3, 4, 5].includes(legacyVersion) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
   const sizeFromMetric = (metric: unknown): BuildingSize => {
     const value = typeof metric === 'number' && Number.isFinite(metric) ? metric : 0
     if (value <= 8) return 'xs'
@@ -59,6 +59,11 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
       delete nodeFields.metric
       delete nodeFields.unit
       return legacyVersion >= 4 ? nodeFields : { faceTexture: 'auto', ...nodeFields, size: sizeFromMetric(metric) }
+    }),
+    relations: legacy.relations.map((relation) => {
+      const relationFields = { ...relation as Record<string, unknown> }
+      delete relationFields.via
+      return relationFields
     }),
     flows: legacyVersion >= 3 ? legacy.flows : legacy.flows.map((flow, flowIndex) => {
       const legacyFlow = flow as Record<string, unknown>
