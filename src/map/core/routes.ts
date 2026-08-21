@@ -21,6 +21,7 @@ const PORT_NORMALS: Record<PortSide, GridPoint> = {
 const PORT_CLEARANCE = 0.8
 const OBSTACLE_PADDING = 0.35
 const BEND_PENALTY = 1.2
+const ALIGNMENT_EPSILON = 1e-9
 
 function distance(a: GridPoint, b: GridPoint): number {
   return Math.abs(a.gx - b.gx) + Math.abs(a.gy - b.gy)
@@ -237,7 +238,30 @@ function portOptions(node: VisualNode, nodes: readonly VisualNode[]): PortOption
     .filter((option) => !nodes.some((obstacle) => obstacle.id !== node.id && segmentHits(option.anchor, option.clear, obstacle)))
 }
 
+function directCenteredRoute(from: VisualNode, to: VisualNode, nodes: readonly VisualNode[]): { route: GridPoint[]; fromSide: PortSide; toSide: PortSide } | null {
+  if (from.id === to.id) return null
+  const fromRect = from.footprint
+  const toRect = to.footprint
+  const fromPorts = portAnchors(fromRect)
+  const toPorts = portAnchors(toRect)
+  const fromCenter = { gx: fromRect.gx + fromRect.w / 2, gy: fromRect.gy + fromRect.d / 2 }
+  const toCenter = { gx: toRect.gx + toRect.w / 2, gy: toRect.gy + toRect.d / 2 }
+  const obstacles = nodes.filter((node) => node.id !== from.id && node.id !== to.id)
+  const candidates: { route: GridPoint[]; fromSide: PortSide; toSide: PortSide }[] = []
+  if (Math.abs(fromCenter.gx - toCenter.gx) < ALIGNMENT_EPSILON) {
+    if (fromRect.gy + fromRect.d < toRect.gy) candidates.push({ route: [fromPorts.south, toPorts.north], fromSide: 'south', toSide: 'north' })
+    if (toRect.gy + toRect.d < fromRect.gy) candidates.push({ route: [fromPorts.north, toPorts.south], fromSide: 'north', toSide: 'south' })
+  }
+  if (Math.abs(fromCenter.gy - toCenter.gy) < ALIGNMENT_EPSILON) {
+    if (fromRect.gx + fromRect.w < toRect.gx) candidates.push({ route: [fromPorts.east, toPorts.west], fromSide: 'east', toSide: 'west' })
+    if (toRect.gx + toRect.w < fromRect.gx) candidates.push({ route: [fromPorts.west, toPorts.east], fromSide: 'west', toSide: 'east' })
+  }
+  return candidates.filter((candidate) => routeIsClear(candidate.route, obstacles)).sort((a, b) => distance(a.route[0]!, a.route[1]!) - distance(b.route[0]!, b.route[1]!))[0] ?? null
+}
+
 function routeFor(from: VisualNode, to: VisualNode, nodes: readonly VisualNode[], graph: RoutingGraph): { route: GridPoint[]; fromSide: PortSide; toSide: PortSide } | null {
+  const direct = directCenteredRoute(from, to, nodes)
+  if (direct) return direct
   const starts = portOptions(from, nodes)
   const ends = portOptions(to, nodes)
   const core = routeCore(graph, starts, ends, from.id === to.id)

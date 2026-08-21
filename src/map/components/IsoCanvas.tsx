@@ -28,11 +28,27 @@ type Props = {
 }
 
 type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera: Camera; moved: boolean; deferCapture: boolean }
-type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
+type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; alignments: GridPoint[]; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
 type InteractionSession = PanSession | NodeDragSession
+
+const ALIGNMENT_SNAP_DISTANCE = 0.6
 
 function snapGridPoint(point: GridPoint): GridPoint {
   return { gx: Math.round(point.gx * 2) / 2, gy: Math.round(point.gy * 2) / 2 }
+}
+
+function snapToConnectedAxes(point: GridPoint, alignments: readonly GridPoint[]): GridPoint {
+  let gx = point.gx
+  let gy = point.gy
+  let closestX = ALIGNMENT_SNAP_DISTANCE
+  let closestY = ALIGNMENT_SNAP_DISTANCE
+  for (const alignment of alignments) {
+    const dx = Math.abs(point.gx - alignment.gx)
+    if (dx < closestX) { gx = alignment.gx; closestX = dx }
+    const dy = Math.abs(point.gy - alignment.gy)
+    if (dy < closestY) { gy = alignment.gy; closestY = dy }
+  }
+  return { gx, gy }
 }
 
 function DistrictFlag({ district, selected, hovered, onSelect, onHover, onMeasure }: { district: District; selected: boolean; hovered: boolean; onSelect: () => void; onHover: (id: string | null) => void; onMeasure: (id: string, width: number) => void }) {
@@ -169,8 +185,13 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     if (!camera || interaction.current) return
     const svg = svgRef.current
     if (!svg) return
+    const connectedIds = new Set(document.relations.flatMap((relation) => relation.from === node.id ? [relation.to] : relation.to === node.id ? [relation.from] : []))
+    const alignments = nodes.filter((candidate) => connectedIds.has(candidate.id)).map((candidate) => ({
+      gx: candidate.footprint.gx + candidate.footprint.w / 2 - node.footprint.w / 2,
+      gy: candidate.footprint.gy + candidate.footprint.d / 2 - node.footprint.d / 2,
+    }))
     setCameraOverride(camera)
-    interaction.current = { kind: 'node', pointerId: event.pointerId, nodeId: node.id, startX: event.clientX, startY: event.clientY, start: node.position, camera, pending: node.position, moved: false, frame: 0 }
+    interaction.current = { kind: 'node', pointerId: event.pointerId, nodeId: node.id, startX: event.clientX, startY: event.clientY, start: node.position, alignments, camera, pending: node.position, moved: false, frame: 0 }
     setDraggingNodeId(node.id)
     svg.setPointerCapture(event.pointerId)
   }
@@ -223,7 +244,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
           const dy = (event.clientY - session.startY) / session.camera.k
           session.moved ||= Math.hypot(event.clientX - session.startX, event.clientY - session.startY) > 4
           if (!session.moved) return
-          session.pending = snapGridPoint({ gx: session.start.gx + dx / 48 + dy / 24, gy: session.start.gy + dy / 24 - dx / 48 })
+          session.pending = snapToConnectedAxes(snapGridPoint({ gx: session.start.gx + dx / 48 + dy / 24, gy: session.start.gy + dy / 24 - dx / 48 }), session.alignments)
           if (!session.frame) session.frame = requestAnimationFrame(() => {
             if (interaction.current !== session) return
             session.frame = 0
