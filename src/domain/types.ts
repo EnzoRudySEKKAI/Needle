@@ -21,6 +21,7 @@ export type OntologyGroup = {
   id: string
   name: string
   description: string
+  flagPosition?: GridPoint
 }
 
 export type OntologyProperty = {

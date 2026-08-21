@@ -56,10 +56,18 @@ export function isOntologyDocument(value: unknown): value is OntologyDocument {
   const candidate = value as Partial<OntologyDocument>
   if (candidate.schemaVersion !== 6 || typeof candidate.id !== 'string' || !Array.isArray(candidate.groups) || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.relations) || !Array.isArray(candidate.flows)) return false
   if ('metricLabel' in candidate) return false
+  const groupsValid = candidate.groups.every((value) => {
+    if (!value || typeof value !== 'object') return false
+    const flagPosition = (value as unknown as Record<string, unknown>).flagPosition
+    if (flagPosition === undefined) return true
+    if (!flagPosition || typeof flagPosition !== 'object') return false
+    const point = flagPosition as Record<string, unknown>
+    return typeof point.gx === 'number' && Number.isFinite(point.gx) && typeof point.gy === 'number' && Number.isFinite(point.gy)
+  })
   const nodesValid = candidate.nodes.every((value) => {
     if (!value || typeof value !== 'object') return false
     const node = value as unknown as Record<string, unknown>
     return typeof node.id === 'string' && BUILDING_SIZES.has(node.size as BuildingSize) && Array.isArray(node.properties) && !('metric' in node) && !('unit' in node) && !('role' in node) && !('kind' in node)
   })
-  return nodesValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value)))
+  return groupsValid && nodesValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value)))
 }

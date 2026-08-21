@@ -13,6 +13,16 @@ export type District = {
 export type Scene = { key: string; shapes: VisualNode[]; districts: District[]; grid: { key: string; a: ScreenPoint; b: ScreenPoint }[]; bounds: ReturnType<typeof sceneBounds> }
 export type Camera = { x: number; y: number; k: number }
 
+function includeFlag(rect: Footprint, flagAt: { gx: number; gy: number }, labelWidth: number): Footprint {
+  const margin = 0.5
+  const labelSpan = (labelWidth + 4) / 48
+  const gx0 = Math.min(rect.gx, flagAt.gx - margin)
+  const gy0 = Math.min(rect.gy, flagAt.gy - labelSpan - margin)
+  const gx1 = Math.max(rect.gx + rect.w, flagAt.gx + labelSpan + margin)
+  const gy1 = Math.max(rect.gy + rect.d, flagAt.gy + margin)
+  return { gx: gx0, gy: gy0, w: gx1 - gx0, d: gy1 - gy0 }
+}
+
 function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], flagWidths: ReadonlyMap<string, number>): District[] {
   return groups.flatMap((group) => {
     const members = nodes.filter((node) => node.groupId === group.id)
@@ -23,15 +33,18 @@ function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNo
     const gx0 = Math.min(...members.map((node) => node.footprint.gx)) - 1.2
     const gy0 = Math.min(...members.map((node) => node.footprint.gy)) - 1.2
     const gx1 = Math.max(...members.map((node) => node.footprint.gx + node.footprint.w)) + 1.2
-    const gy1 = Math.max(...members.map((node) => node.footprint.gy + node.footprint.d)) + frontPadding
-    const rect = { gx: gx0, gy: gy0, w: gx1 - gx0, d: gy1 - gy0 }
+    const memberGy1 = Math.max(...members.map((node) => node.footprint.gy + node.footprint.d)) + 1.2
+    const memberRect = { gx: gx0, gy: gy0, w: gx1 - gx0, d: memberGy1 - gy0 }
+    const automaticRect = { ...memberRect, d: memberRect.d + frontPadding - 1.2 }
+    const flagAt = group.flagPosition ?? { gx: automaticRect.gx + 0.35, gy: automaticRect.gy + automaticRect.d - 0.5 }
+    const rect = group.flagPosition ? includeFlag(memberRect, flagAt, labelWidth) : automaticRect
     return [{
       id: group.id,
       name: group.name,
       displayName,
       labelWidth,
       rect,
-      flagAt: { gx: rect.gx + 0.35, gy: rect.gy + rect.d - 0.5 },
+      flagAt,
       nodeIds: members.map((node) => node.id),
     }]
   })
