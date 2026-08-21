@@ -168,7 +168,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
 
   if (!syncReady) return <main className="map-load-state"><span>Connecting to the shared workspace…</span></main>
 
-  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''}`}>
+  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''}`}>
     {persistenceError ? <div className="sync-error" role="alert">{persistenceError}</div> : null}
     <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} />
     <main className="map-workspace">

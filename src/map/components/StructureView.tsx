@@ -24,7 +24,9 @@ export function StructureView({ document, activeFloorId, onOpenFloor }: { docume
 
   return <div className="structure-view">
     <svg id="ontology-map-svg" className="structure-view-svg" viewBox={`${geometry.viewBox.x} ${geometry.viewBox.y} ${geometry.viewBox.width} ${geometry.viewBox.height}`} preserveAspectRatio="xMidYMid meet" aria-label={`${structureName} structure view`}>
-      <defs><pattern id="map-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" className="hatch-line" /></pattern></defs>
+      <defs>
+        <pattern id="map-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" className="hatch-line" /></pattern>
+      </defs>
       <StructureSilhouette geometry={geometry} previewIndex={previewIndex} currentIndex={currentIndex} floorNames={document.floors.map((floor) => floor.name)} onPreview={setPreviewIndex} onEnter={(index) => { const floor = document.floors[index]; if (floor) onOpenFloor(floor.id) }} />
       {previewFloor && previewSlot ? <g className="structure-preview" aria-live="polite">
         <text x={geometry.previewX} y={previewY - 26} className="structure-preview-index">Floor {String(previewIndex! + 1).padStart(2, '0')}</text>
