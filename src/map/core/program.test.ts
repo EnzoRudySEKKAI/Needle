@@ -19,6 +19,6 @@ describe('branched flow programs', () => {
     const program = buildFlowProgram(flow, nodes, document.relations, buildRelationGeometry(nodes, document.relations))!
     expect(program.stages[0]?.branches).toHaveLength(2)
     expect(flowPositions(program, program.stages[0]!.start + 100)).toHaveLength(2)
-    expect(activeNodeIds(program, program.stages[0]!.start + 100)).toEqual(new Set(['observer', 'intake', 'habitat']))
+    expect(activeNodeIds(program, program.stages[0]!.start + 100)).toEqual(new Set(['observer', 'habitat']))
   })
 })

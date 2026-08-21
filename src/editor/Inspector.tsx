@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { deleteGroupCascade, deleteNodeCascade, deleteRelationsCascade } from '../domain/commands'
-import { canAppendFlowFrom, flowRelationIds } from '../domain/flows'
+import { flowRelationIds } from '../domain/flows'
 import { makeId } from '../domain/id'
 import type { BuildingSize, OntologyDocument, OntologyGroup, OntologyNode, OntologyRelation, Selection } from '../domain/types'
 import { validateDocument } from '../domain/validation'
@@ -88,7 +88,7 @@ function GroupDeleteDialog({ group, document, onCancel, onConfirm }: { group: On
 
 function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: { draft: ConnectionDraft; document: OntologyDocument; onUpdate: (draft: ConnectionDraft | null) => void; onCancel: () => void; onCommit: () => void }) {
   const source = document.nodes.find((node) => node.id === draft.sourceId)
-  const compatibleFlows = document.flows.filter((flow) => canAppendFlowFrom(flow, document.relations, draft.sourceId))
+  const compatibleFlows = document.flows
   const count = draft.targets.length
   return <>
     <span className="eyebrow">Connection mode</span>

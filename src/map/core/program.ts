@@ -14,6 +14,9 @@ export type ProgramBranch = {
 export type ProgramStage = {
   id: string
   start: number
+  travelStart: number
+  targetStart: number
+  end: number
   duration: number
   branches: ProgramBranch[]
   sourceIds: string[]
@@ -36,7 +39,7 @@ export function buildFlowProgram(flow: OntologyFlow, nodes: readonly VisualNode[
   const relationById = new Map(relations.map((relation) => [relation.id, relation]))
   const nodeIds = new Set(nodes.map((node) => node.id))
   const stages: ProgramStage[] = []
-  let at = DWELL
+  let at = 0
   for (const stage of flow.stages) {
     const branches: ProgramBranch[] = []
     for (const traversal of stage.traversals) {
@@ -49,8 +52,12 @@ export function buildFlowProgram(flow: OntologyFlow, nodes: readonly VisualNode[
     }
     if (branches.length === 0) return null
     const duration = Math.max(...branches.map((branch) => Math.max(900, Math.min(2100, branch.geometry.total * 5))))
-    stages.push({ id: stage.id, start: at, duration, branches, sourceIds: [...new Set(branches.map((branch) => branch.sourceId))], targetIds: [...new Set(branches.map((branch) => branch.targetId))] })
-    at += duration + DWELL
+    const start = at
+    const travelStart = start + DWELL
+    const targetStart = travelStart + duration
+    const end = targetStart + DWELL
+    stages.push({ id: stage.id, start, travelStart, targetStart, end, duration, branches, sourceIds: [...new Set(branches.map((branch) => branch.sourceId))], targetIds: [...new Set(branches.map((branch) => branch.targetId))] })
+    at = end
   }
   if (stages.length === 0) return null
   return { id: flow.id, total: at + 900, stages, nodeIds: [...new Set(stages.flatMap((stage) => [...stage.sourceIds, ...stage.targetIds]))] }
@@ -63,8 +70,8 @@ export function activeStageState(program: FlowProgram, time: number): { index: n
     if (wrapped >= program.stages[candidate]!.start) { index = candidate; break }
   }
   const stage = program.stages[index]!
-  if (wrapped < stage.start) return { index, phase: 'source' }
-  if (wrapped <= stage.start + stage.duration) return { index, phase: 'travel' }
+  if (wrapped < stage.travelStart) return { index, phase: 'source' }
+  if (wrapped < stage.targetStart) return { index, phase: 'travel' }
   return { index, phase: 'target' }
 }
 
@@ -87,7 +94,7 @@ export function flowPositions(program: FlowProgram, time: number): ScreenPoint[]
   return stage.branches.map((branch) => {
     if (phase === 'source') return branch.geometry.points[0]!
     if (phase === 'target') return branch.geometry.points[branch.geometry.points.length - 1]!
-    const progress = Math.max(0, Math.min(1, (wrapped - stage.start) / stage.duration))
+    const progress = Math.max(0, Math.min(1, (wrapped - stage.travelStart) / stage.duration))
     const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
     return pointAtLength(branch.geometry.points, branch.geometry.cumulative, eased * branch.geometry.total)
   })

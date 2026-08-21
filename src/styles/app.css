@@ -253,6 +253,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .district-flags .is-selected text { fill: var(--accent); }
 .relation-line { fill: none; stroke: var(--structure); stroke-width: 1.1; opacity: .75; }
 .relation-arrow { fill: var(--structure); opacity: .75; }
+.relation:focus, .relation:focus-visible { outline: none; }
+.relation:focus-visible .relation-line { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.relation:focus-visible .relation-arrow { fill: var(--accent); opacity: 1; }
+.relation:focus-visible .relation-label rect { stroke: var(--accent); }
 .relation-label { opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 .relation-label rect { fill: var(--surface-raised); stroke: var(--structure); stroke-width: 1; }
 .relation-label text { fill: var(--ink); font: 8px var(--mono); }

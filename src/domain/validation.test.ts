@@ -7,10 +7,10 @@ describe('ontology validation', () => {
     expect(validateDocument(cloneSample())).toEqual([])
   })
 
-  it('reports a discontinuous scenario', () => {
+  it('accepts scenario steps with independent sources', () => {
     const document = cloneSample()
     document.flows[0]!.stages = [document.flows[0]!.stages[0]!, document.flows[0]!.stages[3]!]
-    expect(validateDocument(document)).toContainEqual(expect.objectContaining({ message: 'Raise an alert has a branch disconnected from the previous step.' }))
+    expect(validateDocument(document)).toEqual([])
   })
 
   it('reports a relation to a missing concept', () => {

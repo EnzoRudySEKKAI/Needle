@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { canAppendFlowFrom } from '../domain/flows'
 import { makeId } from '../domain/id'
 import { IsoCanvas } from '../map/components/IsoCanvas'
 import { toggleFlow } from '../map/stores/flow-clock'
@@ -31,7 +30,7 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
 
   const startConnection = (sourceId: string) => {
     const activeFlow = document.flows.find((flow) => flow.id === activeFlowId)
-    const flowId = activeFlow && canAppendFlowFrom(activeFlow, document.relations, sourceId) ? activeFlow.id : null
+    const flowId = activeFlow?.id ?? null
     setConnectionDraft({ sourceId, targets: [], label: 'new relation', kind: 'flow', flowId })
   }
   const toggleConnectionTarget = (nodeId: string) => setConnectionDraft((draft) => {

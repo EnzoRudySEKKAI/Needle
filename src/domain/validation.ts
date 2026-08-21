@@ -34,27 +34,18 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
     if (!nodeIds.has(relation.from) || !nodeIds.has(relation.to)) diagnostics.push({ level: 'error', message: `${relation.label} points to a missing concept.`, target: { kind: 'relation', id: relation.id } })
   }
   for (const flow of document.flows) {
-    let frontier: Set<string> | null = null
     for (const stage of flow.stages) {
       if (stage.traversals.length === 0) {
         diagnostics.push({ level: 'error', message: `${flow.name} contains an empty step.`, target: { kind: 'flow', id: flow.id } })
         continue
       }
-      const destinations = new Set<string>()
       for (const traversal of stage.traversals) {
         const relation = relationById.get(traversal.relationId)
         if (!relation) {
           diagnostics.push({ level: 'error', message: `${flow.name} uses a missing relation.`, target: { kind: 'flow', id: flow.id } })
           continue
         }
-        const source = traversal.direction === 'forward' ? relation.from : relation.to
-        const destination = traversal.direction === 'forward' ? relation.to : relation.from
-        if (frontier !== null && !frontier.has(source)) {
-          diagnostics.push({ level: 'error', message: `${flow.name} has a branch disconnected from the previous step.`, target: { kind: 'flow', id: flow.id } })
-        }
-        destinations.add(destination)
       }
-      frontier = destinations
     }
   }
   return diagnostics

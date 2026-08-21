@@ -9,13 +9,3 @@ export function resolveTraversal(traversal: FlowTraversal, relation: OntologyRel
 export function flowRelationIds(flow: OntologyFlow): string[] {
   return flow.stages.flatMap((stage) => stage.traversals.map((traversal) => traversal.relationId))
 }
-
-export function canAppendFlowFrom(flow: OntologyFlow, relations: readonly OntologyRelation[], sourceId: string): boolean {
-  const lastStage = flow.stages[flow.stages.length - 1]
-  if (!lastStage) return true
-  const relationById = new Map(relations.map((relation) => [relation.id, relation]))
-  return lastStage.traversals.some((traversal) => {
-    const relation = relationById.get(traversal.relationId)
-    return relation ? resolveTraversal(traversal, relation).targetId === sourceId : false
-  })
-}
