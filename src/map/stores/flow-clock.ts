@@ -46,6 +46,13 @@ export function toggleFlow() {
   notify()
 }
 
+export function pauseFlow() {
+  if (!state.playing) return
+  stop()
+  state = { ...state, playing: false }
+  notify()
+}
+
 export function setFlowSpeed(speed: number) {
   state = { ...state, speed }
   notify()

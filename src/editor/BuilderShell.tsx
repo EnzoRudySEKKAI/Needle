@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
-import { addFlowTraversal } from '../domain/commands'
+import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { addFlowTraversal, setFloorFlagPosition } from '../domain/commands'
 import { makeId } from '../domain/id'
 import { IsoCanvas } from '../map/components/IsoCanvas'
+import { BuildingView } from '../map/components/BuildingView'
+import { ExportDialog } from '../export/ExportDialog'
+import { visualiseNodes } from '../map/core/layout'
+import { buildFlowProgram } from '../map/core/program'
+import { buildRelationGeometry } from '../map/core/routes'
 import type { StepDisplayMode } from '../map/core/step-display'
-import { toggleFlow } from '../map/stores/flow-clock'
+import { configureFlow, pauseFlow, toggleFlow, useClockActiveKey } from '../map/stores/flow-clock'
 import { Inspector } from './Inspector'
+import { FloorNavigator } from './FloorNavigator'
 import { LeftRail } from './LeftRail'
 import { MapHeader } from './MapHeader'
 import { useDocumentStore } from './document-store'
@@ -12,11 +18,18 @@ import type { ConnectionDraft } from './connection'
 import type { RelationPreview } from './RelationCandidatePicker'
 import type { RelationPickTarget, StagePreviewTarget } from './ScenarioInspector'
 
-export function BuilderShell({ presentation = false, onExport }: { presentation?: boolean; onExport?: () => void }) {
+export function BuilderShell({ presentation = false }: { presentation?: boolean }) {
   const { document, selection, setSelection, commit, persistenceError, syncReady } = useDocumentStore()
   const appRef = useRef<HTMLDivElement | null>(null)
   const [editable, setEditable] = useState(!presentation)
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null)
+  const [requestedFloorId, setActiveFloorId] = useState(document.floors[0]!.id)
+  const activeFloorId = document.floors.some((floor) => floor.id === requestedFloorId) ? requestedFloorId : document.floors[0]!.id
+  const [previousFloorId, setPreviousFloorId] = useState<string | null>(null)
+  const [floorDirection, setFloorDirection] = useState<'up' | 'down'>('up')
+  const [buildingView, setBuildingView] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportScope, setExportScope] = useState<'floor' | 'building'>('floor')
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null)
   const [relationPreview, setRelationPreview] = useState<RelationPreview | null>(null)
   const [relationPickTarget, setRelationPickTarget] = useState<RelationPickTarget | null>(null)
@@ -24,15 +37,28 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
   const [stepDisplayModes, setStepDisplayModes] = useState<{ build: StepDisplayMode; present: StepDisplayMode }>({ build: 'all', present: 'current' })
   const [fullscreen, setFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState<string | null>(null)
+  const floorTimer = useRef(0)
   const stepDisplayContext = editable ? 'build' : 'present'
   const stepDisplayMode = stepDisplayModes[stepDisplayContext]
   const setStepDisplayMode = (mode: StepDisplayMode) => setStepDisplayModes((current) => ({ ...current, [stepDisplayContext]: mode }))
+  const allVisualNodes = useMemo(() => visualiseNodes(document.nodes), [document.nodes])
+  const allGeometry = useMemo(() => buildRelationGeometry(allVisualNodes, document.relations), [allVisualNodes, document.relations])
+  const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
+  const flowProgram = useMemo(() => activeFlow ? buildFlowProgram(activeFlow, allVisualNodes, document.relations, allGeometry) : null, [activeFlow, allGeometry, allVisualNodes, document.relations])
+  const activeClockKey = useClockActiveKey()
 
   useEffect(() => {
     const syncFullscreen = () => setFullscreen(window.document.fullscreenElement === appRef.current)
     window.document.addEventListener('fullscreenchange', syncFullscreen)
     return () => window.document.removeEventListener('fullscreenchange', syncFullscreen)
   }, [])
+
+  useEffect(() => () => window.clearTimeout(floorTimer.current), [])
+
+  useEffect(() => {
+    configureFlow(flowProgram, !editable)
+    return () => configureFlow(null)
+  }, [editable, flowProgram])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -100,6 +126,34 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
     setStagePreviewTarget(null)
     if (relationPickTarget && relationPickTarget.flowId !== id) { setRelationPickTarget(null); setRelationPreview(null) }
   }
+  const openFloor = (floorId: string) => {
+    if (floorId === activeFloorId && !buildingView) return
+    const fromIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
+    const toIndex = document.floors.findIndex((floor) => floor.id === floorId)
+    if (toIndex < 0) return
+    window.clearTimeout(floorTimer.current)
+    setFloorDirection(toIndex >= fromIndex ? 'up' : 'down')
+    setPreviousFloorId(buildingView ? null : activeFloorId)
+    setBuildingView(false)
+    setRelationPickTarget(null)
+    setRelationPreview(null)
+    setStagePreviewTarget(null)
+    const selectedNode = selection?.kind === 'node' ? document.nodes.find((node) => node.id === selection.id) : null
+    if (selectedNode && selectedNode.floorId !== floorId) setSelection(null)
+    startTransition(() => setActiveFloorId(floorId))
+    floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
+  }
+  const followScenarioFloor = useEffectEvent((floorId: string) => openFloor(floorId))
+  useEffect(() => {
+    if (!flowProgram || activeClockKey === 'none') return
+    const [, indexValue, phase] = activeClockKey.split(':')
+    const stage = flowProgram.stages[Number(indexValue)]
+    const nodeId = phase === 'target' ? stage?.targetIds[0] : stage?.sourceIds[0]
+    const floorId = document.nodes.find((node) => node.id === nodeId)?.floorId
+    if (!floorId || floorId === activeFloorId) return
+    const timer = window.setTimeout(() => followScenarioFloor(floorId), 0)
+    return () => window.clearTimeout(timer)
+  }, [activeClockKey, activeFloorId, document.nodes, flowProgram])
   const relationPickFlow = relationPickTarget ? document.flows.find((flow) => flow.id === relationPickTarget.flowId) : null
   const relationPickStage = relationPickTarget?.stageId ? relationPickFlow?.stages.find((stage) => stage.id === relationPickTarget.stageId) : null
   const relationPickIds = relationPickTarget && relationPickFlow && (relationPickTarget.stageId === null || relationPickStage)
@@ -116,14 +170,19 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
 
   return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${selection || connectionDraft ? 'has-inspector' : ''}`}>
     {persistenceError ? <div className="sync-error" role="alert">{persistenceError}</div> : null}
-    <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={onExport} />
+    <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(buildingView ? 'building' : 'floor'); setExporting(true) }} />
     <main className="map-workspace">
-      <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} editable={editable} />
+      <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} />
       <section className="stage-column">
-        <IsoCanvas document={document} selection={selection} activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => ({ ...current, groups: current.groups.map((group) => group.id === id ? { ...group, flagPosition: { gx, gy } } : group) }))} />
-        <footer className="map-footer"><span className="legend-key flow-key" /> flow <span className="legend-key support-key" /> support <span className="legend-key retry-key" /> retry <span className="payload-key" /> payload <b>{editable ? 'drag buildings or flags · scroll to zoom · drag ground to pan' : 'choose a scenario · space plays · scroll to zoom'}</b></footer>
+        <div className="floor-viewport">
+          {previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroupFlag={() => {}} /></div> : null}
+          {buildingView ? <div className="floor-layer is-building"><BuildingView document={document} selection={selection} onOpenFloor={openFloor} onSelectNode={(nodeId, floorId) => { openFloor(floorId); setSelection({ kind: 'node', id: nodeId }) }} /></div> : <div className={`floor-layer ${previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={activeFloorId} document={document} floorId={activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} /></div>}
+          <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} buildingView={buildingView} onFloor={openFloor} onBuilding={() => { pauseFlow(); setPreviousFloorId(null); setBuildingView(true); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null) }} />
+        </div>
+        <footer className="map-footer"><span className="legend-key flow-key" /> flow <span className="legend-key support-key" /> support <span className="legend-key retry-key" /> retry <span className="payload-key" /> payload <b>{buildingView ? 'select a floor or concept to enter' : editable ? 'drag buildings or flags · scroll to zoom · drag ground to pan' : 'choose a scenario · space plays · scroll to zoom'}</b></footer>
       </section>
-      <Inspector editable={editable} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} onStagePreview={setStagePreviewTarget} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} />
+      <Inspector editable={editable} onActiveFloor={openFloor} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} onStagePreview={setStagePreviewTarget} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} />
     </main>
+    {exporting ? <ExportDialog filename={document.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} scope={exportScope} onScope={(scope) => { setExportScope(scope); setPreviousFloorId(null); setBuildingView(scope === 'building') }} onClose={() => setExporting(false)} /> : null}
   </div>
 }

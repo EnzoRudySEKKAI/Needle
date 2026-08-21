@@ -23,7 +23,7 @@ function includeFlag(rect: Footprint, flagAt: { gx: number; gy: number }, labelW
   return { gx: gx0, gy: gy0, w: gx1 - gx0, d: gy1 - gy0 }
 }
 
-function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], flagWidths: ReadonlyMap<string, number>): District[] {
+function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], flagWidths: ReadonlyMap<string, number>, flagPositions: Readonly<Record<string, { gx: number; gy: number }>>): District[] {
   return groups.flatMap((group) => {
     const members = nodes.filter((node) => node.groupId === group.id)
     if (members.length === 0) return []
@@ -36,8 +36,9 @@ function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNo
     const memberGy1 = Math.max(...members.map((node) => node.footprint.gy + node.footprint.d)) + 1.2
     const memberRect = { gx: gx0, gy: gy0, w: gx1 - gx0, d: memberGy1 - gy0 }
     const automaticRect = { ...memberRect, d: memberRect.d + frontPadding - 1.2 }
-    const flagAt = group.flagPosition ?? { gx: automaticRect.gx + 0.35, gy: automaticRect.gy + automaticRect.d - 0.5 }
-    const rect = group.flagPosition ? includeFlag(memberRect, flagAt, labelWidth) : automaticRect
+    const customFlag = flagPositions[group.id]
+    const flagAt = customFlag ?? { gx: automaticRect.gx + 0.35, gy: automaticRect.gy + automaticRect.d - 0.5 }
+    const rect = customFlag ? includeFlag(memberRect, flagAt, labelWidth) : automaticRect
     return [{
       id: group.id,
       name: group.name,
@@ -50,9 +51,9 @@ function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNo
   })
 }
 
-export function buildScene(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], key: string, flagWidths: ReadonlyMap<string, number> = new Map()): Scene {
+export function buildScene(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], key: string, flagWidths: ReadonlyMap<string, number> = new Map(), flagPositions: Readonly<Record<string, { gx: number; gy: number }>> = {}): Scene {
   const shapes = [...nodes].sort((a, b) => depthKey(a.footprint) - depthKey(b.footprint))
-  const districts = districtsFor(groups, nodes, flagWidths)
+  const districts = districtsFor(groups, nodes, flagWidths, flagPositions)
   const extents = [...shapes.map((node) => ({ footprint: node.footprint, height: node.height })), ...districts.map((district) => ({ footprint: district.rect, height: 0 }))]
   const bounds = sceneBounds(extents)
   if (extents.length === 0) return { key, shapes, districts, grid: [], bounds }

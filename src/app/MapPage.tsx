@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { BuilderShell } from '../editor/BuilderShell'
 import { DocumentProvider } from '../editor/document-store'
-import { ExportDialog } from '../export/ExportDialog'
 import { loadMap } from '../persistence/map-repository'
 
 export function MapPage({ presentation = false }: { presentation?: boolean }) {
@@ -12,7 +11,6 @@ export function MapPage({ presentation = false }: { presentation?: boolean }) {
 }
 
 function LoadedMapPage({ id, presentation }: { id: string; presentation: boolean }) {
-  const [exporting, setExporting] = useState(false)
   const [document, setDocument] = useState<Awaited<ReturnType<typeof loadMap>> | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
@@ -23,5 +21,5 @@ function LoadedMapPage({ id, presentation }: { id: string; presentation: boolean
   if (error) return <main className="map-load-state"><strong>Shared map unavailable</strong><span>{error}</span></main>
   if (document === undefined) return <main className="map-load-state"><span>Loading shared map…</span></main>
   if (!document) return <Navigate to="/" replace />
-  return <DocumentProvider initial={document}><BuilderShell presentation={presentation} onExport={() => setExporting(true)} />{exporting ? <ExportDialog filename={document.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} onClose={() => setExporting(false)} /> : null}</DocumentProvider>
+  return <DocumentProvider initial={document}><BuilderShell presentation={presentation} /></DocumentProvider>
 }

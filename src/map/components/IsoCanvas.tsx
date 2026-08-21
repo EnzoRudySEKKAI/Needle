@@ -1,24 +1,29 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { GridPoint, OntologyDocument, Selection, VisualNode } from '../../domain/types'
+import { projectFloor } from '../../domain/floors'
 import type { ConnectionDraft } from '../../editor/connection'
 import type { RelationPreview } from '../../editor/RelationCandidatePicker'
 import type { StagePreviewTarget } from '../../editor/ScenarioInspector'
 import { portAnchors } from '../core/archetypes'
 import { visualiseNodes } from '../core/layout'
-import { buildFlowProgram } from '../core/program'
-import { nodeIdsForStageState } from '../core/program'
-import { buildRelationGeometry } from '../core/routes'
+import { nodeIdsForStageState, type FlowProgram } from '../core/program'
+import { buildRelationGeometry, type RelationGeometry } from '../core/routes'
 import { buildScene, fitCamera, zoomAbout, type Camera, type District } from '../core/scene'
 import type { StepDisplayMode } from '../core/step-display'
-import { pointsAttribute, toScreen } from '../core/iso'
-import { configureFlow, useClockActiveKey } from '../stores/flow-clock'
+import { pointsAttribute, polylineLengths, toScreen } from '../core/iso'
+import { useClockActiveKey } from '../stores/flow-clock'
 import { Building } from './Building'
 import { FlowAnimation } from './FlowAnimation'
 
 type Props = {
   document: OntologyDocument
+  floorId: string
+  svgId?: string
+  initialCamera?: Camera | null
+  onCameraChange?: (camera: Camera | null) => void
   selection: Selection | null
   activeFlowId: string | null
+  flowProgram: FlowProgram | null
   editable: boolean
   stepDisplayMode: StepDisplayMode
   relationPreview: RelationPreview | null
@@ -26,6 +31,7 @@ type Props = {
   relationPickIds: ReadonlySet<string> | null
   onPickRelation: (id: string) => void
   onSelect: (selection: Selection | null) => void
+  onOpenFloor?: (id: string) => void
   onMoveNode: (id: string, gx: number, gy: number) => void
   onMoveGroupFlag: (id: string, gx: number, gy: number) => void
   connectionDraft: ConnectionDraft | null
@@ -73,11 +79,18 @@ function DistrictFlag({ district, selected, hovered, editable, dragging, onSelec
   return <g className={`district-flag ${selected ? 'is-selected' : ''} ${hovered ? 'is-hovered' : ''} ${dragging ? 'is-dragging' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => onHover(district.id)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(district.id)} onBlur={() => onHover(null)} onPointerDown={(event) => { if (event.button !== 0 || !editable) return; event.stopPropagation(); onDragStart(event) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect() } }} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
 }
 
-export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget }: Props) {
+function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationGeometry {
+  if (!reverse) return geometry
+  const points = [...geometry.points].reverse()
+  const { cumulative, total } = polylineLengths(points)
+  return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
+}
+
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
-  const [cameraOverride, setCameraOverride] = useState<Camera | null>(null)
+  const [cameraOverride, setCameraOverride] = useState<Camera | null>(initialCamera)
   const [flagWidths, setFlagWidths] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [dragPositions, setDragPositions] = useState<ReadonlyMap<string, { gx: number; gy: number }>>(() => new Map())
   const [dragFlagPositions, setDragFlagPositions] = useState<ReadonlyMap<string, GridPoint>>(() => new Map())
@@ -87,11 +100,13 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
   const interaction = useRef<InteractionSession | null>(null)
   const suppressCanvasClick = useRef(false)
   const clickSuppressionTimer = useRef(0)
-  const positionedNodes = useMemo(() => document.nodes.map((node) => dragPositions.has(node.id) ? { ...node, position: dragPositions.get(node.id)! } : node), [document.nodes, dragPositions])
-  const positionedGroups = useMemo(() => document.groups.map((group) => dragFlagPositions.has(group.id) ? { ...group, flagPosition: dragFlagPositions.get(group.id)! } : group), [document.groups, dragFlagPositions])
+  const projection = useMemo(() => projectFloor(document, floorId), [document, floorId])
+  const positionedNodes = useMemo(() => (projection?.nodes ?? []).map((node) => dragPositions.has(node.id) ? { ...node, position: dragPositions.get(node.id)! } : node), [dragPositions, projection])
   const nodes = useMemo(() => visualiseNodes(positionedNodes), [positionedNodes])
-  const scene = useMemo(() => buildScene(positionedGroups, nodes, `${document.id}:${document.updatedAt}`, flagWidths), [document.id, document.updatedAt, flagWidths, nodes, positionedGroups])
-  const geometry = useMemo(() => buildRelationGeometry(nodes, document.relations), [nodes, document.relations])
+  const flagPositions = useMemo(() => ({ ...projection?.floor.groupFlagPositions, ...Object.fromEntries(dragFlagPositions) }), [dragFlagPositions, projection?.floor.groupFlagPositions])
+  const scene = useMemo(() => buildScene(projection?.groups ?? [], nodes, `${document.id}:${floorId}:${document.updatedAt}`, flagWidths, flagPositions), [document.id, document.updatedAt, flagPositions, flagWidths, floorId, nodes, projection?.groups])
+  const visibleRelations = useMemo(() => projection?.relations ?? [], [projection])
+  const geometry = useMemo(() => buildRelationGeometry(nodes, visibleRelations), [nodes, visibleRelations])
   const previewRelations = useMemo(() => connectionDraft ? connectionDraft.targets.map((target, index) => ({ id: `preview-${index}`, from: target.direction === 'outbound' ? connectionDraft.sourceId : target.nodeId, to: target.direction === 'outbound' ? target.nodeId : connectionDraft.sourceId, kind: connectionDraft.kind, label: connectionDraft.label })) : [], [connectionDraft])
   const previewGeometry = useMemo(() => buildRelationGeometry(nodes, previewRelations), [nodes, previewRelations])
   const previewStage = stagePreviewTarget ? document.flows.find((flow) => flow.id === stagePreviewTarget.flowId)?.stages.find((stage) => stage.id === stagePreviewTarget.stageId) ?? null : null
@@ -111,16 +126,37 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     }
   }
   const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
-  const program = useMemo(() => activeFlow ? buildFlowProgram(activeFlow, nodes, document.relations, geometry) : null, [activeFlow, nodes, document.relations, geometry])
+  const relationById = useMemo(() => new Map(visibleRelations.map((relation) => [relation.id, relation])), [visibleRelations])
+  const program = useMemo(() => flowProgram ? {
+    ...flowProgram,
+    stages: flowProgram.stages.map((stage) => ({
+      ...stage,
+      branches: stage.branches.flatMap((branch) => {
+        const route = geometry.get(branch.relationId)
+        const relation = relationById.get(branch.relationId)
+        return route && relation ? [{ ...branch, geometry: orientGeometry(route, branch.sourceId !== relation.from) }] : []
+      }),
+    })),
+  } : null, [flowProgram, geometry, relationById])
   const activeClockKey = useClockActiveKey()
   const fitted = size.width > 0 ? fitCamera(size.width, size.height, scene.bounds) : null
   const camera = cameraOverride ?? fitted
   const relationPicking = relationPickIds !== null
-
-  useEffect(() => {
-    configureFlow(program, !editable)
-    return () => configureFlow(null)
-  }, [editable, program])
+  const updateCamera = (next: Camera | null) => {
+    setCameraOverride(next)
+    onCameraChange?.(next)
+  }
+  const crossFloorExits = (projection?.crossFloorRelations ?? []).flatMap((relation) => {
+    const localId = nodes.some((node) => node.id === relation.from) ? relation.from : relation.to
+    const remoteId = localId === relation.from ? relation.to : relation.from
+    const node = nodes.find((candidate) => candidate.id === localId)
+    const remote = document.nodes.find((candidate) => candidate.id === remoteId)
+    const floor = document.floors.find((candidate) => candidate.id === remote?.floorId)
+    if (!node || !floor) return []
+    const point = toScreen(node.footprint.gx + node.footprint.w, node.footprint.gy + node.footprint.d / 2, node.height * 0.55)
+    const direction = document.floors.findIndex((candidate) => candidate.id === floor.id) > document.floors.findIndex((candidate) => candidate.id === floorId) ? '↑' : '↓'
+    return [{ relation, point, floor, direction }]
+  })
 
   useLayoutEffect(() => {
     const element = containerRef.current
@@ -238,12 +274,12 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     if (!camera || interaction.current) return
     const svg = svgRef.current
     if (!svg) return
-    const connectedIds = new Set(document.relations.flatMap((relation) => relation.from === node.id ? [relation.to] : relation.to === node.id ? [relation.from] : []))
+    const connectedIds = new Set(visibleRelations.flatMap((relation) => relation.from === node.id ? [relation.to] : relation.to === node.id ? [relation.from] : []))
     const alignments = nodes.filter((candidate) => connectedIds.has(candidate.id)).map((candidate) => ({
       gx: candidate.footprint.gx + candidate.footprint.w / 2 - node.footprint.w / 2,
       gy: candidate.footprint.gy + candidate.footprint.d / 2 - node.footprint.d / 2,
     }))
-    setCameraOverride(camera)
+    updateCamera(camera)
     interaction.current = { kind: 'node', pointerId: event.pointerId, nodeId: node.id, startX: event.clientX, startY: event.clientY, start: node.position, alignments, camera, pending: node.position, moved: false, frame: 0 }
     setDraggingNodeId(node.id)
     svg.setPointerCapture(event.pointerId)
@@ -252,7 +288,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     if (!camera || interaction.current) return
     const svg = svgRef.current
     if (!svg) return
-    setCameraOverride(camera)
+    updateCamera(camera)
     interaction.current = { kind: 'flag', pointerId: event.pointerId, groupId: district.id, startX: event.clientX, startY: event.clientY, start: district.flagAt, camera, pending: district.flagAt, moved: false, frame: 0 }
     setDraggingFlagId(district.id)
     svg.setPointerCapture(event.pointerId)
@@ -264,12 +300,12 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
 
   return (
     <div className={`canvas-wrap ${relationPicking ? 'is-relation-picking' : ''}`} ref={containerRef}>
-      {document.nodes.length === 0 ? (
-        <div className="canvas-empty"><span>Empty ground</span><strong>Add a concept from the left rail.</strong></div>
+      {nodes.length === 0 ? (
+        <div className="canvas-empty"><span>Empty floor</span><strong>Add a concept from the left rail.</strong></div>
       ) : null}
       <svg
         ref={svgRef}
-        id="ontology-map-svg"
+        id={svgId}
         className="iso-canvas"
         aria-label="Interactive ontology map"
         onClick={() => {
@@ -280,7 +316,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
           event.preventDefault()
           if (!camera || (interaction.current && interaction.current.kind !== 'pan')) return
           const rect = event.currentTarget.getBoundingClientRect()
-          setCameraOverride(zoomAbout(camera, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top))
+          updateCamera(zoomAbout(camera, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top))
         }}
         onPointerDown={(event) => {
           if (event.button !== 0 || !camera || interaction.current) return
@@ -299,7 +335,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
               session.moved = true
               if (session.deferCapture && !event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId)
             }
-            setCameraOverride({ ...session.camera, x: session.camera.x + event.clientX - session.x, y: session.camera.y + event.clientY - session.y })
+            updateCamera({ ...session.camera, x: session.camera.x + event.clientX - session.x, y: session.camera.y + event.clientY - session.y })
             return
           }
           const dx = (event.clientX - session.startX) / session.camera.k
@@ -332,7 +368,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
               })}
             </g>
             <g className="relations" onPointerDown={(event) => event.stopPropagation()}>
-              {document.relations.map((relation) => {
+              {visibleRelations.map((relation) => {
                 const route = geometry.get(relation.id)
                 if (!route) return null
                 const selected = selection?.kind === 'relation' && selection.id === relation.id
@@ -360,6 +396,10 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
               if (connectionDraft) onToggleConnectionTarget(node.id)
               else if (!relationPicking) onSelect({ kind: 'node', id: node.id })
             }} onDragStart={(event) => startNodeDrag(event, node)} />)}
+            <g className="floor-exits">{crossFloorExits.map(({ relation, point, floor, direction }) => {
+              const width = Math.max(46, floor.name.length * 5.2 + 20)
+              return <g key={relation.id} className="floor-exit" role="button" tabIndex={0} aria-label={`${relation.label}, continue to ${floor.name}`} transform={`translate(${point.x} ${point.y})`} onClick={(event) => { event.stopPropagation(); onOpenFloor?.(floor.id) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onOpenFloor?.(floor.id) } }}><line y1="0" y2="-24" vectorEffect="non-scaling-stroke" /><circle cy="-24" r="3" vectorEffect="non-scaling-stroke" /><g transform="translate(7 -31)"><rect width={width} height="15" rx="3" vectorEffect="non-scaling-stroke" /><text x="6" y="10.5">{floor.name} {direction}</text></g></g>
+            })}</g>
             {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} /> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
             <g className="district-flags">
@@ -368,7 +408,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
           </g>
         ) : null}
       </svg>
-      <div className="camera-controls"><button type="button" onClick={() => setCameraOverride(null)} title="Recenter">⌾</button><button type="button" onClick={() => camera && setCameraOverride(zoomAbout(camera, 1.25, size.width / 2, size.height / 2))}>+</button><button type="button" onClick={() => camera && setCameraOverride(zoomAbout(camera, 0.8, size.width / 2, size.height / 2))}>−</button></div>
+      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} title="Recenter">⌾</button><button type="button" onClick={() => camera && updateCamera(zoomAbout(camera, 1.25, size.width / 2, size.height / 2))}>+</button><button type="button" onClick={() => camera && updateCamera(zoomAbout(camera, 0.8, size.width / 2, size.height / 2))}>−</button></div>
     </div>
   )
 }

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { codeFromName, makeId } from '../domain/id'
-import { deleteRelationsCascade } from '../domain/commands'
+import { addFloor, deleteRelationsCascade, moveFloor } from '../domain/commands'
 import type { Selection } from '../domain/types'
 import { nextFreePosition } from '../map/core/layout'
 import { useDocumentStore } from './document-store'
 
-export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; editable: boolean }) {
+export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; activeFloorId: string; onActiveFloor: (id: string) => void; editable: boolean }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
-  const [tabChoice, setTabChoice] = useState<{ tab: 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'concepts', selection })
-  const selectionTab = selection?.kind === 'flow' ? 'scenarios' : selection?.kind === 'relation' ? 'relations' : selection?.kind === 'node' || selection?.kind === 'group' ? 'concepts' : null
+  const [tabChoice, setTabChoice] = useState<{ tab: 'floors' | 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'concepts', selection })
+  const selectionTab = selection?.kind === 'floor' ? 'floors' : selection?.kind === 'flow' ? 'scenarios' : selection?.kind === 'relation' ? 'relations' : selection?.kind === 'node' || selection?.kind === 'group' ? 'concepts' : null
   const activeTab = tabChoice.selection === selection ? tabChoice.tab : selectionTab ?? tabChoice.tab
 
   const addGroup = () => {
@@ -21,8 +21,8 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
     const id = makeId('node')
     const name = 'New concept'
     const code = codeFromName(name, new Set(document.nodes.map((node) => node.code)))
-    const position = nextFreePosition(document.nodes, groupId)
-    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, groupId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
+    const position = nextFreePosition(document.nodes.filter((node) => node.floorId === activeFloorId), groupId)
+    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, groupId, floorId: activeFloorId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
     setSelection({ kind: 'node', id })
   }
 
@@ -43,11 +43,19 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
     if (selection?.kind === 'relation' && selection.id === id) setSelection(null)
     onActiveFlow(null)
   }
+  const createFloor = () => {
+    const floorId = makeId('floor')
+    commit((current) => addFloor(current, activeFloorId, floorId).document)
+    onActiveFloor(floorId)
+    setSelection({ kind: 'floor', id: floorId })
+  }
+  const visibleNodeIds = new Set(document.nodes.filter((node) => node.floorId === activeFloorId).map((node) => node.id))
+  const visibleRelations = document.relations.filter((relation) => visibleNodeIds.has(relation.from) || visibleNodeIds.has(relation.to))
 
   return (
     <aside className="left-rail">
       <div className="rail-tabs" role="tablist" aria-label="Map content">
-        {(['concepts', 'relations', 'scenarios'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
+        {(['concepts', 'relations', 'scenarios', 'floors'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
       </div>
       {activeTab === 'scenarios' ? <section className="rail-section rail-flows" role="tabpanel">
         <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario">+</button> : null}</div>
@@ -61,22 +69,22 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
         </div>
       </section> : null}
       {activeTab === 'relations' ? <section className="rail-section rail-relations" role="tabpanel">
-        <div className="rail-heading"><span>Relations</span><span>{document.relations.length}</span></div>
+        <div className="rail-heading"><span>Relations</span><span>{visibleRelations.length}</span></div>
         <div className="relation-list">
-          {document.relations.map((relation) => {
+          {visibleRelations.map((relation) => {
             const from = document.nodes.find((node) => node.id === relation.from)
             const to = document.nodes.find((node) => node.id === relation.to)
             return <div className={`relation-row ${selection?.kind === 'relation' && selection.id === relation.id ? 'is-active' : ''}`} key={relation.id}><button type="button" onClick={() => select({ kind: 'relation', id: relation.id })}><span>{from?.code ?? '?'}</span><strong>{relation.label}</strong><span>{to?.code ?? '?'}</span></button>{editable ? <button type="button" className="relation-row-delete" aria-label={`Delete ${relation.label}`} onClick={() => deleteRelation(relation.id)}>×</button> : null}</div>
           })}
-          {document.relations.length === 0 ? <p className="rail-empty">No relation yet.</p> : null}
+          {visibleRelations.length === 0 ? <p className="rail-empty">No relation on this floor.</p> : null}
         </div>
       </section> : null}
       {activeTab === 'concepts' ? <div className="rail-neighborhoods" role="tabpanel">
         {document.groups.map((group) => (
           <section className="rail-section" key={group.id}>
-            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id).length}</span></button>
+            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId).length}</span></button>
             <div className="node-list">
-              {document.nodes.filter((node) => node.groupId === group.id).map((node) => (
+              {document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId).map((node) => (
                 <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>
               ))}
               {editable ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
@@ -85,6 +93,14 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
         ))}
         {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
       </div> : null}
+      {activeTab === 'floors' ? <section className="rail-section rail-floors" role="tabpanel">
+        <div className="rail-heading"><span>Building floors</span>{editable ? <button type="button" onClick={createFloor} aria-label="Add floor">+</button> : null}</div>
+        <div className="floor-list">{[...document.floors].reverse().map((floor) => {
+          const index = document.floors.indexOf(floor)
+          const count = document.nodes.filter((node) => node.floorId === floor.id).length
+          return <div key={floor.id} className={`floor-row ${floor.id === activeFloorId ? 'is-active' : ''}`}><button type="button" onClick={() => { onActiveFloor(floor.id); setSelection({ kind: 'floor', id: floor.id }) }}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span><small>{count}</small></button>{editable ? <div><button type="button" aria-label={`Move ${floor.name} up`} disabled={index === document.floors.length - 1} onClick={() => commit((current) => moveFloor(current, floor.id, 1))}>↑</button><button type="button" aria-label={`Move ${floor.name} down`} disabled={index === 0} onClick={() => commit((current) => moveFloor(current, floor.id, -1))}>↓</button></div> : null}</div>
+        })}</div>
+      </section> : null}
     </aside>
   )
 }

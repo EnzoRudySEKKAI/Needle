@@ -1,5 +1,45 @@
 import { makeId } from './id'
-import type { FlowDirection, OntologyDocument } from './types'
+import type { FlowDirection, GridPoint, OntologyDocument } from './types'
+
+export function addFloor(document: OntologyDocument, afterFloorId: string | null, floorId = makeId('floor')): { document: OntologyDocument; floorId: string } {
+  const floor = { id: floorId, name: 'New floor', groupFlagPositions: {} }
+  const floors = [...document.floors]
+  const afterIndex = afterFloorId ? floors.findIndex((candidate) => candidate.id === afterFloorId) : floors.length - 1
+  floors.splice(afterIndex < 0 ? floors.length : afterIndex + 1, 0, floor)
+  return { document: { ...document, floors }, floorId }
+}
+
+export function moveFloor(document: OntologyDocument, floorId: string, direction: -1 | 1): OntologyDocument {
+  const index = document.floors.findIndex((floor) => floor.id === floorId)
+  const destination = index + direction
+  if (index < 0 || destination < 0 || destination >= document.floors.length) return document
+  const floors = [...document.floors]
+  const [floor] = floors.splice(index, 1)
+  floors.splice(destination, 0, floor!)
+  return { ...document, floors }
+}
+
+export function setFloorFlagPosition(document: OntologyDocument, floorId: string, groupId: string, position: GridPoint): OntologyDocument {
+  return { ...document, floors: document.floors.map((floor) => floor.id === floorId ? { ...floor, groupFlagPositions: { ...floor.groupFlagPositions, [groupId]: position } } : floor) }
+}
+
+export function deleteFloorCascade(document: OntologyDocument, floorId: string): OntologyDocument {
+  if (document.floors.length <= 1) return document
+  const nodeIds = new Set(document.nodes.filter((node) => node.floorId === floorId).map((node) => node.id))
+  const relationIds = new Set(document.relations.filter((relation) => nodeIds.has(relation.from) || nodeIds.has(relation.to)).map((relation) => relation.id))
+  const withoutRelations = deleteRelationsCascade(document, relationIds)
+  return { ...withoutRelations, floors: document.floors.filter((floor) => floor.id !== floorId), nodes: document.nodes.filter((node) => !nodeIds.has(node.id)) }
+}
+
+export function moveFloorContents(document: OntologyDocument, floorId: string, targetFloorId: string): OntologyDocument {
+  if (floorId === targetFloorId || document.floors.length <= 1 || !document.floors.some((floor) => floor.id === targetFloorId)) return document
+  const source = document.floors.find((floor) => floor.id === floorId)
+  return {
+    ...document,
+    floors: document.floors.filter((floor) => floor.id !== floorId).map((floor) => floor.id === targetFloorId && source ? { ...floor, groupFlagPositions: { ...source.groupFlagPositions, ...floor.groupFlagPositions } } : floor),
+    nodes: document.nodes.map((node) => node.floorId === floorId ? { ...node, floorId: targetFloorId } : node),
+  }
+}
 
 export function addFlowTraversal(document: OntologyDocument, flowId: string, stageId: string | null, relationId: string, direction: FlowDirection): OntologyDocument {
   if (!document.relations.some((relation) => relation.id === relationId)) return document
@@ -56,6 +96,11 @@ export function deleteGroupCascade(document: OntologyDocument, groupId: string):
   const removedRelationIds = new Set(document.relations.filter((relation) => removedNodeIds.has(relation.from) || removedNodeIds.has(relation.to)).map((relation) => relation.id))
   return {
     ...deleteRelationsCascade(document, removedRelationIds),
+    floors: document.floors.map((floor) => {
+      const groupFlagPositions = { ...floor.groupFlagPositions }
+      delete groupFlagPositions[groupId]
+      return { ...floor, groupFlagPositions }
+    }),
     groups: document.groups.filter((group) => group.id !== groupId),
     nodes: document.nodes.filter((node) => !removedNodeIds.has(node.id)),
   }

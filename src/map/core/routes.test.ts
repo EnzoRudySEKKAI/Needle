@@ -3,7 +3,7 @@ import type { VisualNode } from '../../domain/types'
 import { closestAnchorPair } from './routes'
 
 function node(id: string, gx: number, gy: number): VisualNode {
-  return { id, code: id, name: id, groupId: 'g', whatItDoes: '', howItsBuilt: '', size: 'm', properties: [], position: { gx, gy }, faceTexture: 'plain', archetype: 'cube', footprint: { gx, gy, w: 2, d: 2 }, height: 2 }
+  return { id, code: id, name: id, groupId: 'g', floorId: 'floor-1', whatItDoes: '', howItsBuilt: '', size: 'm', properties: [], position: { gx, gy }, faceTexture: 'plain', archetype: 'cube', footprint: { gx, gy, w: 2, d: 2 }, height: 2 }
 }
 
 describe('dynamic relation anchors', () => {

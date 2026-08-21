@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 6 as const
+export const SCHEMA_VERSION = 7 as const
 
 export type GridPoint = { gx: number; gy: number }
 export type Footprint = GridPoint & { w: number; d: number }
@@ -21,7 +21,12 @@ export type OntologyGroup = {
   id: string
   name: string
   description: string
-  flagPosition?: GridPoint
+}
+
+export type OntologyFloor = {
+  id: string
+  name: string
+  groupFlagPositions: Record<string, GridPoint>
 }
 
 export type OntologyProperty = {
@@ -35,6 +40,7 @@ export type OntologyNode = {
   code: string
   name: string
   groupId: string
+  floorId: string
   whatItDoes: string
   howItsBuilt: string
   size: BuildingSize
@@ -81,6 +87,7 @@ export type OntologyDocument = {
   description: string
   createdAt: string
   updatedAt: string
+  floors: OntologyFloor[]
   groups: OntologyGroup[]
   nodes: OntologyNode[]
   relations: OntologyRelation[]
@@ -94,6 +101,7 @@ export type VisualNode = OntologyNode & {
 }
 
 export type Selection =
+  | { kind: 'floor'; id: string }
   | { kind: 'node'; id: string }
   | { kind: 'relation'; id: string }
   | { kind: 'group'; id: string }
