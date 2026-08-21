@@ -11,16 +11,11 @@ function toggleTheme() {
 }
 
 export function MapHeader({ activeFlowId, editable, stepDisplayMode, fullscreen, fullscreenError, onStepDisplayMode, onFullscreen, onEditable, onExport }: { activeFlowId: string | null; editable: boolean; stepDisplayMode: StepDisplayMode; fullscreen: boolean; fullscreenError: string | null; onStepDisplayMode: (mode: StepDisplayMode) => void; onFullscreen: () => void; onEditable?: (editable: boolean) => void; onExport?: () => void }) {
-  const { document, selection, undo, redo, canUndo, canRedo } = useDocumentStore()
+  const { document, undo, redo, canUndo, canRedo } = useDocumentStore()
   const clock = useClockState()
-  const selected = selection?.kind === 'node' ? document.nodes.find((node) => node.id === selection.id)?.name : selection?.kind ?? 'none'
   return <header className="map-header">
     <Link to="/" className="brand"><strong>Needle</strong><span>ONTOLOGY</span></Link>
     <div className="header-cell repository-cell"><span>Map</span><strong>{document.name} · {document.version}</strong></div>
-    <div className="header-cell"><span>Scenarios</span><strong>{document.flows.length}</strong></div>
-    <div className="header-cell"><span>Concepts</span><strong>{document.nodes.length}</strong></div>
-    <div className="header-cell"><span>Relations</span><strong>{document.relations.length}</strong></div>
-    <div className="header-cell selected-cell"><span>Selected</span><strong>{selected}</strong></div>
     <div className="header-actions">
       {onEditable ? <div className="segmented"><button type="button" className={editable ? 'is-active' : ''} onClick={() => onEditable(true)}>Build</button><button type="button" className={!editable ? 'is-active' : ''} onClick={() => onEditable(false)}>Play</button></div> : null}
       {editable ? <><button type="button" disabled={!canUndo} onClick={undo} title="Undo">↶</button><button type="button" disabled={!canRedo} onClick={redo} title="Redo">↷</button></> : null}

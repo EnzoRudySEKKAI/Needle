@@ -82,6 +82,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .card-actions { display: flex; gap: 8px; }
 .card-actions button { padding: 9px 16px; border: 1px solid var(--border); background: var(--surface); font: 500 10px var(--mono); text-transform: uppercase; }
 .card-actions button:first-child { border-color: var(--accent); color: var(--accent); }
+.card-actions .delete-map-button { color: var(--danger); }
+.library-empty { width: 100%; margin: 0; padding: 36px 0; color: var(--ink-3); font-size: 13px; }
 
 /* Map shell */
 .map-app { height: 100vh; min-width: 900px; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
@@ -91,7 +93,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .header-cell span { color: var(--ink-3); font: 9px var(--mono); letter-spacing: .7px; text-transform: uppercase; }
 .header-cell strong { margin-top: 3px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11px var(--mono); text-transform: uppercase; }
 .repository-cell { min-width: 190px; }
-.selected-cell { min-width: 105px; }
 .header-actions { min-width: 0; margin-left: auto; padding: 0 10px; display: flex; align-items: center; gap: 6px; overflow-x: auto; }
 .header-actions > button, .segmented button, .speed-control button { white-space: nowrap; border: 1px solid var(--border); background: var(--surface); padding: 7px 9px; border-radius: 4px; font: 500 9px var(--mono); text-transform: uppercase; }
 .header-actions button:disabled { opacity: .35; cursor: default; }
@@ -159,11 +160,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .inspector .lede { margin: 8px 0 20px; color: var(--ink-3); }
 .inspector mark { padding: 1px 3px; background: var(--accent-wash); color: var(--accent); }
 .divider { height: 1px; margin: 26px 0; background: var(--border); }
-.map-facts { margin: 26px 0; border-top: 1px solid var(--border); }
-.map-facts div { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); }
-.map-facts dt { color: var(--ink-3); font: 9px var(--mono); text-transform: uppercase; }
-.map-facts dd { margin: 0; font: 11px var(--mono); }
-.clean-state { color: var(--ink-3) !important; font: 9px var(--mono) !important; text-transform: uppercase; }
 .diagnostics p { margin: 5px 0; padding: 7px; border-left: 2px solid var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); font-size: 11px; }
 .form-stack { display: flex; flex-direction: column; gap: 13px; }
 .appearance-picker { display: flex; flex-direction: column; gap: 12px; }
@@ -359,7 +355,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .map-library { padding: 50px 20px; }
   .library-heading > span { display: none; }
   .map-card { grid-template-columns: 36px 1fr; padding: 20px 0; }
-  .card-actions { grid-column: 2; }
+  .card-actions { grid-column: 2; flex-wrap: wrap; }
   .map-app { min-width: 0; height: 100dvh; }
   .map-header { height: 54px; flex-basis: 54px; }
   .map-header > .brand { width: auto; padding: 0 12px; }

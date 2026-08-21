@@ -62,8 +62,7 @@ export function Inspector({ editable, onActiveFlow, onRelationPreview, connectio
         <div className="divider" />
         <h3>Read the city</h3>
         <p>Buildings are concepts. Their form and size make structure visible. Streets are declared relations; moving dots are payloads following complete scenarios.</p>
-        <dl className="map-facts"><div><dt>Neighborhoods</dt><dd>{document.groups.length}</dd></div><div><dt>Concepts</dt><dd>{document.nodes.length}</dd></div><div><dt>Relations</dt><dd>{document.relations.length}</dd></div></dl>
-        {diagnostics.length ? <section className="diagnostics"><h3>Diagnostics</h3>{diagnostics.map((item, index) => <p key={index} className={item.level}>{item.message}</p>)}</section> : <p className="clean-state">Structure valid · no broken paths</p>}
+        {diagnostics.length ? <section className="diagnostics"><h3>Diagnostics</h3>{diagnostics.map((item, index) => <p key={index} className={item.level}>{item.message}</p>)}</section> : null}
       </aside>
     )
   }
@@ -114,9 +113,7 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
 function NodeInspector({ node, editable, commit, document, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; onStartConnection: (sourceId: string) => void }) {
   const patch = (value: Partial<OntologyNode>) => commit((current) => updateNode(current, node.id, value))
   return <>
-    <span className="eyebrow">{node.code}</span>
-    <h2>{node.name}</h2>
-    <p className="lede">{node.size.toUpperCase()}</p>
+    {!editable ? <><span className="eyebrow">{node.code}</span><h2>{node.name}</h2><p className="lede">{node.size.toUpperCase()}</p></> : null}
     {editable ? <div className="form-stack">
       <Field label="Code" value={node.code} onChange={(value) => patch({ code: value.toUpperCase().slice(0, 3) })} />
       <Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} />

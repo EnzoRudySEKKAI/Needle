@@ -4,6 +4,7 @@ import { SCHEMA_VERSION, type BuildingSize, type OntologyDocument } from '../dom
 
 const PREFIX = 'needle:map:'
 const INDEX_KEY = 'needle:map-index'
+const SAMPLE_INITIALIZED_KEY = 'needle:sample-initialized'
 
 export type MapSummary = Pick<OntologyDocument, 'id' | 'name' | 'description' | 'updatedAt'>
 
@@ -83,12 +84,23 @@ export function saveMap(document: OntologyDocument): void {
   localStorage.setItem(INDEX_KEY, JSON.stringify([summary, ...index]))
 }
 
+export function deleteMap(id: string): void {
+  localStorage.removeItem(`${PREFIX}${id}`)
+  localStorage.setItem(INDEX_KEY, JSON.stringify(readIndex().filter((item) => item.id !== id)))
+}
+
 export function ensureSampleMap(): OntologyDocument {
   const existing = loadMap('signal-garden')
   if (existing) return existing
   const sample = cloneSample()
   saveMap(sample)
   return sample
+}
+
+export function initializeSampleMap(): void {
+  if (localStorage.getItem(SAMPLE_INITIALIZED_KEY)) return
+  ensureSampleMap()
+  localStorage.setItem(SAMPLE_INITIALIZED_KEY, '1')
 }
 
 export function createBlankMap(name = 'Untitled ontology'): OntologyDocument {
