@@ -7,7 +7,7 @@ import { useDocumentStore } from './document-store'
 
 export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; editable: boolean }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
-  const [tabChoice, setTabChoice] = useState<{ tab: 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'scenarios', selection })
+  const [tabChoice, setTabChoice] = useState<{ tab: 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'concepts', selection })
   const selectionTab = selection?.kind === 'flow' ? 'scenarios' : selection?.kind === 'relation' ? 'relations' : selection?.kind === 'node' || selection?.kind === 'group' ? 'concepts' : null
   const activeTab = tabChoice.selection === selection ? tabChoice.tab : selectionTab ?? tabChoice.tab
 
@@ -47,7 +47,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
   return (
     <aside className="left-rail">
       <div className="rail-tabs" role="tablist" aria-label="Map content">
-        {(['scenarios', 'relations', 'concepts'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
+        {(['concepts', 'relations', 'scenarios'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
       </div>
       {activeTab === 'scenarios' ? <section className="rail-section rail-flows" role="tabpanel">
         <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario">+</button> : null}</div>

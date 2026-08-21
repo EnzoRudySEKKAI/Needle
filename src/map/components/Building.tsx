@@ -33,9 +33,9 @@ function BuildingInner({ node, selected, dimmed, active, editable, onSelect, onD
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect() }}
       onPointerDown={(event) => {
         if (event.button !== 0) return
-        if (connectionMode) { event.stopPropagation(); return }
-        if (!editable) return
         event.stopPropagation()
+        if (connectionMode) return
+        if (!editable) return
         onDragStart(event)
       }}
     >
