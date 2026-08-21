@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { activeStageState, type FlowProgram } from '../core/program'
 
-type ClockState = { program: FlowProgram | null; time: number; playing: boolean; speed: number }
-let state: ClockState = { program: null, time: 0, playing: false, speed: 1 }
+type ClockState = { program: FlowProgram | null; time: number; playing: boolean; started: boolean; speed: number }
+let state: ClockState = { program: null, time: 0, playing: false, started: false, speed: 1 }
 let frameId: number | null = null
 let lastFrame = 0
 const listeners = new Set<() => void>()
@@ -32,14 +32,15 @@ function stop() {
 
 export function configureFlow(program: FlowProgram | null, autoplay = true) {
   stop()
-  state = { ...state, program, time: 0, playing: Boolean(program && autoplay && !matchMedia('(prefers-reduced-motion: reduce)').matches) }
+  const playing = Boolean(program && autoplay && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+  state = { ...state, program, time: 0, playing, started: playing }
   if (state.playing) start()
   notify()
 }
 
 export function toggleFlow() {
   if (!state.program) return
-  state = { ...state, playing: !state.playing }
+  state = { ...state, playing: !state.playing, started: true }
   if (state.playing) start()
   else stop()
   notify()
@@ -55,7 +56,7 @@ export function stepFlow() {
   if (!program) return
   stop()
   const next = program.stages.find((stage) => stage.start > state.time + 80)?.start ?? 0
-  state = { ...state, time: next, playing: false }
+  state = { ...state, time: next, playing: false, started: true }
   notify()
 }
 
@@ -65,7 +66,7 @@ function subscribe(listener: () => void) {
 }
 
 export function useClockState() {
-  return useSyncExternalStore(subscribe, () => state, () => ({ program: null, time: 0, playing: false, speed: 1 }))
+  return useSyncExternalStore(subscribe, () => state, () => ({ program: null, time: 0, playing: false, started: false, speed: 1 }))
 }
 
 export function useClockActiveKey(): string {

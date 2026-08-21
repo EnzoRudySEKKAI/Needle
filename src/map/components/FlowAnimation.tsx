@@ -7,8 +7,9 @@ import { useClockState } from '../stores/flow-clock'
 export function FlowAnimation({ program, flow, stepDisplayMode }: { program: FlowProgram; flow: OntologyFlow; stepDisplayMode: StepDisplayMode }) {
   const clock = useClockState()
   const time = clock.program?.id === program.id ? clock.time : 0
-  const positions = flowPositions(program, time)
-  const activeIndex = activeStageState(program, time).index
+  const started = clock.program?.id === program.id && clock.started
+  const positions = started ? flowPositions(program, time) : []
+  const activeIndex = started ? activeStageState(program, time).index : -1
   const markers = program.stages.flatMap((stage, stageIndex) => stage.branches.map((branch, branchIndex) => ({
     branch,
     branchIndex,
