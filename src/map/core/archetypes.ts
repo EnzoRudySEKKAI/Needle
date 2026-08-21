@@ -69,12 +69,9 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     const innerRight = gx + w - wing
     const innerBack = gy + d - wing
     return [
+      verticalFace({ gx: innerLeft, gy }, { gx: innerLeft, gy: innerBack }, 0, height, 'right'),
       verticalFace({ gx, gy: gy + d }, { gx: gx + w, gy: gy + d }, 0, height, 'left'),
       verticalFace({ gx: gx + w, gy }, { gx: gx + w, gy: gy + d }, 0, height, 'right'),
-      verticalFace({ gx: innerLeft, gy }, { gx: innerLeft, gy: innerBack }, 0, height, 'right'),
-      verticalFace({ gx: innerLeft, gy: innerBack }, { gx: innerRight, gy: innerBack }, 0, height, 'left'),
-      verticalFace({ gx, gy }, { gx: innerLeft, gy }, 0, height, 'left'),
-      verticalFace({ gx: innerRight, gy }, { gx: gx + w, gy }, 0, height, 'left'),
       topFace([
         { gx, gy },
         { gx: innerLeft, gy },
@@ -94,6 +91,7 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     const openingRight = gx + w - support
     const beamBottom = height * 0.64
     return [
+      verticalFace({ gx: openingLeft, gy }, { gx: openingLeft, gy: gy + d }, 0, beamBottom, 'right', true),
       {
         points: [
           toScreen(gx, gy + d, height),
@@ -109,16 +107,6 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
         hatch: true,
       },
       verticalFace({ gx: gx + w, gy }, { gx: gx + w, gy: gy + d }, 0, height, 'right', true),
-      verticalFace({ gx: openingLeft, gy }, { gx: openingLeft, gy: gy + d }, 0, beamBottom, 'right', true),
-      {
-        points: [
-          toScreen(openingLeft, gy, beamBottom),
-          toScreen(openingRight, gy, beamBottom),
-          toScreen(openingRight, gy + d, beamBottom),
-          toScreen(openingLeft, gy + d, beamBottom),
-        ],
-        shade: 'left',
-      },
       topFace([{ gx, gy }, { gx: gx + w, gy }, { gx: gx + w, gy: gy + d }, { gx, gy: gy + d }], height),
     ]
   }
