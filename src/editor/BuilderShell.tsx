@@ -10,7 +10,7 @@ import { MapHeader } from './MapHeader'
 import { useDocumentStore } from './document-store'
 import type { ConnectionDraft } from './connection'
 import type { RelationPreview } from './RelationCandidatePicker'
-import type { RelationPickTarget } from './ScenarioInspector'
+import type { RelationPickTarget, StagePreviewTarget } from './ScenarioInspector'
 
 export function BuilderShell({ presentation = false, onExport }: { presentation?: boolean; onExport?: () => void }) {
   const { document, selection, setSelection, commit, persistenceError, syncReady } = useDocumentStore()
@@ -20,6 +20,7 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null)
   const [relationPreview, setRelationPreview] = useState<RelationPreview | null>(null)
   const [relationPickTarget, setRelationPickTarget] = useState<RelationPickTarget | null>(null)
+  const [stagePreviewTarget, setStagePreviewTarget] = useState<StagePreviewTarget | null>(null)
   const [stepDisplayModes, setStepDisplayModes] = useState<{ build: StepDisplayMode; present: StepDisplayMode }>({ build: 'all', present: 'current' })
   const [fullscreen, setFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState<string | null>(null)
@@ -92,10 +93,11 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
   }
   const setEditorMode = (nextEditable: boolean) => {
     setEditable(nextEditable)
-    if (!nextEditable) { setRelationPickTarget(null); setRelationPreview(null) }
+    if (!nextEditable) { setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }
   }
   const changeActiveFlow = (id: string | null) => {
     setActiveFlowId(id)
+    setStagePreviewTarget(null)
     if (relationPickTarget && relationPickTarget.flowId !== id) { setRelationPickTarget(null); setRelationPreview(null) }
   }
   const relationPickFlow = relationPickTarget ? document.flows.find((flow) => flow.id === relationPickTarget.flowId) : null
@@ -118,10 +120,10 @@ export function BuilderShell({ presentation = false, onExport }: { presentation?
     <main className="map-workspace">
       <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} editable={editable} />
       <section className="stage-column">
-        <IsoCanvas document={document} selection={selection} activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} />
+        <IsoCanvas document={document} selection={selection} activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} />
         <footer className="map-footer"><span className="legend-key flow-key" /> flow <span className="legend-key support-key" /> support <span className="legend-key retry-key" /> retry <span className="payload-key" /> payload <b>{editable ? 'drag buildings · scroll to zoom · drag ground to pan' : 'choose a scenario · space plays · scroll to zoom'}</b></footer>
       </section>
-      <Inspector editable={editable} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} />
+      <Inspector editable={editable} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} onStagePreview={setStagePreviewTarget} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} />
     </main>
   </div>
 }

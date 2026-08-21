@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, 
 import type { GridPoint, OntologyDocument, Selection, VisualNode } from '../../domain/types'
 import type { ConnectionDraft } from '../../editor/connection'
 import type { RelationPreview } from '../../editor/RelationCandidatePicker'
+import type { StagePreviewTarget } from '../../editor/ScenarioInspector'
 import { portAnchors } from '../core/archetypes'
 import { visualiseNodes } from '../core/layout'
 import { buildFlowProgram } from '../core/program'
@@ -21,6 +22,7 @@ type Props = {
   editable: boolean
   stepDisplayMode: StepDisplayMode
   relationPreview: RelationPreview | null
+  stagePreviewTarget: StagePreviewTarget | null
   relationPickIds: ReadonlySet<string> | null
   onPickRelation: (id: string) => void
   onSelect: (selection: Selection | null) => void
@@ -69,7 +71,7 @@ function DistrictFlag({ district, selected, hovered, onSelect, onHover, onMeasur
   return <g className={`district-flag ${selected ? 'is-selected' : ''} ${hovered ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => onHover(district.id)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(district.id)} onBlur={() => onHover(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect() } }} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
 }
 
-export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, relationPickIds, onPickRelation, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
+export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -87,8 +89,22 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
   const geometry = useMemo(() => buildRelationGeometry(nodes, document.relations), [nodes, document.relations])
   const previewRelations = useMemo(() => connectionDraft ? connectionDraft.targets.map((target, index) => ({ id: `preview-${index}`, from: target.direction === 'outbound' ? connectionDraft.sourceId : target.nodeId, to: target.direction === 'outbound' ? target.nodeId : connectionDraft.sourceId, kind: connectionDraft.kind, label: connectionDraft.label })) : [], [connectionDraft])
   const previewGeometry = useMemo(() => buildRelationGeometry(nodes, previewRelations), [nodes, previewRelations])
-  const candidateRoute = relationPreview ? geometry.get(relationPreview.relationId) ?? null : null
-  const candidatePoints = candidateRoute ? relationPreview?.direction === 'reverse' ? [...candidateRoute.points].reverse() : candidateRoute.points : null
+  const previewStage = stagePreviewTarget ? document.flows.find((flow) => flow.id === stagePreviewTarget.flowId)?.stages.find((stage) => stage.id === stagePreviewTarget.stageId) ?? null : null
+  const routePreviews = (relationPreview
+    ? [{ key: 'candidate', relationId: relationPreview.relationId, direction: relationPreview.direction }]
+    : previewStage?.traversals.map((traversal) => ({ key: traversal.id, relationId: traversal.relationId, direction: traversal.direction })) ?? [])
+    .flatMap((preview) => {
+      const route = geometry.get(preview.relationId)
+      if (!route) return []
+      return [{ key: preview.key, points: preview.direction === 'reverse' ? [...route.points].reverse() : route.points }]
+    })
+  const previewNodeIds = new Set<string>()
+  if (!relationPreview && previewStage) {
+    for (const traversal of previewStage.traversals) {
+      const relation = document.relations.find((candidate) => candidate.id === traversal.relationId)
+      if (relation) { previewNodeIds.add(relation.from); previewNodeIds.add(relation.to) }
+    }
+  }
   const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
   const program = useMemo(() => activeFlow ? buildFlowProgram(activeFlow, nodes, document.relations, geometry) : null, [activeFlow, nodes, document.relations, geometry])
   const activeClockKey = useClockActiveKey()
@@ -287,14 +303,14 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
                 if (!route) return null
                 return <polyline key={relation.id} points={pointsAttribute(route.points)} className="connection-preview" vectorEffect="non-scaling-stroke" />
               })}
-              {candidatePoints ? (() => {
-                const end = candidatePoints[candidatePoints.length - 1]!
-                const before = candidatePoints[candidatePoints.length - 2] ?? end
+              {routePreviews.map((preview) => {
+                const end = preview.points[preview.points.length - 1]!
+                const before = preview.points[preview.points.length - 2] ?? end
                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
-                return <g className="candidate-relation-preview"><polyline points={pointsAttribute(candidatePoints)} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -8 4 L -8 -4 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} /></g>
-              })() : null}
+                return <g key={preview.key} className="candidate-relation-preview"><polyline points={pointsAttribute(preview.points)} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -8 4 L -8 -4 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} /></g>
+              })}
             </g>
-            {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} editable={editable && !connectionDraft && !relationPicking} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
+            {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} previewed={previewNodeIds.has(node.id)} editable={editable && !connectionDraft && !relationPicking} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
               if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
               if (connectionDraft) onToggleConnectionTarget(node.id)
               else if (!relationPicking) onSelect({ kind: 'node', id: node.id })

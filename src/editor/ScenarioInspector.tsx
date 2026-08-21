@@ -6,9 +6,10 @@ import { RelationCandidatePicker, type RelationCandidateOption, type RelationPre
 
 type Commit = (transform: (document: OntologyDocument) => OntologyDocument) => void
 export type RelationPickTarget = { flowId: string; stageId: string | null }
-type StageDragSession = { pointerId: number; stageId: string; beforeStageId: string | null; startY: number; clientY: number; moved: boolean; frame: number; handle: HTMLButtonElement }
+export type StagePreviewTarget = { flowId: string; stageId: string }
+type StageDragSession = { pointerId: number; stageId: string; beforeStageId: string | null; startY: number; clientX: number; clientY: number; moved: boolean; frame: number; owner: HTMLElement }
 
-export function ScenarioInspector({ flow, document, commit, editable, relationPickTarget, onRelationPickTarget, onRelationPreview }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void }) {
+export function ScenarioInspector({ flow, document, commit, editable, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void }) {
   const patch = (value: Partial<OntologyFlow>) => commit((current) => ({ ...current, flows: current.flows.map((item) => item.id === flow.id ? { ...item, ...value } : item) }))
   const nodeById = new Map(document.nodes.map((node) => [node.id, node]))
   const relationById = new Map(document.relations.map((relation) => [relation.id, relation]))
@@ -46,7 +47,7 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
     const tick = () => {
       const current = dragSession.current
       if (!current || !current.moved) return
-      const inspector = current.handle.closest<HTMLElement>('.inspector')
+      const inspector = current.owner.closest<HTMLElement>('.inspector')
       if (!inspector) return
       const bounds = inspector.getBoundingClientRect()
       const margin = 52
@@ -63,10 +64,12 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
     if (!session) return
     dragSession.current = null
     if (session.frame) cancelAnimationFrame(session.frame)
-    if (session.handle.hasPointerCapture(session.pointerId)) session.handle.releasePointerCapture(session.pointerId)
+    if (session.owner.hasPointerCapture(session.pointerId)) session.owner.releasePointerCapture(session.pointerId)
     setDraggingStageId(null)
     setDropBeforeStageId(null)
     if (shouldCommit && session.moved) commit((current) => moveFlowStage(current, flow.id, session.stageId, session.beforeStageId))
+    const hoveredStage = window.document.elementFromPoint(session.clientX, session.clientY)?.closest<HTMLElement>('[data-stage-id]')?.dataset.stageId
+    onStagePreview(hoveredStage ? { flowId: flow.id, stageId: hoveredStage } : null)
   }
   const cancelStageDrag = useEffectEvent(() => finishStageDrag(false))
 
@@ -87,18 +90,23 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
     }
   }, [])
 
-  const startStageDrag = (event: ReactPointerEvent<HTMLButtonElement>, stageId: string) => {
+  useEffect(() => () => onStagePreview(null), [onStagePreview])
+
+  const startStageDrag = (event: ReactPointerEvent<HTMLElement>, stageId: string) => {
     if (event.button !== 0 || dragSession.current) return
+    const target = event.target as Element
+    if (target.closest('button, input, textarea, select, a, [contenteditable="true"], [role="dialog"]')) return
     event.preventDefault()
     event.stopPropagation()
-    dragSession.current = { pointerId: event.pointerId, stageId, beforeStageId: stageId, startY: event.clientY, clientY: event.clientY, moved: false, frame: 0, handle: event.currentTarget }
+    dragSession.current = { pointerId: event.pointerId, stageId, beforeStageId: stageId, startY: event.clientY, clientX: event.clientX, clientY: event.clientY, moved: false, frame: 0, owner: event.currentTarget }
     event.currentTarget.setPointerCapture(event.pointerId)
     setDraggingStageId(stageId)
     setDropBeforeStageId(stageId)
   }
-  const moveStageDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const moveStageDrag = (event: ReactPointerEvent<HTMLElement>) => {
     const session = dragSession.current
     if (!session || session.pointerId !== event.pointerId) return
+    session.clientX = event.clientX
     session.clientY = event.clientY
     session.moved ||= Math.abs(event.clientY - session.startY) > 5
     if (!session.moved) return
@@ -123,8 +131,8 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
           const usedRelationIds = new Set(stage.traversals.map((traversal) => traversal.relationId))
           const candidates = document.relations.filter((relation) => !usedRelationIds.has(relation.id))
           const withoutStage = flow.stages.filter((_, index) => index !== stageIndex)
-          return <section ref={(element) => { if (element) stageElements.current.set(stage.id, element); else stageElements.current.delete(stage.id) }} className={`scenario-stage ${draggingStageId === stage.id ? 'is-dragging' : ''} ${draggingStageId && dropBeforeStageId === stage.id ? 'is-drop-before' : ''}`} key={stage.id}>
-            <header><strong>Step {String(stageIndex + 1).padStart(2, '0')}</strong><div><button type="button" className="scenario-drag-handle" aria-label={`Drag step ${stageIndex + 1}`} title="Drag to reorder" onPointerDown={(event) => startStageDrag(event, stage.id)} onPointerMove={moveStageDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }}><span aria-hidden="true">::</span></button><button type="button" disabled={stageIndex === 0} onClick={() => commit((current) => moveFlowStage(current, flow.id, stage.id, flow.stages[stageIndex - 1]?.id ?? null))}>↑</button><button type="button" disabled={stageIndex === flow.stages.length - 1} onClick={() => commit((current) => moveFlowStage(current, flow.id, stage.id, flow.stages[stageIndex + 2]?.id ?? null))}>↓</button><button type="button" onClick={() => patch({ stages: withoutStage })}>×</button></div></header>
+          return <section ref={(element) => { if (element) stageElements.current.set(stage.id, element); else stageElements.current.delete(stage.id) }} data-stage-id={stage.id} className={`scenario-stage ${draggingStageId === stage.id ? 'is-dragging' : ''} ${draggingStageId && dropBeforeStageId === stage.id ? 'is-drop-before' : ''}`} key={stage.id} onPointerEnter={() => onStagePreview({ flowId: flow.id, stageId: stage.id })} onPointerLeave={() => { if (!dragSession.current) onStagePreview(null) }} onPointerDown={(event) => startStageDrag(event, stage.id)} onPointerMove={moveStageDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }}>
+            <header><strong>Step {String(stageIndex + 1).padStart(2, '0')}</strong><div><span className="scenario-drag-indicator" aria-hidden="true">::</span><button type="button" disabled={stageIndex === 0} onClick={() => commit((current) => moveFlowStage(current, flow.id, stage.id, flow.stages[stageIndex - 1]?.id ?? null))}>↑</button><button type="button" disabled={stageIndex === flow.stages.length - 1} onClick={() => commit((current) => moveFlowStage(current, flow.id, stage.id, flow.stages[stageIndex + 2]?.id ?? null))}>↓</button><button type="button" onClick={() => patch({ stages: withoutStage })}>×</button></div></header>
             {stage.traversals.map((traversal) => {
               const relation = relationById.get(traversal.relationId)
               if (!relation) return <div className="scenario-branch is-missing" key={traversal.id}>Missing relation</div>

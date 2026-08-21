@@ -244,8 +244,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation-direction strong { font-size: 11px; text-align: center; }
 .relation-direction button { height: 30px; border: 1px solid var(--accent); background: var(--accent-wash); color: var(--accent); }
 .scenario-stages { display: flex; flex-direction: column; gap: 10px; }
-.scenario-stage { position: relative; border: 1px solid var(--border); background: var(--surface-soft); transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
-.scenario-stage.is-dragging { opacity: .42; transform: scale(.985); }
+.scenario-stage { position: relative; border: 1px solid var(--border); background: var(--surface-soft); cursor: grab; touch-action: none; user-select: none; transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease, background 120ms ease; }
+.scenario-stage:hover:not(.is-dragging) { background: color-mix(in srgb, var(--accent-wash) 38%, var(--surface-soft)); box-shadow: 0 7px 18px color-mix(in srgb, var(--ink) 7%, transparent); }
+.scenario-stage.is-dragging { opacity: .42; transform: scale(.985); cursor: grabbing; }
 .scenario-stage.is-drop-before { box-shadow: 0 -4px 0 -1px var(--accent); }
 .scenario-stage-drop-end { height: 3px; margin-top: -4px; border-radius: 2px; background: var(--accent); }
 .scenario-stage > header { display: flex; align-items: center; justify-content: space-between; padding: 7px 9px; border-bottom: 1px solid var(--border); }
@@ -253,8 +254,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .scenario-stage > header div { display: flex; gap: 3px; }
 .scenario-stage > header button { width: 23px; height: 22px; padding: 0; border: 1px solid var(--border); background: var(--surface); font: 9px var(--mono); }
 .scenario-stage > header button:disabled { opacity: .25; }
-.scenario-stage > header .scenario-drag-handle { cursor: grab; touch-action: none; }
-.scenario-stage > header .scenario-drag-handle:active { cursor: grabbing; }
+.scenario-drag-indicator { width: 23px; height: 22px; display: grid; place-items: center; color: var(--ink-3); font: 9px var(--mono); }
 .scenario-branch { display: grid; grid-template-columns: 25px minmax(0, 1fr) 27px 25px minmax(0, 1fr) 22px; align-items: center; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); }
 .scenario-branch .branch-code { color: var(--ink-3); font: 8px var(--mono); }
 .scenario-branch .branch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
@@ -328,13 +328,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .is-hatched.face-left, .is-hatched.face-right { fill: url(#map-hatch); }
 .hatch-line { stroke: var(--structure); stroke-width: .7; opacity: .45; }
 .building:hover .building-face { stroke: var(--ink); }
-.building.is-selected .building-face, .building.is-active .building-face { stroke: var(--accent); }
+.building.is-selected .building-face, .building.is-active .building-face, .building.is-previewed .building-face { stroke: var(--accent); }
+.building.is-previewed .face-top { fill: var(--accent-wash); }
 .building.is-connect-source .building-face, .building.is-connect-target .building-face { stroke: var(--accent); }
 .building.is-connect-target .face-top { fill: var(--accent-wash); }
 .roof-chip rect { fill: var(--surface-raised); stroke: var(--structure); stroke-width: 1; }
 .roof-chip text { fill: var(--ink); font: 8px var(--mono); text-transform: uppercase; }
-.building.is-selected .roof-chip rect, .building.is-active .roof-chip rect { stroke: var(--accent); }
-.building.is-selected .roof-chip text { fill: var(--accent); }
+.building.is-selected .roof-chip rect, .building.is-active .roof-chip rect, .building.is-previewed .roof-chip rect { stroke: var(--accent); }
+.building.is-selected .roof-chip text, .building.is-previewed .roof-chip text { fill: var(--accent); }
 .flow-trace { fill: none; stroke: var(--accent); stroke-width: 1.8; opacity: .45; }
 .flow-animation, .candidate-relation-preview, .connection-preview { pointer-events: none; }
 .flow-arrow { fill: var(--accent); opacity: .45; }
@@ -412,7 +413,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .inspector { display: none; }
   .map-app.has-inspector .left-rail { display: none; }
   .map-app.has-inspector .inspector { position: absolute; right: 8px; bottom: 40px; left: 8px; z-index: 9; display: block; width: auto; max-height: min(46vh, 390px); border: 1px solid var(--border); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
-  .scenario-stage > header .scenario-drag-handle { width: 44px; height: 44px; margin: -11px 0; }
   .camera-controls { bottom: 174px; }
   .map-footer { padding-right: 8px; }
   .map-footer b { display: none; }

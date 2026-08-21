@@ -8,6 +8,7 @@ type BuildingProps = {
   selected: boolean
   dimmed: boolean
   active: boolean
+  previewed: boolean
   editable: boolean
   onSelect: () => void
   onDragStart: (event: ReactPointerEvent<SVGGElement>) => void
@@ -16,15 +17,15 @@ type BuildingProps = {
   connectionMode?: boolean
 }
 
-function BuildingInner({ node, selected, dimmed, active, editable, onSelect, onDragStart, connectionSource = false, connectionTarget = false, connectionMode = false }: BuildingProps) {
+function BuildingInner({ node, selected, dimmed, active, previewed, editable, onSelect, onDragStart, connectionSource = false, connectionTarget = false, connectionMode = false }: BuildingProps) {
   const faces = buildingFaces(node.archetype, node.footprint, node.height, node.properties.length)
   const chip = chipAnchor(node.footprint, node.height)
-  const label = selected || active ? `${node.code} · ${node.name}` : node.code
+  const label = selected || active || previewed ? `${node.code} · ${node.name}` : node.code
   const half = Math.max(15, label.length * 3.2 + 8)
 
   return (
     <g
-      className={`building ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${connectionSource ? 'is-connect-source' : ''} ${connectionTarget ? 'is-connect-target' : ''}`}
+      className={`building ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${previewed ? 'is-previewed' : ''} ${connectionSource ? 'is-connect-source' : ''} ${connectionTarget ? 'is-connect-target' : ''}`}
       opacity={dimmed ? 0.28 : 1}
       role="button"
       tabIndex={0}
