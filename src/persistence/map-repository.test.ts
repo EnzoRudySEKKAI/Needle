@@ -15,11 +15,15 @@ describe('map migrations', () => {
     legacy.nodes = (legacy.nodes as Record<string, unknown>[]).map((node) => {
       const copy = { ...node }
       delete copy.faceTexture
+      delete copy.size
+      copy.metric = 12
+      copy.unit = 'items'
       return copy
     })
     const migrated = migrateDocument(legacy)
-    expect(migrated?.schemaVersion).toBe(3)
+    expect(migrated?.schemaVersion).toBe(4)
     expect(migrated?.nodes.every((node) => node.faceTexture === 'auto')).toBe(true)
+    expect(migrated?.nodes.every((node) => node.size === 's' && !('metric' in node) && !('unit' in node))).toBe(true)
     expect(migrated?.flows[0]?.stages.length).toBeGreaterThan(0)
   })
 })

@@ -44,8 +44,11 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, onSelec
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [cameraOverride, setCameraOverride] = useState<Camera | null>(null)
   const [flagWidths, setFlagWidths] = useState<ReadonlyMap<string, number>>(() => new Map())
+  const [dragPositions, setDragPositions] = useState<ReadonlyMap<string, { gx: number; gy: number }>>(() => new Map())
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
   const gesture = useRef<{ x: number; y: number; camera: Camera } | null>(null)
-  const nodes = useMemo(() => visualiseNodes(document.nodes), [document.nodes])
+  const positionedNodes = useMemo(() => document.nodes.map((node) => dragPositions.has(node.id) ? { ...node, position: dragPositions.get(node.id)! } : node), [document.nodes, dragPositions])
+  const nodes = useMemo(() => visualiseNodes(positionedNodes), [positionedNodes])
   const scene = useMemo(() => buildScene(document.groups, nodes, `${document.id}:${document.updatedAt}`, flagWidths), [document.groups, document.id, document.updatedAt, flagWidths, nodes])
   const geometry = useMemo(() => buildRelationGeometry(nodes, document.relations), [nodes, document.relations])
   const previewRelations = useMemo(() => connectionDraft ? connectionDraft.targets.map((target, index) => ({ id: `preview-${index}`, from: target.direction === 'outbound' ? connectionDraft.sourceId : target.nodeId, to: target.direction === 'outbound' ? target.nodeId : connectionDraft.sourceId, kind: connectionDraft.kind, label: connectionDraft.label })) : [], [connectionDraft])
@@ -82,6 +85,25 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, onSelec
     next.set(id, width)
     return next
   })
+  const previewNodePosition = (id: string, gx: number, gy: number) => setDragPositions((current) => {
+    const next = new Map(current)
+    next.set(id, { gx, gy })
+    return next
+  })
+  const finishNodePosition = (id: string, gx: number, gy: number) => {
+    onMoveNode(id, gx, gy)
+    setDragPositions((current) => {
+      const next = new Map(current)
+      next.delete(id)
+      return next
+    })
+  }
+  const cancelNodePosition = (id: string) => setDragPositions((current) => {
+    if (!current.has(id)) return current
+    const next = new Map(current)
+    next.delete(id)
+    return next
+  })
 
   return (
     <div className="canvas-wrap" ref={containerRef}>
@@ -95,7 +117,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, onSelec
         onClick={() => onSelect(null)}
         onWheel={(event) => {
           event.preventDefault()
-          if (!camera) return
+          if (!camera || draggingNodeId) return
           const rect = event.currentTarget.getBoundingClientRect()
           setCameraOverride(zoomAbout(camera, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top))
         }}
@@ -107,9 +129,12 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, onSelec
         onPointerMove={(event) => {
           const start = gesture.current
           if (!start) return
+          if (event.buttons === 0) { gesture.current = null; return }
           setCameraOverride({ ...start.camera, x: start.camera.x + event.clientX - start.x, y: start.camera.y + event.clientY - start.y })
         }}
         onPointerUp={() => { gesture.current = null }}
+        onPointerCancel={() => { gesture.current = null }}
+        onLostPointerCapture={() => { gesture.current = null }}
       >
         <defs>
           <pattern id="map-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" className="hatch-line" /></pattern>
@@ -131,7 +156,8 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, onSelec
                 const end = route.points[route.points.length - 1]!
                 const before = route.points[route.points.length - 2] ?? end
                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
-                return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program ? 'is-dimmed' : ''}`} onClick={(event) => { event.stopPropagation(); onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
+                const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
+                return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program ? 'is-dimmed' : ''}`} role="button" tabIndex={0} aria-label={`${relation.label}: ${relation.from} to ${relation.to}`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect({ kind: 'relation', id: relation.id }) }} onClick={(event) => { event.stopPropagation(); onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
               })}
               {previewRelations.map((relation) => {
                 const route = previewGeometry.get(relation.id)
@@ -139,7 +165,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, onSelec
                 return <polyline key={relation.id} points={pointsAttribute(route.points)} className="connection-preview" vectorEffect="non-scaling-stroke" />
               })}
             </g>
-            {scene.shapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} editable={editable && !connectionDraft} cameraScale={camera.k} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => connectionDraft ? onToggleConnectionTarget(node.id) : onSelect({ kind: 'node', id: node.id })} onMove={(gx, gy) => onMoveNode(node.id, gx, gy)} />)}
+            {scene.shapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} editable={editable && !connectionDraft} cameraScale={camera.k} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => connectionDraft ? onToggleConnectionTarget(node.id) : onSelect({ kind: 'node', id: node.id })} onMovePreview={(gx, gy) => previewNodePosition(node.id, gx, gy)} onMoveEnd={(gx, gy) => finishNodePosition(node.id, gx, gy)} onMoveCancel={() => cancelNodePosition(node.id)} onDragState={(dragging) => setDraggingNodeId(dragging ? node.id : null)} />)}
             {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} /> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
             <g className="district-flags">

@@ -1,6 +1,6 @@
 import { cloneSample } from '../domain/sample'
 import { isOntologyDocument } from '../domain/validation'
-import { SCHEMA_VERSION, type OntologyDocument } from '../domain/types'
+import { SCHEMA_VERSION, type BuildingSize, type OntologyDocument } from '../domain/types'
 
 const PREFIX = 'needle:map:'
 const INDEX_KEY = 'needle:map-index'
@@ -35,12 +35,28 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
   if (isOntologyDocument(value)) return value
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
-  if (![1, 2].includes(legacy.schemaVersion as number) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
+  if (![1, 2, 3].includes(legacy.schemaVersion as number) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
+  const sizeFromMetric = (metric: unknown): BuildingSize => {
+    const value = typeof metric === 'number' && Number.isFinite(metric) ? metric : 0
+    if (value <= 8) return 'xs'
+    if (value <= 24) return 's'
+    if (value <= 64) return 'm'
+    if (value <= 159) return 'l'
+    return 'xl'
+  }
+  const documentFields = { ...legacy }
+  delete documentFields.metricLabel
   const migrated = {
-    ...legacy,
+    ...documentFields,
     schemaVersion: SCHEMA_VERSION,
-    nodes: legacy.nodes.map((node) => ({ faceTexture: 'auto', ...(node as object) })),
-    flows: legacy.flows.map((flow, flowIndex) => {
+    nodes: legacy.nodes.map((node) => {
+      const nodeFields = { ...node as Record<string, unknown> }
+      const metric = nodeFields.metric
+      delete nodeFields.metric
+      delete nodeFields.unit
+      return { faceTexture: 'auto', ...nodeFields, size: sizeFromMetric(metric) }
+    }),
+    flows: legacy.schemaVersion === 3 ? legacy.flows : legacy.flows.map((flow, flowIndex) => {
       const legacyFlow = flow as Record<string, unknown>
       const relationIds = Array.isArray(legacyFlow.relationIds) ? legacyFlow.relationIds : []
       const rest = { ...legacyFlow }
@@ -81,7 +97,6 @@ export function createBlankMap(name = 'Untitled ontology'): OntologyDocument {
     name,
     version: 'v0.1',
     description: 'Describe what this ontology helps people understand.',
-    metricLabel: 'structural weight',
     createdAt: now,
     updatedAt: now,
     groups: [{ id: 'first-neighborhood', name: 'First neighborhood', description: 'A place for related concepts.' }],

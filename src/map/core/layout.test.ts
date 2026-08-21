@@ -4,10 +4,10 @@ import { footprintsOverlap } from './iso'
 import { deriveHeight, visualiseNodes } from './layout'
 
 describe('derived map geometry', () => {
-  it('grows logarithmically and stays bounded', () => {
-    expect(deriveHeight(0, 'cube')).toBe(1.2)
-    expect(deriveHeight(100, 'cube')).toBeGreaterThan(deriveHeight(10, 'cube'))
-    expect(deriveHeight(100_000, 'tower')).toBe(6)
+  it('gives every predefined size a distinct height', () => {
+    const heights = (['xs', 's', 'm', 'l', 'xl'] as const).map((size) => deriveHeight(size, 'cube'))
+    expect(new Set(heights).size).toBe(5)
+    expect(deriveHeight('xl', 'tower')).toBeGreaterThan(deriveHeight('l', 'tower'))
   })
 
   it('keeps the authored sample footprints separate', () => {

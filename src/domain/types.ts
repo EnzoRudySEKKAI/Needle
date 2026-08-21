@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3 as const
+export const SCHEMA_VERSION = 4 as const
 
 export type GridPoint = { gx: number; gy: number }
 export type Footprint = GridPoint & { w: number; d: number }
@@ -15,6 +15,7 @@ export type Archetype =
   | 'stepped-pyramid'
 export type FaceTexture = 'auto' | 'plain' | 'hatched'
 export type RelationKind = 'flow' | 'data' | 'support' | 'retry'
+export type BuildingSize = 'xs' | 's' | 'm' | 'l' | 'xl'
 
 export type OntologyGroup = {
   id: string
@@ -37,8 +38,7 @@ export type OntologyNode = {
   kind: string
   whatItDoes: string
   howItsBuilt: string
-  metric: number
-  unit: string
+  size: BuildingSize
   properties: OntologyProperty[]
   position: GridPoint
   archetypeOverride?: Archetype
@@ -81,7 +81,6 @@ export type OntologyDocument = {
   name: string
   version: string
   description: string
-  metricLabel: string
   createdAt: string
   updatedAt: string
   groups: OntologyGroup[]

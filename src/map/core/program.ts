@@ -29,7 +29,7 @@ function geometryForTraversal(traversal: FlowTraversal, geometry: RelationGeomet
   if (traversal.direction === 'forward') return geometry
   const points = [...geometry.points].reverse()
   const { cumulative, total } = polylineLengths(points)
-  return { points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
+  return { points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide, labelPoint: geometry.labelPoint }
 }
 
 export function buildFlowProgram(flow: OntologyFlow, nodes: readonly VisualNode[], relations: readonly OntologyRelation[], geometry: ReadonlyMap<string, RelationGeometry>): FlowProgram | null {

@@ -1,4 +1,6 @@
-import type { OntologyDocument } from './types'
+import type { BuildingSize, OntologyDocument } from './types'
+
+const BUILDING_SIZES = new Set<BuildingSize>(['xs', 's', 'm', 'l', 'xl'])
 
 export type Diagnostic = {
   level: 'error' | 'warning'
@@ -26,7 +28,7 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
   for (const code of duplicates(document.nodes.map((node) => node.code))) diagnostics.push({ level: 'warning', message: `Duplicate roof code: ${code}` })
   for (const node of document.nodes) {
     if (!groupIds.has(node.groupId)) diagnostics.push({ level: 'error', message: `${node.name} has no valid neighborhood.`, target: { kind: 'node', id: node.id } })
-    if (!Number.isFinite(node.metric) || node.metric < 0) diagnostics.push({ level: 'error', message: `${node.name} has an invalid metric.`, target: { kind: 'node', id: node.id } })
+    if (!BUILDING_SIZES.has(node.size)) diagnostics.push({ level: 'error', message: `${node.name} has an invalid size.`, target: { kind: 'node', id: node.id } })
   }
   for (const relation of document.relations) {
     if (!nodeIds.has(relation.from) || !nodeIds.has(relation.to)) diagnostics.push({ level: 'error', message: `${relation.label} points to a missing concept.`, target: { kind: 'relation', id: relation.id } })
@@ -61,5 +63,11 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
 export function isOntologyDocument(value: unknown): value is OntologyDocument {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<OntologyDocument>
-  return candidate.schemaVersion === 3 && typeof candidate.id === 'string' && Array.isArray(candidate.groups) && Array.isArray(candidate.nodes) && Array.isArray(candidate.relations) && Array.isArray(candidate.flows)
+  if (candidate.schemaVersion !== 4 || typeof candidate.id !== 'string' || !Array.isArray(candidate.groups) || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.relations) || !Array.isArray(candidate.flows)) return false
+  if ('metricLabel' in candidate) return false
+  return candidate.nodes.every((value) => {
+    if (!value || typeof value !== 'object') return false
+    const node = value as unknown as Record<string, unknown>
+    return typeof node.id === 'string' && BUILDING_SIZES.has(node.size as BuildingSize) && Array.isArray(node.properties) && !('metric' in node) && !('unit' in node)
+  })
 }

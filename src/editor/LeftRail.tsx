@@ -1,4 +1,5 @@
 import { codeFromName, makeId } from '../domain/id'
+import { deleteRelationsCascade } from '../domain/commands'
 import type { Selection } from '../domain/types'
 import { nextFreePosition } from '../map/core/layout'
 import { useDocumentStore } from './document-store'
@@ -17,7 +18,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
     const name = 'New concept'
     const code = codeFromName(name, new Set(document.nodes.map((node) => node.code)))
     const position = nextFreePosition(document.nodes, groupId)
-    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, role: 'an undefined role', groupId, kind: 'concept', whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', metric: 12, unit: 'units', properties: [], position, faceTexture: 'auto' }] }))
+    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, role: 'an undefined role', groupId, kind: 'concept', whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
     setSelection({ kind: 'node', id })
   }
 
@@ -33,6 +34,12 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
     if (next.kind !== 'flow') onActiveFlow(null)
   }
 
+  const deleteRelation = (id: string) => {
+    commit((current) => deleteRelationsCascade(current, new Set([id])))
+    if (selection?.kind === 'relation' && selection.id === id) setSelection(null)
+    onActiveFlow(null)
+  }
+
   return (
     <aside className="left-rail">
       <section className="rail-section rail-flows">
@@ -46,13 +53,24 @@ export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowI
           {document.flows.length === 0 ? <p className="rail-empty">No scenario yet.</p> : null}
         </div>
       </section>
+      <section className="rail-section rail-relations">
+        <div className="rail-heading"><span>Relations</span><span>{document.relations.length}</span></div>
+        <div className="relation-list">
+          {document.relations.map((relation) => {
+            const from = document.nodes.find((node) => node.id === relation.from)
+            const to = document.nodes.find((node) => node.id === relation.to)
+            return <div className={`relation-row ${selection?.kind === 'relation' && selection.id === relation.id ? 'is-active' : ''}`} key={relation.id}><button type="button" onClick={() => select({ kind: 'relation', id: relation.id })}><span>{from?.code ?? '?'}</span><strong>{relation.label}</strong><span>{to?.code ?? '?'}</span></button>{editable ? <button type="button" className="relation-row-delete" aria-label={`Delete ${relation.label}`} onClick={() => deleteRelation(relation.id)}>×</button> : null}</div>
+          })}
+          {document.relations.length === 0 ? <p className="rail-empty">No relation yet.</p> : null}
+        </div>
+      </section>
       <div className="rail-neighborhoods">
         {document.groups.map((group) => (
           <section className="rail-section" key={group.id}>
             <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id).length}</span></button>
             <div className="node-list">
               {document.nodes.filter((node) => node.groupId === group.id).map((node) => (
-                <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-metric">{node.metric}</span></button>
+                <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>
               ))}
               {editable ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
             </div>

@@ -1,32 +1,49 @@
-import type { Archetype, Footprint, OntologyNode, VisualNode } from '../../domain/types'
+import type { Archetype, BuildingSize, Footprint, OntologyNode, VisualNode } from '../../domain/types'
 import { footprintsOverlap } from './iso'
 
 export function deriveArchetype(node: OntologyNode): Archetype {
   if (node.archetypeOverride) return node.archetypeOverride
-  if (node.metric <= 8) return 'low-slab'
-  if (node.properties.length >= 4) return 'fin-row'
-  if (node.metric >= 160) return 'slab-stack'
-  if (node.metric >= 80 && node.properties.length <= 2) return 'tower'
-  return 'cube'
+  return { xs: 'low-slab', s: 'cube', m: 'podium-tower', l: 'tower', xl: 'slab-stack' }[node.size] as Archetype
 }
 
-export function deriveHeight(metric: number, archetype: Archetype): number {
-  if (archetype === 'low-slab') return 0.65
-  const steps = Math.log2(Math.max(0, metric) / 12 + 1) * 1.3
-  return Math.max(1.2, Math.min(6, Math.round(steps * 2) / 2))
+const SIZE_PROFILES: Record<BuildingSize, { footprint: number; height: number }> = {
+  xs: { footprint: 0.68, height: 0.8 },
+  s: { footprint: 0.84, height: 1.25 },
+  m: { footprint: 1, height: 1.9 },
+  l: { footprint: 1.22, height: 2.9 },
+  xl: { footprint: 1.48, height: 4.2 },
+}
+
+const HEIGHT_FACTOR: Record<Archetype, number> = {
+  cube: 1,
+  tower: 1.35,
+  'low-slab': 0.48,
+  'slab-stack': 0.92,
+  'fin-row': 0.72,
+  'podium-tower': 1.15,
+  'twin-towers': 1.25,
+  courtyard: 0.68,
+  bridge: 0.75,
+  'stepped-pyramid': 0.9,
+}
+
+export function deriveHeight(size: BuildingSize, archetype: Archetype): number {
+  return SIZE_PROFILES[size].height * HEIGHT_FACTOR[archetype]
 }
 
 export function deriveSize(node: OntologyNode, archetype: Archetype): { w: number; d: number } {
-  if (archetype === 'fin-row') return { w: Math.max(3, Math.min(7, node.properties.length + 1)), d: 2 }
-  if (archetype === 'slab-stack') return { w: 3.5, d: 3 }
-  if (archetype === 'tower') return { w: 2.2, d: 2.2 }
-  if (archetype === 'low-slab') return { w: 3, d: 2 }
-  if (archetype === 'podium-tower') return { w: 3.2, d: 2.8 }
-  if (archetype === 'twin-towers') return { w: 3.5, d: 2.5 }
-  if (archetype === 'courtyard') return { w: 3.5, d: 3.2 }
-  if (archetype === 'bridge') return { w: 3.5, d: 2.4 }
-  if (archetype === 'stepped-pyramid') return { w: 3.5, d: 3.2 }
-  return node.metric > 50 ? { w: 3, d: 2 } : { w: 2.2, d: 2 }
+  const base = archetype === 'fin-row' ? { w: Math.max(3, Math.min(7, node.properties.length + 1)), d: 2 }
+    : archetype === 'slab-stack' ? { w: 3.5, d: 3 }
+      : archetype === 'tower' ? { w: 2.2, d: 2.2 }
+        : archetype === 'low-slab' ? { w: 3, d: 2 }
+          : archetype === 'podium-tower' ? { w: 3.2, d: 2.8 }
+            : archetype === 'twin-towers' ? { w: 3.5, d: 2.5 }
+              : archetype === 'courtyard' ? { w: 3.5, d: 3.2 }
+                : archetype === 'bridge' ? { w: 3.5, d: 2.4 }
+                  : archetype === 'stepped-pyramid' ? { w: 3.5, d: 3.2 }
+                    : { w: 2.6, d: 2.2 }
+  const scale = SIZE_PROFILES[node.size].footprint
+  return { w: base.w * scale, d: base.d * scale }
 }
 
 export function visualiseNodes(nodes: readonly OntologyNode[]): VisualNode[] {
@@ -36,7 +53,7 @@ export function visualiseNodes(nodes: readonly OntologyNode[]): VisualNode[] {
     return {
       ...node,
       archetype,
-      height: deriveHeight(node.metric, archetype),
+      height: deriveHeight(node.size, archetype),
       footprint: { ...node.position, ...size },
     }
   })
