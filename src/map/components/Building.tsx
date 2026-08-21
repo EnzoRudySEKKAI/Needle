@@ -1,7 +1,7 @@
 import { memo, type PointerEvent as ReactPointerEvent } from 'react'
 import type { VisualNode } from '../../domain/types'
-import { buildingFaces, chipAnchor } from '../core/archetypes'
-import { pointsAttribute } from '../core/iso'
+import { chipAnchor } from '../core/archetypes'
+import { ConceptVolume } from './ConceptVolume'
 
 type BuildingProps = {
   node: VisualNode
@@ -18,7 +18,6 @@ type BuildingProps = {
 }
 
 function BuildingInner({ node, selected, dimmed, active, previewed, editable, onSelect, onDragStart, connectionSource = false, connectionTarget = false, connectionMode = false }: BuildingProps) {
-  const faces = buildingFaces(node.archetype, node.footprint, node.height, node.properties.length)
   const chip = chipAnchor(node.footprint, node.height)
   const code = node.code.trim()
   const label = selected || active || previewed ? `${code} · ${node.name}` : code
@@ -41,7 +40,7 @@ function BuildingInner({ node, selected, dimmed, active, previewed, editable, on
         onDragStart(event)
       }}
     >
-      {faces.map((face, index) => <polygon key={index} points={pointsAttribute(face.points)} className={`building-face face-${face.shade} ${node.faceTexture === 'hatched' || (node.faceTexture === 'auto' && face.hatch) ? 'is-hatched' : ''}`} vectorEffect="non-scaling-stroke" />)}
+      <ConceptVolume node={node} />
       {code ? <g className="roof-chip" transform={`translate(${chip.x} ${chip.y - 12})`}><rect x={-half} y={-9} width={half * 2} height={18} rx={3} vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{label}</text></g> : null}
     </g>
   )

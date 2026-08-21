@@ -1,6 +1,7 @@
-import type { BuildingSize, OntologyDocument } from './types'
+import { SCHEMA_VERSION, STRUCTURE_TYPES, type BuildingSize, type OntologyDocument, type StructureType } from './types'
 
 const BUILDING_SIZES = new Set<BuildingSize>(['xs', 's', 'm', 'l', 'xl'])
+const VALID_STRUCTURE_TYPES = new Set<StructureType>(STRUCTURE_TYPES)
 
 export type Diagnostic = {
   level: 'error' | 'warning'
@@ -56,7 +57,7 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
 export function isOntologyDocument(value: unknown): value is OntologyDocument {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<OntologyDocument>
-  if (candidate.schemaVersion !== 7 || typeof candidate.id !== 'string' || !Array.isArray(candidate.floors) || !Array.isArray(candidate.groups) || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.relations) || !Array.isArray(candidate.flows)) return false
+  if (candidate.schemaVersion !== SCHEMA_VERSION || typeof candidate.id !== 'string' || !VALID_STRUCTURE_TYPES.has(candidate.structureType as StructureType) || !Array.isArray(candidate.floors) || !Array.isArray(candidate.groups) || !Array.isArray(candidate.nodes) || !Array.isArray(candidate.relations) || !Array.isArray(candidate.flows)) return false
   if ('metricLabel' in candidate) return false
   const floorsValid = candidate.floors.length > 0 && candidate.floors.every((value) => {
     if (!value || typeof value !== 'object') return false

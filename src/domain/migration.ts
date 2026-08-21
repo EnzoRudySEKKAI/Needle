@@ -8,6 +8,10 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
   const legacyVersion = legacy.schemaVersion as number
+  if (legacyVersion === 7) {
+    const migrated = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower' }
+    return isOntologyDocument(migrated) ? migrated : null
+  }
   if (![1, 2, 3, 4, 5, 6].includes(legacyVersion) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
   const sizeFromMetric = (metric: unknown): BuildingSize => {
     const value = typeof metric === 'number' && Number.isFinite(metric) ? metric : 0
@@ -31,6 +35,7 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
   const migrated = {
     ...documentFields,
     schemaVersion: SCHEMA_VERSION,
+    structureType: 'tower',
     floors: [{ id: MIGRATED_FLOOR_ID, name: 'Floor 1', groupFlagPositions }],
     groups,
     nodes: legacy.nodes.map((node) => {

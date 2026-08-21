@@ -1,7 +1,7 @@
 import { useEffect, useRef, type WheelEvent } from 'react'
 import type { OntologyFloor } from '../domain/types'
 
-export function FloorNavigator({ floors, activeFloorId, buildingView, onFloor, onBuilding }: { floors: readonly OntologyFloor[]; activeFloorId: string; buildingView: boolean; onFloor: (id: string) => void; onBuilding: () => void }) {
+export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructure }: { floors: readonly OntologyFloor[]; activeFloorId: string; view: 'floor' | 'structure'; onFloor: (id: string) => void; onStructure: () => void }) {
   const activeIndex = floors.findIndex((floor) => floor.id === activeFloorId)
   const wheelLocked = useRef(false)
   const wheelTimer = useRef(0)
@@ -21,9 +21,9 @@ export function FloorNavigator({ floors, activeFloorId, buildingView, onFloor, o
     <div className="floor-navigator-list">
       {[...floors].reverse().map((floor) => {
         const index = floors.indexOf(floor)
-        return <button key={floor.id} type="button" className={!buildingView && floor.id === activeFloorId ? 'is-active' : ''} aria-current={!buildingView && floor.id === activeFloorId ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span></button>
+        return <button key={floor.id} type="button" className={view === 'floor' && floor.id === activeFloorId ? 'is-active' : ''} aria-current={view === 'floor' && floor.id === activeFloorId ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span></button>
       })}
     </div>
-    <button type="button" className={`building-view-button ${buildingView ? 'is-active' : ''}`} onClick={onBuilding}>Building view</button>
+    <button type="button" className={`structure-view-button ${view === 'structure' ? 'is-active' : ''}`} onClick={onStructure}>Structure view</button>
   </div>
 }

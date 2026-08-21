@@ -9,6 +9,7 @@ import type { ConnectionDraft } from './connection'
 import { useDocumentStore } from './document-store'
 import { ScenarioInspector, type RelationPickTarget, type StagePreviewTarget } from './ScenarioInspector'
 import type { RelationPreview } from './RelationCandidatePicker'
+import { StructureTypePicker } from './StructureTypePicker'
 
 type Commit = ReturnType<typeof useDocumentStore>['commit']
 
@@ -61,10 +62,10 @@ export function Inspector({ editable, onActiveFloor, onActiveFlow, relationPickT
         <span className="eyebrow">Ontology map</span>
         <h2>{document.name}</h2>
         <p className="lede">{document.description}</p>
-        {editable ? <div className="form-stack map-settings"><Field label="Map name" value={document.name} onChange={(value) => commit((current) => ({ ...current, name: value }))} /><Field label="Version" value={document.version} onChange={(value) => commit((current) => ({ ...current, version: value }))} /><Field label="Purpose" value={document.description} multiline onChange={(value) => commit((current) => ({ ...current, description: value }))} /></div> : null}
+        {editable ? <div className="form-stack map-settings"><Field label="Map name" value={document.name} onChange={(value) => commit((current) => ({ ...current, name: value }))} /><Field label="Version" value={document.version} onChange={(value) => commit((current) => ({ ...current, version: value }))} /><StructureTypePicker value={document.structureType} onChange={(structureType) => commit((current) => ({ ...current, structureType }))} /><Field label="Purpose" value={document.description} multiline onChange={(value) => commit((current) => ({ ...current, description: value }))} /></div> : null}
         <div className="divider" />
-        <h3>Read the city</h3>
-        <p>Buildings are concepts. Their form and size make structure visible. Streets are declared relations; moving dots are payloads following complete scenarios.</p>
+        <h3>Read the structure</h3>
+        <p>Volumes are concepts. Their form and size make the ontology visible. Paths are declared relations; moving dots are payloads following complete scenarios.</p>
         {diagnostics.length ? <section className="diagnostics"><h3>Diagnostics</h3>{diagnostics.map((item, index) => <p key={index} className={item.level}>{item.message}</p>)}</section> : null}
       </aside>
     )

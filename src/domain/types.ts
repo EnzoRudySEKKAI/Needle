@@ -1,4 +1,5 @@
-export const SCHEMA_VERSION = 7 as const
+export const SCHEMA_VERSION = 8 as const
+export const STRUCTURE_TYPES = ['tower', 'campus', 'cruise-ship'] as const
 
 export type GridPoint = { gx: number; gy: number }
 export type Footprint = GridPoint & { w: number; d: number }
@@ -16,6 +17,7 @@ export type Archetype =
 export type FaceTexture = 'auto' | 'plain' | 'hatched'
 export type RelationKind = 'flow' | 'data' | 'support' | 'retry'
 export type BuildingSize = 'xs' | 's' | 'm' | 'l' | 'xl'
+export type StructureType = typeof STRUCTURE_TYPES[number]
 
 export type OntologyGroup = {
   id: string
@@ -85,6 +87,7 @@ export type OntologyDocument = {
   name: string
   version: string
   description: string
+  structureType: StructureType
   createdAt: string
   updatedAt: string
   floors: OntologyFloor[]

@@ -89,6 +89,7 @@ export async function createBlankMap(name = 'Untitled ontology'): Promise<Ontolo
     name,
     version: 'v0.1',
     description: 'Describe what this ontology helps people understand.',
+    structureType: 'tower',
     createdAt: now,
     updatedAt: now,
     floors: [{ id: 'floor-1', name: 'Floor 1', groupFlagPositions: {} }],

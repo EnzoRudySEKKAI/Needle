@@ -8,6 +8,7 @@ export const SAMPLE_MAP: OntologyDocument = {
   name: 'Signal Garden',
   version: 'v1.0',
   description: 'How a field observation becomes a trusted ecological alert.',
+  structureType: 'tower',
   createdAt: now,
   updatedAt: now,
   floors: [
