@@ -55,8 +55,18 @@ export function stepFlow() {
   const program = state.program
   if (!program) return
   stop()
-  const next = program.stages.find((stage) => stage.start > state.time + 80)?.start ?? 0
+  const next = state.started ? program.stages.find((stage) => stage.start > state.time + 80)?.start ?? 0 : 0
   state = { ...state, time: next, playing: false, started: true }
+  notify()
+}
+
+export function seekFlowStage(programId: string, stageId: string) {
+  const program = state.program
+  if (!program || program.id !== programId) return
+  const stage = program.stages.find((candidate) => candidate.id === stageId)
+  if (!stage) return
+  stop()
+  state = { ...state, time: stage.start + 1, playing: false, started: true }
   notify()
 }
 
