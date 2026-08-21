@@ -1,0 +1,65 @@
+import { codeFromName, makeId } from '../domain/id'
+import type { Selection } from '../domain/types'
+import { nextFreePosition } from '../map/core/layout'
+import { useDocumentStore } from './document-store'
+
+export function LeftRail({ activeFlowId, onActiveFlow, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; editable: boolean }) {
+  const { document, selection, setSelection, commit } = useDocumentStore()
+
+  const addGroup = () => {
+    const id = makeId('group')
+    commit((current) => ({ ...current, groups: [...current.groups, { id, name: 'New neighborhood', description: 'Describe what belongs here.' }] }))
+    setSelection({ kind: 'group', id })
+  }
+
+  const addNode = (groupId: string) => {
+    const id = makeId('node')
+    const name = 'New concept'
+    const code = codeFromName(name, new Set(document.nodes.map((node) => node.code)))
+    const position = nextFreePosition(document.nodes, groupId)
+    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, role: 'an undefined role', groupId, kind: 'concept', whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', metric: 12, unit: 'units', properties: [], position, faceTexture: 'auto' }] }))
+    setSelection({ kind: 'node', id })
+  }
+
+  const addFlow = () => {
+    const id = makeId('flow')
+    commit((current) => ({ ...current, flows: [...current.flows, { id, name: 'New scenario', payload: 'payload', summary: 'Explain what this journey accomplishes.', relationIds: [] }] }))
+    setSelection({ kind: 'flow', id })
+    onActiveFlow(id)
+  }
+
+  const select = (next: Selection) => {
+    setSelection(next)
+    if (next.kind !== 'flow') onActiveFlow(null)
+  }
+
+  return (
+    <aside className="left-rail">
+      <section className="rail-section rail-flows">
+        <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario">+</button> : null}</div>
+        <div className="flow-list">
+          {document.flows.map((flow, index) => (
+            <button key={flow.id} type="button" className={`flow-row ${activeFlowId === flow.id ? 'is-active' : ''}`} onClick={() => { const next = activeFlowId === flow.id ? null : flow.id; onActiveFlow(next); setSelection(next ? { kind: 'flow', id: flow.id } : null) }}>
+              <span className="flow-index">{String(index + 1).padStart(2, '0')}</span><span className="flow-name">{flow.name}</span><span className="flow-payload">{flow.payload}</span>
+            </button>
+          ))}
+          {document.flows.length === 0 ? <p className="rail-empty">No scenario yet.</p> : null}
+        </div>
+      </section>
+      <div className="rail-neighborhoods">
+        {document.groups.map((group) => (
+          <section className="rail-section" key={group.id}>
+            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id).length}</span></button>
+            <div className="node-list">
+              {document.nodes.filter((node) => node.groupId === group.id).map((node) => (
+                <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-metric">{node.metric}</span></button>
+              ))}
+              {editable ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
+            </div>
+          </section>
+        ))}
+        {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
+      </div>
+    </aside>
+  )
+}

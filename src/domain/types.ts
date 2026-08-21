@@ -1,0 +1,90 @@
+export const SCHEMA_VERSION = 2 as const
+
+export type GridPoint = { gx: number; gy: number }
+export type Footprint = GridPoint & { w: number; d: number }
+export type Archetype =
+  | 'cube'
+  | 'tower'
+  | 'low-slab'
+  | 'slab-stack'
+  | 'fin-row'
+  | 'podium-tower'
+  | 'twin-towers'
+  | 'courtyard'
+  | 'bridge'
+  | 'stepped-pyramid'
+export type FaceTexture = 'auto' | 'plain' | 'hatched'
+export type RelationKind = 'flow' | 'data' | 'support' | 'retry'
+
+export type OntologyGroup = {
+  id: string
+  name: string
+  description: string
+}
+
+export type OntologyProperty = {
+  id: string
+  key: string
+  value: string
+}
+
+export type OntologyNode = {
+  id: string
+  code: string
+  name: string
+  role: string
+  groupId: string
+  kind: string
+  whatItDoes: string
+  howItsBuilt: string
+  metric: number
+  unit: string
+  properties: OntologyProperty[]
+  position: GridPoint
+  archetypeOverride?: Archetype
+  faceTexture: FaceTexture
+}
+
+export type OntologyRelation = {
+  id: string
+  from: string
+  to: string
+  kind: RelationKind
+  label: string
+  via?: GridPoint[]
+}
+
+export type OntologyFlow = {
+  id: string
+  name: string
+  payload: string
+  summary: string
+  relationIds: string[]
+}
+
+export type OntologyDocument = {
+  schemaVersion: typeof SCHEMA_VERSION
+  id: string
+  name: string
+  version: string
+  description: string
+  metricLabel: string
+  createdAt: string
+  updatedAt: string
+  groups: OntologyGroup[]
+  nodes: OntologyNode[]
+  relations: OntologyRelation[]
+  flows: OntologyFlow[]
+}
+
+export type VisualNode = OntologyNode & {
+  archetype: Archetype
+  footprint: Footprint
+  height: number
+}
+
+export type Selection =
+  | { kind: 'node'; id: string }
+  | { kind: 'relation'; id: string }
+  | { kind: 'group'; id: string }
+  | { kind: 'flow'; id: string }
