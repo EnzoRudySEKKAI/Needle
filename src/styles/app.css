@@ -244,12 +244,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation-direction strong { font-size: 11px; text-align: center; }
 .relation-direction button { height: 30px; border: 1px solid var(--accent); background: var(--accent-wash); color: var(--accent); }
 .scenario-stages { display: flex; flex-direction: column; gap: 10px; }
-.scenario-stage { border: 1px solid var(--border); background: var(--surface-soft); }
+.scenario-stage { position: relative; border: 1px solid var(--border); background: var(--surface-soft); transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
+.scenario-stage.is-dragging { opacity: .42; transform: scale(.985); }
+.scenario-stage.is-drop-before { box-shadow: 0 -4px 0 -1px var(--accent); }
+.scenario-stage-drop-end { height: 3px; margin-top: -4px; border-radius: 2px; background: var(--accent); }
 .scenario-stage > header { display: flex; align-items: center; justify-content: space-between; padding: 7px 9px; border-bottom: 1px solid var(--border); }
 .scenario-stage > header strong { font: 500 9px var(--mono); text-transform: uppercase; }
 .scenario-stage > header div { display: flex; gap: 3px; }
 .scenario-stage > header button { width: 23px; height: 22px; padding: 0; border: 1px solid var(--border); background: var(--surface); font: 9px var(--mono); }
 .scenario-stage > header button:disabled { opacity: .25; }
+.scenario-stage > header .scenario-drag-handle { cursor: grab; touch-action: none; }
+.scenario-stage > header .scenario-drag-handle:active { cursor: grabbing; }
 .scenario-branch { display: grid; grid-template-columns: 25px minmax(0, 1fr) 27px 25px minmax(0, 1fr) 22px; align-items: center; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); }
 .scenario-branch .branch-code { color: var(--ink-3); font: 8px var(--mono); }
 .scenario-branch .branch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
@@ -262,6 +267,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .form-stack > .relation-candidate-picker > .relation-candidate-trigger { border: 1px solid var(--border); }
 .relation-candidate-trigger:disabled { opacity: .45; cursor: default; }
 .relation-candidate-list { position: absolute; left: 0; right: 0; z-index: 12; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); background: var(--surface-raised); box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 14%, transparent); outline: none; }
+.relation-candidate-map-hint { position: sticky; top: 0; z-index: 1; margin: 0; padding: 8px 10px; background: color-mix(in srgb, var(--accent-wash) 72%, var(--surface-raised)); color: var(--accent); font: 8px/1.45 var(--mono); text-transform: uppercase; }
 .relation-candidate-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; color: var(--ink-2); }
 .relation-candidate-row.is-active { background: var(--accent-wash); color: var(--accent); }
 .relation-candidate-choice { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; border: 0; background: transparent; color: inherit; text-align: left; }
@@ -306,6 +312,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation.is-selected .relation-arrow { fill: var(--accent); opacity: 1; }
 .relation.is-dimmed .relation-line { opacity: .18; }
 .relation-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.relation.is-pickable .relation-line { opacity: .95; }
+.relation.is-pickable:hover .relation-line, .relation.is-pickable:focus-visible .relation-line { stroke: var(--accent); stroke-width: 2.2; }
+.relation.is-pickable:hover .relation-arrow, .relation.is-pickable:focus-visible .relation-arrow { fill: var(--accent); opacity: 1; }
+.relation.is-pickable .relation-hit { cursor: crosshair; }
+.relation.is-pick-disabled { opacity: .14; pointer-events: none; }
+.canvas-wrap.is-relation-picking .building, .canvas-wrap.is-relation-picking .district, .canvas-wrap.is-relation-picking .district-flag { cursor: default; }
 .building { cursor: pointer; transition: opacity 180ms ease; }
 .building:focus, .building:focus-visible { outline: none; }
 .building:focus-visible .building-face { stroke: var(--accent); }
@@ -324,6 +336,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .building.is-selected .roof-chip rect, .building.is-active .roof-chip rect { stroke: var(--accent); }
 .building.is-selected .roof-chip text { fill: var(--accent); }
 .flow-trace { fill: none; stroke: var(--accent); stroke-width: 1.8; opacity: .45; }
+.flow-animation, .candidate-relation-preview, .connection-preview { pointer-events: none; }
 .flow-arrow { fill: var(--accent); opacity: .45; }
 .flow-animation .is-current .flow-trace { opacity: 1; stroke-width: 2.2; stroke-dasharray: 9 7; animation: dash-march .55s linear infinite; }
 .flow-animation .is-current .flow-arrow { opacity: 1; }
@@ -399,6 +412,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .inspector { display: none; }
   .map-app.has-inspector .left-rail { display: none; }
   .map-app.has-inspector .inspector { position: absolute; right: 8px; bottom: 40px; left: 8px; z-index: 9; display: block; width: auto; max-height: min(46vh, 390px); border: 1px solid var(--border); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
+  .scenario-stage > header .scenario-drag-handle { width: 44px; height: 44px; margin: -11px 0; }
   .camera-controls { bottom: 174px; }
   .map-footer { padding-right: 8px; }
   .map-footer b { display: none; }

@@ -21,6 +21,8 @@ type Props = {
   editable: boolean
   stepDisplayMode: StepDisplayMode
   relationPreview: RelationPreview | null
+  relationPickIds: ReadonlySet<string> | null
+  onPickRelation: (id: string) => void
   onSelect: (selection: Selection | null) => void
   onMoveNode: (id: string, gx: number, gy: number) => void
   connectionDraft: ConnectionDraft | null
@@ -67,7 +69,7 @@ function DistrictFlag({ district, selected, hovered, onSelect, onHover, onMeasur
   return <g className={`district-flag ${selected ? 'is-selected' : ''} ${hovered ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => onHover(district.id)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(district.id)} onBlur={() => onHover(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect() } }} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
 }
 
-export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
+export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, relationPickIds, onPickRelation, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -92,6 +94,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
   const activeClockKey = useClockActiveKey()
   const fitted = size.width > 0 ? fitCamera(size.width, size.height, scene.bounds) : null
   const camera = cameraOverride ?? fitted
+  const relationPicking = relationPickIds !== null
 
   useEffect(() => {
     configureFlow(program, !editable)
@@ -201,7 +204,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
     : scene.shapes
 
   return (
-    <div className="canvas-wrap" ref={containerRef}>
+    <div className={`canvas-wrap ${relationPicking ? 'is-relation-picking' : ''}`} ref={containerRef}>
       {document.nodes.length === 0 ? (
         <div className="canvas-empty"><span>Empty ground</span><strong>Add a concept from the left rail.</strong></div>
       ) : null}
@@ -212,7 +215,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
         aria-label="Interactive ontology map"
         onClick={() => {
           if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
-          onSelect(null)
+          if (!relationPicking) onSelect(null)
         }}
         onWheel={(event) => {
           event.preventDefault()
@@ -264,7 +267,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
             <g className="districts">
               {scene.districts.map((district) => {
                 const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
-                return <g key={district.id} className={`district ${selection?.kind === 'group' && selection.id === district.id ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
+                 return <g key={district.id} className={`district ${selection?.kind === 'group' && selection.id === district.id ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
               })}
             </g>
             <g className="relations" onPointerDown={(event) => event.stopPropagation()}>
@@ -272,11 +275,12 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
                 const route = geometry.get(relation.id)
                 if (!route) return null
                 const selected = selection?.kind === 'relation' && selection.id === relation.id
+                const pickable = relationPickIds?.has(relation.id) ?? false
                 const end = route.points[route.points.length - 1]!
                 const before = route.points[route.points.length - 2] ?? end
                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
                 const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
-                return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program ? 'is-dimmed' : ''}`} role="button" tabIndex={0} aria-label={`${relation.label}: ${relation.from} to ${relation.to}`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect({ kind: 'relation', id: relation.id }) } }} onClick={(event) => { event.stopPropagation(); onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
+                return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program && !relationPicking ? 'is-dimmed' : ''} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${relation.from} to ${relation.to}`} aria-disabled={relationPicking && !pickable ? true : undefined} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) } }} onClick={(event) => { event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
               })}
               {previewRelations.map((relation) => {
                 const route = previewGeometry.get(relation.id)
@@ -290,15 +294,15 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
                 return <g className="candidate-relation-preview"><polyline points={pointsAttribute(candidatePoints)} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -8 4 L -8 -4 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} /></g>
               })() : null}
             </g>
-            {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} editable={editable && !connectionDraft} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
+            {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} editable={editable && !connectionDraft && !relationPicking} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
               if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
               if (connectionDraft) onToggleConnectionTarget(node.id)
-              else onSelect({ kind: 'node', id: node.id })
+              else if (!relationPicking) onSelect({ kind: 'node', id: node.id })
             }} onDragStart={(event) => startNodeDrag(event, node)} />)}
             {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} /> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
             <g className="district-flags">
-              {scene.districts.map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} hovered={hoveredDistrictId === district.id} onSelect={() => onSelect({ kind: 'group', id: district.id })} onHover={setHoveredDistrictId} onMeasure={measureFlag} />)}
+              {scene.districts.map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} hovered={hoveredDistrictId === district.id} onSelect={() => { if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }} onHover={setHoveredDistrictId} onMeasure={measureFlag} />)}
             </g>
           </g>
         ) : null}

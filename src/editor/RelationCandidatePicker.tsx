@@ -10,11 +10,10 @@ export type RelationCandidateOption = {
   label: string
 }
 
-export function RelationCandidatePicker({ label, options, onSelect, onPreview }: { label: string; options: RelationCandidateOption[]; onSelect: (selection: RelationPreview) => void; onPreview: (preview: RelationPreview | null) => void }) {
+export function RelationCandidatePicker({ label, options, open, onOpenChange, onSelect, onPreview }: { label: string; options: RelationCandidateOption[]; open: boolean; onOpenChange: (open: boolean) => void; onSelect: (selection: RelationPreview) => void; onPreview: (preview: RelationPreview | null) => void }) {
   const panelId = useId()
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const choiceRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const [directions, setDirections] = useState<Record<string, FlowDirection>>({})
 
@@ -25,7 +24,7 @@ export function RelationCandidatePicker({ label, options, onSelect, onPreview }:
     onPreview(option ? { relationId: option.relationId, direction } : null)
   }
   const close = (restoreFocus = false) => {
-    setOpen(false)
+    onOpenChange(false)
     onPreview(null)
     if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus())
   }
@@ -61,17 +60,18 @@ export function RelationCandidatePicker({ label, options, onSelect, onPreview }:
 
   useEffect(() => () => onPreview(null), [onPreview])
 
-  return <div className="relation-candidate-picker" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) close() }}>
+  return <div className="relation-candidate-picker">
     <button ref={triggerRef} type="button" className="relation-candidate-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={panelId} disabled={options.length === 0} onClick={() => {
       if (open) close()
       else {
         setDirections({})
         setActiveIndex(0)
         onPreview(options[0] ? { relationId: options[0].relationId, direction: 'forward' } : null)
-        setOpen(true)
+        onOpenChange(true)
       }
     }}>{label}<span aria-hidden="true">⌄</span></button>
     {open ? <div id={panelId} role="dialog" aria-label={label} className="relation-candidate-list">
+      <p className="relation-candidate-map-hint">Click a link on the map, or choose below.</p>
       {options.map((option, index) => {
         const direction = directionAt(index)
         const source = direction === 'forward' ? option.fromLabel : option.toLabel
