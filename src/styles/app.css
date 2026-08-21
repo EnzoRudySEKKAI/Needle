@@ -258,12 +258,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 /* SVG scene */
 .floor-grid line { stroke: var(--grid); stroke-width: 1; }
-.district-plate { fill: var(--surface-soft); fill-opacity: .6; stroke: var(--border); stroke-width: 1; cursor: pointer; transition: fill 160ms ease; }
+.district, .district-flag { cursor: pointer; }
+.district:focus, .district-flag:focus { outline: none; }
+.district-plate { fill: var(--surface-soft); fill-opacity: .6; stroke: var(--border); stroke-width: 1; transition: fill 160ms ease, fill-opacity 160ms ease; }
+.district:hover:not(.is-selected) .district-plate, .district.is-hovered:not(.is-selected) .district-plate { fill: color-mix(in srgb, var(--accent-wash) 55%, var(--surface-soft)); fill-opacity: .9; }
+.district:focus-visible .district-plate { fill: var(--accent-wash); stroke: var(--accent); }
 .districts .is-selected .district-plate { fill: var(--accent-wash); stroke: var(--accent); }
-.flag-pole { stroke: var(--structure); }
-.flag-label { fill: var(--surface); stroke: var(--structure); }
-.district-flags { cursor: pointer; }
-.district-flags text { fill: var(--ink-3); font: 8px var(--mono); text-transform: uppercase; letter-spacing: .5px; }
+.flag-pole { stroke: var(--structure); transition: stroke 140ms ease; }
+.flag-label { fill: var(--surface); stroke: var(--structure); transition: fill 140ms ease, stroke 140ms ease; }
+.district-flags text { fill: var(--ink-3); font: 8px var(--mono); text-transform: uppercase; letter-spacing: .5px; transition: fill 140ms ease; }
+.district-flag:hover:not(.is-selected) .flag-label, .district-flag.is-hovered:not(.is-selected) .flag-label { fill: var(--surface-soft); stroke: var(--ink-2); }
+.district-flag:hover:not(.is-selected) .flag-pole, .district-flag.is-hovered:not(.is-selected) .flag-pole { stroke: var(--ink-2); }
+.district-flag:hover:not(.is-selected) text, .district-flag.is-hovered:not(.is-selected) text { fill: var(--ink); }
+.district-flag:focus-visible .flag-label { fill: var(--accent-wash); stroke: var(--accent); }
+.district-flag:focus-visible text { fill: var(--accent); }
 .district-flags .is-selected .flag-label { stroke: var(--accent); }
 .district-flags .is-selected text { fill: var(--accent); }
 .relation-line { fill: none; stroke: var(--structure); stroke-width: 1.1; opacity: .75; }

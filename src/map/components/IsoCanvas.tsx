@@ -27,11 +27,11 @@ type Props = {
   onToggleConnectionTarget: (id: string) => void
 }
 
-type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera: Camera; moved: boolean }
+type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera: Camera; moved: boolean; deferCapture: boolean }
 type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
 type InteractionSession = PanSession | NodeDragSession
 
-function DistrictFlag({ district, selected, onSelect, onMeasure }: { district: District; selected: boolean; onSelect: () => void; onMeasure: (id: string, width: number) => void }) {
+function DistrictFlag({ district, selected, hovered, onSelect, onHover, onMeasure }: { district: District; selected: boolean; hovered: boolean; onSelect: () => void; onHover: (id: string | null) => void; onMeasure: (id: string, width: number) => void }) {
   const textRef = useRef<SVGTextElement | null>(null)
   useLayoutEffect(() => {
     let cancelled = false
@@ -44,7 +44,7 @@ function DistrictFlag({ district, selected, onSelect, onMeasure }: { district: D
     return () => { cancelled = true }
   }, [district.id, district.name, onMeasure])
   const flag = toScreen(district.flagAt.gx, district.flagAt.gy)
-  return <g className={selected ? 'is-selected' : ''} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
+  return <g className={`district-flag ${selected ? 'is-selected' : ''} ${hovered ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => onHover(district.id)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(district.id)} onBlur={() => onHover(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect() } }} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
 }
 
 export function IsoCanvas({ document, selection, activeFlowId, editable, stepDisplayMode, relationPreview, onSelect, onMoveNode, connectionDraft, onToggleConnectionTarget }: Props) {
@@ -55,6 +55,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
   const [flagWidths, setFlagWidths] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [dragPositions, setDragPositions] = useState<ReadonlyMap<string, { gx: number; gy: number }>>(() => new Map())
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
+  const [hoveredDistrictId, setHoveredDistrictId] = useState<string | null>(null)
   const interaction = useRef<InteractionSession | null>(null)
   const committedDrag = useRef<{ id: string; position: GridPoint } | null>(null)
   const suppressCanvasClick = useRef(false)
@@ -210,15 +211,21 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
         }}
         onPointerDown={(event) => {
           if (event.button !== 0 || !camera || interaction.current) return
-          interaction.current = { kind: 'pan', pointerId: event.pointerId, x: event.clientX, y: event.clientY, camera, moved: false }
-          event.currentTarget.setPointerCapture(event.pointerId)
+          const target = event.target as Element
+          const deferCapture = Boolean(target.closest('.district, .district-flag'))
+          interaction.current = { kind: 'pan', pointerId: event.pointerId, x: event.clientX, y: event.clientY, camera, moved: false, deferCapture }
+          if (!deferCapture) event.currentTarget.setPointerCapture(event.pointerId)
         }}
         onPointerMove={(event) => {
           const session = interaction.current
           if (!session || session.pointerId !== event.pointerId) return
           if (event.buttons === 0) { endInteraction(session.kind === 'node'); return }
           if (session.kind === 'pan') {
-            session.moved ||= Math.hypot(event.clientX - session.x, event.clientY - session.y) > 4
+            if (!session.moved) {
+              if (Math.hypot(event.clientX - session.x, event.clientY - session.y) <= 4) return
+              session.moved = true
+              if (session.deferCapture && !event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId)
+            }
             setCameraOverride({ ...session.camera, x: session.camera.x + event.clientX - session.x, y: session.camera.y + event.clientY - session.y })
             return
           }
@@ -246,7 +253,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
             <g className="districts">
               {scene.districts.map((district) => {
                 const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
-                return <g key={district.id} className={selection?.kind === 'group' && selection.id === district.id ? 'is-selected' : ''} onClick={(event) => { event.stopPropagation(); onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
+                return <g key={district.id} className={`district ${selection?.kind === 'group' && selection.id === district.id ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
               })}
             </g>
             <g className="relations" onPointerDown={(event) => event.stopPropagation()}>
@@ -280,7 +287,7 @@ export function IsoCanvas({ document, selection, activeFlowId, editable, stepDis
             {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} /> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
             <g className="district-flags">
-              {scene.districts.map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} onSelect={() => onSelect({ kind: 'group', id: district.id })} onMeasure={measureFlag} />)}
+              {scene.districts.map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} hovered={hoveredDistrictId === district.id} onSelect={() => onSelect({ kind: 'group', id: district.id })} onHover={setHoveredDistrictId} onMeasure={measureFlag} />)}
             </g>
           </g>
         ) : null}
