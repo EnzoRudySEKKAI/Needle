@@ -73,7 +73,7 @@ export function Inspector({ editable, activeFloorId, onActiveFloor, onActiveFlow
 
   return <>
     <aside key={`${selection.kind}:${selection.id}`} className="inspector">
-      {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
+      {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}
       {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} relationPickTarget={relationPickTarget} onRelationPickTarget={onRelationPickTarget} onRelationPreview={onRelationPreview} onStagePreview={onStagePreview} /> : null}
@@ -141,8 +141,24 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
   </>
 }
 
-function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; onMoveFloor: (id: string) => void; onStartConnection: (sourceId: string) => void }) {
+function NodeInspector({ node, editable, commit, document, activeFloorId, onActiveFloor, onMoveFloor, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void; onMoveFloor: (id: string) => void; onStartConnection: (sourceId: string) => void }) {
   const patch = (value: Partial<OntologyNode>) => commit((current) => updateNode(current, node.id, value))
+  const connectedFloors = (() => {
+    const map = new Map<string, { floor: OntologyFloor; relations: OntologyRelation[] }>()
+    for (const relation of document.relations) {
+      if (relation.from !== node.id && relation.to !== node.id) continue
+      const otherId = relation.from === node.id ? relation.to : relation.from
+      const other = document.nodes.find((candidate) => candidate.id === otherId)
+      if (!other || other.floorId === node.floorId) continue
+      const floor = document.floors.find((candidate) => candidate.id === other.floorId)
+      if (!floor || floor.id === activeFloorId) continue
+      const entry = map.get(floor.id)
+      if (entry) entry.relations.push(relation)
+      else map.set(floor.id, { floor, relations: [relation] })
+    }
+    return [...map.values()].sort((a, b) => document.floors.indexOf(a.floor) - document.floors.indexOf(b.floor))
+  })()
+  const currentIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
   return <>
     {!editable ? <><span className="eyebrow">{node.code}</span><h2>{node.name}</h2><p className="lede">{node.size.toUpperCase()}</p></> : null}
     {editable ? <div className="form-stack">
@@ -151,6 +167,11 @@ function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartC
       <label className="field"><span>Size</span><select value={node.size} onChange={(event) => patch({ size: event.target.value as BuildingSize })}>{(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label>
       <label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <label className="field"><span>Floor</span><select value={node.floorId} onChange={(event) => onMoveFloor(event.target.value)}>{document.floors.map((floor) => <option key={floor.id} value={floor.id}>{floor.name}</option>)}</select></label>
+      {connectedFloors.length ? <div className="node-connected-floors"><span>Connected floors</span><div className="relation-floor-jump">{connectedFloors.map(({ floor, relations }) => {
+        const up = document.floors.indexOf(floor) > currentIndex
+        const count = relations.length
+        return <button key={floor.id} type="button" title={relations.map((relation) => relation.label).join(', ')} onClick={() => onActiveFloor(floor.id)}>Go to {floor.name} {up ? '↑' : '↓'}{count > 1 ? ` · ${count}` : ''}</button>
+      })}</div></div> : null}
       <Field label="What it does" value={node.whatItDoes} multiline onChange={(value) => patch({ whatItDoes: value })} />
       <Field label="Why it is shaped this way" value={node.howItsBuilt} multiline onChange={(value) => patch({ howItsBuilt: value })} />
       <button type="button" className="secondary-button connect-button" onClick={() => onStartConnection(node.id)}>Connect from {node.name}</button>

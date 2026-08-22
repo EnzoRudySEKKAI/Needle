@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { addFlowTraversal, setFloorFlagPosition } from '../domain/commands'
+import { addFloor, addFlowTraversal, setFloorFlagPosition } from '../domain/commands'
 import { makeId } from '../domain/id'
 import { IsoCanvas } from '../map/components/IsoCanvas'
 import { StructureView } from '../map/components/StructureView'
@@ -126,6 +126,39 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     setStagePreviewTarget(null)
     if (relationPickTarget && relationPickTarget.flowId !== id) { setRelationPickTarget(null); setRelationPreview(null) }
   }
+  const handleAddFloor = () => {
+    const floorId = makeId('floor')
+    commit((current) => addFloor(current, activeFloorId, floorId).document)
+    setSelection({ kind: 'floor', id: floorId })
+    window.clearTimeout(floorTimer.current)
+    const fromIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
+    setFloorDirection('up')
+    setPreviousFloorId(workspaceView === 'structure' ? null : activeFloorId)
+    setWorkspaceView('floor')
+    void fromIndex
+    startTransition(() => setActiveFloorId(floorId))
+    floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
+  }
+  const handleMoveFloor = (floorId: string, beforeFloorId: string | null) => {
+    if (floorId === beforeFloorId) return
+    commit((current) => {
+      const display = [...current.floors].reverse()
+      const fromIndex = display.findIndex((floor) => floor.id === floorId)
+      if (fromIndex < 0) return current
+      const [moved] = display.splice(fromIndex, 1)
+      if (!moved) return current
+      let toIndex: number
+      if (beforeFloorId === null) toIndex = display.length
+      else {
+        toIndex = display.findIndex((floor) => floor.id === beforeFloorId)
+        if (toIndex < 0) return current
+      }
+      display.splice(toIndex, 0, moved)
+      const nextFloors = [...display].reverse()
+      if (nextFloors.every((floor, index) => floor.id === current.floors[index]?.id)) return current
+      return { ...current, floors: nextFloors }
+    })
+  }
   const openFloor = (floorId: string) => {
     if (floorId === activeFloorId && workspaceView === 'floor') return
     const fromIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
@@ -177,7 +210,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
         <div className="floor-viewport">
           {previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroupFlag={() => {}} /></div> : null}
           {workspaceView === 'structure' ? <div className="floor-layer is-structure"><StructureView key={document.structureType} document={document} activeFloorId={activeFloorId} onOpenFloor={openFloor} /></div> : <div className={`floor-layer ${previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={activeFloorId} document={document} floorId={activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} /></div>}
-          <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} view={workspaceView} onFloor={openFloor} onStructure={() => { pauseFlow(); setPreviousFloorId(null); setWorkspaceView('structure'); setSelection(null); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }} />
+          <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} view={workspaceView} onFloor={openFloor} onStructure={() => { pauseFlow(); setPreviousFloorId(null); setWorkspaceView('structure'); setSelection(null); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }} editable={editable} onAddFloor={handleAddFloor} onMoveFloor={handleMoveFloor} />
         </div>
         <footer className="map-footer"><span className="legend-key flow-key" /> flow <span className="legend-key support-key" /> support <span className="legend-key retry-key" /> retry <span className="payload-key" /> payload <b>{workspaceView === 'structure' ? 'hover to preview · select a floor to enter' : editable ? 'drag buildings or flags · scroll to zoom · drag ground to pan' : 'choose a scenario · space plays · scroll to zoom'}</b></footer>
       </section>

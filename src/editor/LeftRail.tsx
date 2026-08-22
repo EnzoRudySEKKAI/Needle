@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { codeFromName, makeId } from '../domain/id'
-import { addFloor, deleteRelationsCascade, moveFloor } from '../domain/commands'
+import { deleteRelationsCascade } from '../domain/commands'
 import type { Selection } from '../domain/types'
 import { nextFreePosition } from '../map/core/layout'
 import { useDocumentStore } from './document-store'
 
 export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; activeFloorId: string; onActiveFloor: (id: string) => void; editable: boolean }) {
+  void onActiveFloor
   const { document, selection, setSelection, commit } = useDocumentStore()
-  const [tabChoice, setTabChoice] = useState<{ tab: 'floors' | 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'concepts', selection })
-  const selectionTab = selection?.kind === 'floor' ? 'floors' : selection?.kind === 'flow' ? 'scenarios' : selection?.kind === 'relation' ? 'relations' : selection?.kind === 'node' || selection?.kind === 'group' ? 'concepts' : null
+  const [tabChoice, setTabChoice] = useState<{ tab: 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'concepts', selection })
+  const selectionTab = selection?.kind === 'flow' ? 'scenarios' : selection?.kind === 'relation' ? 'relations' : selection?.kind === 'node' || selection?.kind === 'group' ? 'concepts' : null
   const activeTab = tabChoice.selection === selection ? tabChoice.tab : selectionTab ?? tabChoice.tab
 
   const addGroup = () => {
@@ -43,19 +44,13 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
     if (selection?.kind === 'relation' && selection.id === id) setSelection(null)
     onActiveFlow(null)
   }
-  const createFloor = () => {
-    const floorId = makeId('floor')
-    commit((current) => addFloor(current, activeFloorId, floorId).document)
-    onActiveFloor(floorId)
-    setSelection({ kind: 'floor', id: floorId })
-  }
   const visibleNodeIds = new Set(document.nodes.filter((node) => node.floorId === activeFloorId).map((node) => node.id))
   const visibleRelations = document.relations.filter((relation) => visibleNodeIds.has(relation.from) || visibleNodeIds.has(relation.to))
 
   return (
     <aside className="left-rail">
       <div className="rail-tabs" role="tablist" aria-label="Map content">
-        {(['concepts', 'relations', 'scenarios', 'floors'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
+        {(['concepts', 'relations', 'scenarios'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
       </div>
       {activeTab === 'scenarios' ? <section className="rail-section rail-flows" role="tabpanel">
         <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario">+</button> : null}</div>
@@ -93,14 +88,6 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         ))}
         {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
       </div> : null}
-      {activeTab === 'floors' ? <section className="rail-section rail-floors" role="tabpanel">
-        <div className="rail-heading"><span>Building floors</span>{editable ? <button type="button" onClick={createFloor} aria-label="Add floor">+</button> : null}</div>
-        <div className="floor-list">{[...document.floors].reverse().map((floor) => {
-          const index = document.floors.indexOf(floor)
-          const count = document.nodes.filter((node) => node.floorId === floor.id).length
-          return <div key={floor.id} className={`floor-row ${floor.id === activeFloorId ? 'is-active' : ''}`}><button type="button" onClick={() => { onActiveFloor(floor.id); setSelection({ kind: 'floor', id: floor.id }) }}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span><small>{count}</small></button>{editable ? <div><button type="button" aria-label={`Move ${floor.name} up`} disabled={index === document.floors.length - 1} onClick={() => commit((current) => moveFloor(current, floor.id, 1))}>↑</button><button type="button" aria-label={`Move ${floor.name} down`} disabled={index === 0} onClick={() => commit((current) => moveFloor(current, floor.id, -1))}>↓</button></div> : null}</div>
-        })}</div>
-      </section> : null}
     </aside>
   )
 }

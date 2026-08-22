@@ -1,12 +1,19 @@
-import { useEffect, useRef, type WheelEvent } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { OntologyFloor } from '../domain/types'
 
-export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructure }: { floors: readonly OntologyFloor[]; activeFloorId: string; view: 'floor' | 'structure'; onFloor: (id: string) => void; onStructure: () => void }) {
+type DragSession = { pointerId: number; floorId: string; beforeFloorId: string | null; startY: number; clientY: number; moved: boolean; frame: number; owner: HTMLElement }
+
+export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructure, editable = false, onAddFloor, onMoveFloor }: { floors: readonly OntologyFloor[]; activeFloorId: string; view: 'floor' | 'structure'; onFloor: (id: string) => void; onStructure: () => void; editable?: boolean; onAddFloor?: () => void; onMoveFloor?: (floorId: string, beforeFloorId: string | null) => void }) {
   const activeIndex = floors.findIndex((floor) => floor.id === activeFloorId)
   const wheelLocked = useRef(false)
   const wheelTimer = useRef(0)
+  const floorElements = useRef(new Map<string, HTMLElement>())
+  const dragSession = useRef<DragSession | null>(null)
+  const [draggingFloorId, setDraggingFloorId] = useState<string | null>(null)
+  const [dropBeforeFloorId, setDropBeforeFloorId] = useState<string | null>(null)
   useEffect(() => () => window.clearTimeout(wheelTimer.current), [])
-  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
+  const displayFloors = [...floors].reverse()
+  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
     if (wheelLocked.current || Math.abs(event.deltaY) < 8 || floors.length < 2) return
     const next = Math.max(0, Math.min(floors.length - 1, activeIndex + (event.deltaY > 0 ? 1 : -1)))
@@ -16,13 +23,99 @@ export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructu
       wheelTimer.current = window.setTimeout(() => { wheelLocked.current = false }, 480)
     }
   }
+
+  const updateDropTarget = (clientY: number) => {
+    const session = dragSession.current
+    if (!session) return
+    const before = displayFloors
+      .filter((floor) => floor.id !== session.floorId)
+      .find((floor) => {
+        const bounds = floorElements.current.get(floor.id)?.getBoundingClientRect()
+        return bounds ? clientY < bounds.top + bounds.height / 2 : false
+      })?.id ?? null
+    session.beforeFloorId = before
+    setDropBeforeFloorId(before)
+  }
+
+  const finishDrag = (shouldCommit: boolean) => {
+    const session = dragSession.current
+    if (!session) return
+    dragSession.current = null
+    if (session.frame) cancelAnimationFrame(session.frame)
+    if (session.owner.hasPointerCapture(session.pointerId)) session.owner.releasePointerCapture(session.pointerId)
+    setDraggingFloorId(null)
+    setDropBeforeFloorId(null)
+    if (shouldCommit && session.moved && onMoveFloor) onMoveFloor(session.floorId, session.beforeFloorId)
+  }
+  const cancelDrag = useEffectEvent(() => finishDrag(false))
+
+  useEffect(() => {
+    const cancel = () => cancelDrag()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !dragSession.current) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      cancel()
+    }
+    window.addEventListener('blur', cancel)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      window.removeEventListener('blur', cancel)
+      window.removeEventListener('keydown', onKeyDown, true)
+      cancel()
+    }
+  }, [])
+
+  const startDrag = (event: ReactPointerEvent<HTMLElement>, floorId: string) => {
+    if (!editable || !onMoveFloor || event.button !== 0 || dragSession.current) return
+    const target = event.target as Element
+    if (target.closest('button')) {
+      const isHandle = (event.currentTarget as HTMLElement).classList.contains('floor-drag-handle')
+      if (!isHandle) return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    dragSession.current = { pointerId: event.pointerId, floorId, beforeFloorId: floorId, startY: event.clientY, clientY: event.clientY, moved: false, frame: 0, owner: event.currentTarget as HTMLElement }
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+    setDraggingFloorId(floorId)
+    setDropBeforeFloorId(floorId)
+  }
+
+  const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const session = dragSession.current
+    if (!session || session.pointerId !== event.pointerId) return
+    session.clientY = event.clientY
+    session.moved ||= Math.abs(event.clientY - session.startY) > 5
+    if (!session.moved) return
+    updateDropTarget(event.clientY)
+  }
+
   return <div className="floor-navigator" aria-label="Floors" onWheel={onWheel}>
-    <span>Floors</span>
+    <div className="floor-navigator-header">
+      <span>Floors</span>
+      {editable && onAddFloor ? <button type="button" className="floor-add-button" aria-label="Add floor" onClick={onAddFloor}>+</button> : null}
+    </div>
     <div className="floor-navigator-list">
-      {[...floors].reverse().map((floor) => {
+      {displayFloors.map((floor) => {
         const index = floors.indexOf(floor)
-        return <button key={floor.id} type="button" className={view === 'floor' && floor.id === activeFloorId ? 'is-active' : ''} aria-current={view === 'floor' && floor.id === activeFloorId ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span></button>
+        const isActive = view === 'floor' && floor.id === activeFloorId
+        const isDragging = draggingFloorId === floor.id
+        const isDropBefore = draggingFloorId && dropBeforeFloorId === floor.id
+        return <div
+          key={floor.id}
+          ref={(element) => { if (element) floorElements.current.set(floor.id, element); else floorElements.current.delete(floor.id) }}
+          data-floor-id={floor.id}
+          className={`floor-navigator-item ${isActive ? 'is-active' : ''} ${isDragging ? 'is-dragging' : ''} ${isDropBefore ? 'is-drop-before' : ''}`}
+          onPointerMove={moveDrag}
+          onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(true) }}
+          onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}
+          onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}
+        >
+          <button type="button" className={isActive ? 'is-active' : ''} aria-current={isActive ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span></button>
+          {editable && onMoveFloor ? <button type="button" className="floor-drag-handle" aria-label={`Drag ${floor.name} to reorder`} onPointerDown={(event) => startDrag(event, floor.id)} onPointerMove={moveDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}><span aria-hidden="true">⋮⋮</span></button> : null}
+        </div>
       })}
+      {draggingFloorId && dropBeforeFloorId === null ? <div className="floor-drop-end" aria-hidden="true" /> : null}
     </div>
     <button type="button" className={`structure-view-button ${view === 'structure' ? 'is-active' : ''}`} onClick={onStructure}>Structure view</button>
   </div>
