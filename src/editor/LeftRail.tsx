@@ -75,7 +75,9 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         </div>
       </section> : null}
       {activeTab === 'concepts' ? <div className="rail-neighborhoods" role="tabpanel">
-        {document.groups.map((group) => (
+        {document.groups
+          .filter((group) => document.nodes.some((node) => node.groupId === group.id && node.floorId === activeFloorId))
+          .map((group) => (
           <section className="rail-section" key={group.id}>
             <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId).length}</span></button>
             <div className="node-list">
@@ -86,6 +88,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
             </div>
           </section>
         ))}
+        {document.groups.filter((group) => document.nodes.some((node) => node.groupId === group.id && node.floorId === activeFloorId)).length === 0 ? <section className="rail-section"><p className="rail-empty">No concepts on this floor.</p></section> : null}
         {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
       </div> : null}
     </aside>

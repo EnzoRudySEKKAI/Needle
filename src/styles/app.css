@@ -507,6 +507,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .floor-exit:focus, .floor-exit-line, .exit-chip { outline: none; }
 .floor-exit .relation-line { opacity: .8; transition: stroke-width 140ms ease, opacity 140ms ease; }
 .floor-exit .relation-arrow { opacity: .8; }
+.floor-exit.is-incoming .relation-line { stroke-dasharray: none; }
 .floor-exit .exit-drop { stroke: var(--exit-stroke, var(--structure)); }
 .floor-exit:hover .exit-drop, .floor-exit:focus-visible .exit-drop, .floor-exit.is-selected .exit-drop, .floor-exit.is-pickable:hover .exit-drop, .floor-exit.is-pickable:focus-visible .exit-drop { stroke: var(--accent); }
 .exit-fade-from { stop-color: var(--structure); stop-opacity: .8; }
@@ -527,7 +528,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .floor-exit.is-group-hovered .relation-line { stroke: var(--accent); stroke-width: 2; opacity: 1; }
 .floor-exit.is-group-hovered .exit-drop { stroke: var(--accent); }
 .floor-exit.is-group-hovered .relation-arrow { fill: var(--accent); opacity: 1; }
-.floor-exit.is-incoming .relation-line { stroke-dasharray: 4 5; }
 .floor-navigator-item.is-highlighted { background: transparent; box-shadow: none; }
 .floor-navigator-item.is-highlighted::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 2px; background: var(--accent); border-radius: 1px; }
 .floor-navigator-item.is-highlighted button { color: var(--accent); }
