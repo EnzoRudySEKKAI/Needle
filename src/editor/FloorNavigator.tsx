@@ -119,7 +119,7 @@ export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructu
           onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}
           onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}
         >
-          <button type="button" className={isActive ? 'is-active' : ''} aria-current={isActive ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span><small className="floor-node-count">{count}</small></button>
+          <button type="button" className={isActive ? 'is-active' : ''} aria-current={isActive ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span><small className="floor-node-count">• {count}</small></button>
           {editable && onMoveFloor ? <button type="button" className="floor-drag-handle" aria-label={`Drag ${floor.name} to reorder`} onPointerDown={(event) => startDrag(event, floor.id)} onPointerMove={moveDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}><span aria-hidden="true">⋮⋮</span></button> : null}
         </div>
       })}

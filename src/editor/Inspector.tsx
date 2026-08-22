@@ -18,6 +18,29 @@ function Field({ label, value, onChange, multiline = false, type = 'text' }: { l
   return <label className="field"><span>{label}</span>{multiline ? <textarea value={value} rows={4} onChange={(event) => onChange(event.target.value)} /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />}</label>
 }
 
+function FloorNeighborhoods({ floorId }: { floorId: string }) {
+  const { document, selection, setSelection } = useDocumentStore()
+  const groups = document.groups.filter((group) => document.nodes.some((node) => node.groupId === group.id && node.floorId === floorId))
+  if (groups.length === 0) return <p className="rail-empty">No neighborhood on this floor.</p>
+  return (
+    <div className="inspector-neighborhoods">
+      {groups.map((group) => {
+        const nodes = document.nodes.filter((node) => node.groupId === group.id && node.floorId === floorId)
+        return (
+          <section className="rail-section" key={group.id} style={{ paddingTop: 8 }}>
+            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => setSelection({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{nodes.length}</span></button>
+            <div className="node-list">
+              {nodes.map((node) => (
+                <button key={node.id} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => setSelection({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>
+              ))}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
 function updateNode(document: OntologyDocument, id: string, patch: Partial<OntologyNode>): OntologyDocument {
   return { ...document, nodes: document.nodes.map((node) => node.id === id ? { ...node, ...patch } : node) }
 }
@@ -58,7 +81,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
   }
 
   if (!selection) {
-    const hoveredFloor = !isStructureView && hoveredFloorId ? document.floors.find((floor) => floor.id === hoveredFloorId) ?? null : null
+    const hoveredFloor = hoveredFloorId ? document.floors.find((floor) => floor.id === hoveredFloorId) ?? null : null
     if (hoveredFloor) {
       const index = document.floors.findIndex((candidate) => candidate.id === hoveredFloor.id)
       const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
@@ -67,14 +90,12 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
           <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
           <h2>{hoveredFloor.name}</h2>
           <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
-          <div className="inspector-preview">
-            <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
-          </div>
-          <button type="button" className="secondary-button" onClick={() => onActiveFloor(hoveredFloor.id)}>Enter {hoveredFloor.name}</button>
-          <div className="divider" />
-          <span className="eyebrow">Ontology map</span>
-          <h2>{document.name}</h2>
-          <p className="lede">{document.description}</p>
+          {!isStructureView ? (
+            <div className="inspector-preview">
+              <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
+            </div>
+          ) : null}
+          <FloorNeighborhoods floorId={hoveredFloor.id} />
         </aside>
       )
     }
@@ -93,7 +114,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
   }
 
   if (floor) {
-    const hoveredFloor = !isStructureView && hoveredFloorId ? document.floors.find((candidate) => candidate.id === hoveredFloorId) ?? null : null
+    const hoveredFloor = hoveredFloorId ? document.floors.find((candidate) => candidate.id === hoveredFloorId) ?? null : null
     if (hoveredFloor && hoveredFloor.id !== floor.id) {
       const index = document.floors.findIndex((candidate) => candidate.id === hoveredFloor.id)
       const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
@@ -102,10 +123,12 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
           <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
           <h2>{hoveredFloor.name}</h2>
           <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
-          <div className="inspector-preview">
-            <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
-          </div>
-          <button type="button" className="secondary-button" onClick={() => onActiveFloor(hoveredFloor.id)}>Enter {hoveredFloor.name}</button>
+          {!isStructureView ? (
+            <div className="inspector-preview">
+              <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
+            </div>
+          ) : null}
+          <FloorNeighborhoods floorId={hoveredFloor.id} />
         </aside>
       )
     }
@@ -230,13 +253,14 @@ function FloorInspector({ floor, editable, commit, document, activeFloorId, isSt
     <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
     <h2>{floor.name}</h2>
     <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
+    {editable ? <div className="form-stack" style={{ marginBottom: 16 }}><Field label="Name" value={floor.name} onChange={(name) => patch({ name })} /></div> : null}
     {!isStructureView ? (
       <div className="inspector-preview">
         <FloorPreviewCard document={document} floorId={floor.id} showHeader={false} />
       </div>
     ) : null}
+    <FloorNeighborhoods floorId={floor.id} />
     {!isActive ? <button type="button" className="secondary-button" onClick={() => onActiveFloor(floor.id)}>Enter {floor.name}</button> : null}
-    {editable ? <div className="form-stack"><Field label="Name" value={floor.name} onChange={(name) => patch({ name })} /></div> : null}
   </>
 }
 
