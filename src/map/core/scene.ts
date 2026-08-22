@@ -67,9 +67,14 @@ export function buildScene(groups: readonly OntologyGroup[], nodes: readonly Vis
   return { key, shapes, districts, grid, bounds }
 }
 
-export function fitCamera(width: number, height: number, bounds: Scene['bounds']): Camera {
-  const k = Math.max(0.35, Math.min(1.4, Math.min(width / bounds.width, height / bounds.height)))
-  return { k, x: (width - bounds.width * k) / 2 - bounds.x * k, y: (height - bounds.height * k) / 2 - bounds.y * k }
+export function fitCamera(width: number, height: number, bounds: Scene['bounds'], insets: { left: number; right: number; top: number; bottom: number } = { left: 0, right: 0, top: 0, bottom: 0 }, dezoom: number = 1): Camera {
+  const visibleWidth = Math.max(1, width - insets.left - insets.right)
+  const visibleHeight = Math.max(1, height - insets.top - insets.bottom)
+  const kBase = Math.min(visibleWidth / bounds.width, visibleHeight / bounds.height)
+  const k = Math.max(0.3, Math.min(1.4, kBase)) * dezoom
+  const centerX = insets.left + visibleWidth / 2
+  const centerY = insets.top + visibleHeight / 2
+  return { k, x: centerX - (bounds.x + bounds.width / 2) * k, y: centerY - (bounds.y + bounds.height / 2) * k }
 }
 
 export function zoomAbout(camera: Camera, factor: number, x: number, y: number): Camera {

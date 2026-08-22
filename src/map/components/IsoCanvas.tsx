@@ -39,6 +39,8 @@ type Props = {
   onToggleConnectionTarget: (id: string) => void
   highlightedFloorId?: string | null
   onHoverFloor?: (floorId: string | null) => void
+  viewportInsets?: { left: number; right: number; top: number; bottom: number }
+  dezoom?: number
 }
 
 type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera: Camera; moved: boolean; deferCapture: boolean }
@@ -89,7 +91,7 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId: propHighlightedFloorId, onHoverFloor }: Props) {
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId: propHighlightedFloorId, onHoverFloor, viewportInsets, dezoom }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -187,7 +189,8 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     }
     return [...map.values()]
   }, [exits])
-  const fitted = size.width > 0 ? fitCamera(size.width, size.height, scene.bounds) : null
+  const insets = viewportInsets ?? { left: 0, right: 0, top: 0, bottom: 0 }
+  const fitted = size.width > 0 ? fitCamera(size.width, size.height, scene.bounds, insets, dezoom) : null
   const camera = cameraOverride ?? fitted
   const relationPicking = relationPickIds !== null
   const updateCamera = (next: Camera | null) => {
@@ -480,7 +483,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
           </g>
         ) : null}
       </svg>
-      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} title="Recenter">⌾</button><button type="button" onClick={() => camera && updateCamera(zoomAbout(camera, 1.25, size.width / 2, size.height / 2))}>+</button><button type="button" onClick={() => camera && updateCamera(zoomAbout(camera, 0.8, size.width / 2, size.height / 2))}>−</button></div>
+      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} title="Recenter">⌾</button><button type="button" onClick={() => { if (!camera) return; const cx = insets.left + (size.width - insets.left - insets.right) / 2; const cy = insets.top + (size.height - insets.top - insets.bottom) / 2; updateCamera(zoomAbout(camera, 1.25, cx, cy)) }}>+</button><button type="button" onClick={() => { if (!camera) return; const cx = insets.left + (size.width - insets.left - insets.right) / 2; const cy = insets.top + (size.height - insets.top - insets.bottom) / 2; updateCamera(zoomAbout(camera, 0.8, cx, cy)) }}>−</button></div>
     </div>
   )
 }
