@@ -26,7 +26,7 @@ export type ProgramStage = {
 export type FlowProgram = { id: string; total: number; stages: ProgramStage[]; nodeIds: string[] }
 export type StagePhase = 'source' | 'travel' | 'target'
 
-const DWELL = 850
+export const DWELL = 850
 
 function geometryForTraversal(traversal: FlowTraversal, geometry: RelationGeometry): RelationGeometry {
   if (traversal.direction === 'forward') return geometry

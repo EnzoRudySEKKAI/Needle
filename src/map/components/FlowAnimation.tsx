@@ -1,14 +1,27 @@
 import type { OntologyFlow } from '../../domain/types'
-import { activeStageState, flowPositions, type FlowProgram } from '../core/program'
+import { DWELL, activeStageState, flowPositions, type FlowProgram } from '../core/program'
 import { pointAtLength, pointsAttribute } from '../core/iso'
 import type { StepDisplayMode } from '../core/step-display'
 import { useClockState } from '../stores/flow-clock'
 
-export function FlowAnimation({ program, flow, stepDisplayMode }: { program: FlowProgram; flow: OntologyFlow; stepDisplayMode: StepDisplayMode }) {
+export function FlowAnimation({ program, flow, stepDisplayMode, arrivalIds }: { program: FlowProgram; flow: OntologyFlow; stepDisplayMode: StepDisplayMode; arrivalIds?: ReadonlySet<string> }) {
   const clock = useClockState()
   const time = clock.program?.id === program.id ? clock.time : 0
   const started = clock.program?.id === program.id && clock.started
-  const positions = started ? flowPositions(program, time) : []
+  const positions = (() => {
+    if (!started) return [] as ReturnType<typeof flowPositions>
+    if (!arrivalIds || arrivalIds.size === 0) return flowPositions(program, time)
+    const wrapped = ((time % program.total) + program.total) % program.total
+    const { index, phase } = activeStageState(program, time)
+    if (phase !== 'target') return flowPositions(program, time)
+    const stage = program.stages[index]!
+    return stage.branches.map((branch) => {
+      if (!arrivalIds.has(branch.relationId)) return branch.geometry.points[branch.geometry.points.length - 1]!
+      const progress = Math.max(0, Math.min(1, (wrapped - stage.targetStart) / DWELL))
+      const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
+      return pointAtLength(branch.geometry.points, branch.geometry.cumulative, eased * branch.geometry.total)
+    })
+  })()
   const activeIndex = started ? activeStageState(program, time).index : -1
   const markers = program.stages.flatMap((stage, stageIndex) => stage.branches.map((branch, branchIndex) => ({
     branch,

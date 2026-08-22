@@ -29,7 +29,7 @@ function updateRelation(document: OntologyDocument, id: string, patch: Partial<O
   return { ...document, relations: document.relations.map((relation) => relation.id === id ? { ...relation, ...patch } : relation) }
 }
 
-export function Inspector({ editable, onActiveFloor, onActiveFlow, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; onActiveFloor: (id: string) => void; onActiveFlow: (id: string | null) => void; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
+export function Inspector({ editable, activeFloorId, onActiveFloor, onActiveFlow, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; activeFloorId: string; onActiveFloor: (id: string) => void; onActiveFlow: (id: string | null) => void; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
   const diagnostics = validateDocument(document)
   const node = selection?.kind === 'node' ? document.nodes.find((item) => item.id === selection.id) : null
@@ -74,7 +74,7 @@ export function Inspector({ editable, onActiveFloor, onActiveFlow, relationPickT
   return <>
     <aside key={`${selection.kind}:${selection.id}`} className="inspector">
       {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
-      {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} /> : null}
+      {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}
       {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} relationPickTarget={relationPickTarget} onRelationPickTarget={onRelationPickTarget} onRelationPreview={onRelationPreview} onStagePreview={onStagePreview} /> : null}
       {floor ? <FloorInspector floor={floor} editable={editable} commit={commit} document={document} /> : null}
@@ -103,15 +103,33 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
   const source = document.nodes.find((node) => node.id === draft.sourceId)
   const compatibleFlows = document.flows
   const count = draft.targets.length
+  const toggleRemote = (nodeId: string) => {
+    const exists = draft.targets.some((target) => target.nodeId === nodeId)
+    onUpdate({ ...draft, targets: exists ? draft.targets.filter((target) => target.nodeId !== nodeId) : [...draft.targets, { nodeId, direction: 'outbound' }] })
+  }
   return <>
     <span className="eyebrow">Connection mode</span>
     <h2>From {source?.name}</h2>
-    <p className="lede">Choose one or more concepts on the map. Use the floor navigator to connect concepts on another floor.</p>
+    <p className="lede">Choose one or more concepts on the map, or pick targets on another floor below.</p>
     <div className="connection-targets">
       {count === 0 ? <p>Nothing selected yet.</p> : draft.targets.map((target) => {
         const node = document.nodes.find((item) => item.id === target.nodeId)
         const outbound = target.direction === 'outbound'
         return <div key={target.nodeId}><span className="node-code">{outbound ? source?.code : node?.code}</span><strong>{outbound ? source?.name : node?.name}</strong><button type="button" title="Reverse connection" onClick={() => onUpdate({ ...draft, targets: draft.targets.map((item) => item.nodeId === target.nodeId ? { ...item, direction: item.direction === 'outbound' ? 'inbound' : 'outbound' } : item) })}>→</button><span className="node-code">{outbound ? node?.code : source?.code}</span><strong>{outbound ? node?.name : source?.name}</strong><button type="button" aria-label={`Remove ${node?.name}`} onClick={() => onUpdate({ ...draft, targets: draft.targets.filter((item) => item.nodeId !== target.nodeId) })}>×</button></div>
+      })}
+    </div>
+    <div className="connection-remote">
+      <p className="connection-remote-title">Other floors</p>
+      {document.floors.filter((floor) => floor.id !== source?.floorId).map((floor) => {
+        const members = document.nodes.filter((node) => node.floorId === floor.id)
+        if (members.length === 0) return null
+        return <div key={floor.id} className="connection-remote-floor">
+          <span>{floor.name}</span>
+          <div>{members.map((node) => {
+            const active = draft.targets.some((target) => target.nodeId === node.id)
+            return <button key={node.id} type="button" className={active ? 'is-target' : ''} aria-pressed={active} onClick={() => toggleRemote(node.id)}><b>{node.code}</b>{node.name}</button>
+          })}</div>
+        </div>
       })}
     </div>
     <div className="form-stack">
@@ -149,11 +167,21 @@ function FloorInspector({ floor, editable, commit, document }: { floor: Ontology
   return <><span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span><h2>{floor.name}</h2><p className="lede">{count} concept{count === 1 ? '' : 's'}</p>{editable ? <div className="form-stack"><Field label="Name" value={floor.name} onChange={(name) => patch({ name })} /></div> : null}</>
 }
 
-function RelationInspector({ relation, editable, commit, document }: { relation: OntologyRelation; editable: boolean; commit: Commit; document: OntologyDocument }) {
+function RelationInspector({ relation, editable, commit, document, activeFloorId, onActiveFloor }: { relation: OntologyRelation; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void }) {
   const patch = (value: Partial<OntologyRelation>) => commit((current) => updateRelation(current, relation.id, value))
   const from = document.nodes.find((node) => node.id === relation.from)?.name
   const to = document.nodes.find((node) => node.id === relation.to)?.name
-  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><strong>{from}</strong><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><strong>{to}</strong></div>{editable ? <div className="form-stack"><Field label="Name" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
+  const fromFloor = document.floors.find((floor) => floor.id === document.nodes.find((node) => node.id === relation.from)?.floorId) ?? null
+  const toFloor = document.floors.find((floor) => floor.id === document.nodes.find((node) => node.id === relation.to)?.floorId) ?? null
+  const crossesFloors = Boolean(fromFloor && toFloor && fromFloor.id !== toFloor.id)
+  const currentIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
+  const jumpFor = (floor: OntologyFloor | null) => {
+    if (!floor || floor.id === activeFloorId) return null
+    const label = floor.name
+    const up = document.floors.indexOf(floor) > currentIndex
+    return <button type="button" key={floor.id} onClick={() => onActiveFloor(floor.id)}>Go to {label} {up ? '↑' : '↓'}</button>
+  }
+  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><div><strong>{from}</strong>{fromFloor ? <small>{fromFloor.name}</small> : null}</div><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><div><strong>{to}</strong>{toFloor ? <small>{toFloor.name}</small> : null}</div></div>{crossesFloors ? <div className="relation-floor-jump">{[jumpFor(fromFloor), jumpFor(toFloor)]}</div> : null}{editable ? <div className="form-stack"><Field label="Name" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
 }
 
 function GroupInspector({ group, editable, commit, document }: { group: OntologyGroup; editable: boolean; commit: Commit; document: OntologyDocument }) {

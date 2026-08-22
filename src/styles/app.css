@@ -273,12 +273,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .structure-view .mini-concept-volume .face-right, .structure-view .mini-concept-volume .is-hatched.face-right { fill: color-mix(in srgb, var(--structure) 38%, var(--surface)); }
 .structure-view .mini-plan-empty { fill: var(--surface-soft); stroke: var(--structure); stroke-width: 1; stroke-dasharray: 5 5; }
 @keyframes structure-preview-in { from { opacity: 0; transform: translateX(8px); } }
-.floor-exit { cursor: pointer; }
-.floor-exit:focus { outline: none; }
-.floor-exit > line { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; }
-.floor-exit > circle { fill: var(--surface-raised); stroke: var(--accent); }
-.floor-exit rect { fill: var(--surface-raised); stroke: var(--accent); }
-.floor-exit text { fill: var(--accent); font: 7px var(--mono); text-transform: uppercase; }
 
 /* Inspector */
 .inspector h2 { margin: 8px 0 0; font-size: 25px; line-height: 1.15; letter-spacing: -.035em; }
@@ -358,6 +352,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .connection-targets > p { padding: 12px; background: var(--surface-soft); color: var(--ink-3); font: 9px var(--mono); text-transform: uppercase; }
 .connection-targets > div { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px 28px minmax(0, 1fr) 24px; align-items: center; gap: 5px; padding: 8px; background: var(--accent-wash); color: var(--accent); }
 .connection-targets strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.connection-remote { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+.connection-remote-title { margin: 0; color: var(--ink-3); font: 9px var(--mono); letter-spacing: .5px; text-transform: uppercase; }
+.connection-remote-floor { display: flex; flex-direction: column; gap: 4px; }
+.connection-remote-floor > span { color: var(--ink-3); font: 8px var(--mono); letter-spacing: .5px; text-transform: uppercase; }
+.connection-remote-floor > div { display: flex; flex-direction: column; gap: 3px; }
+.connection-remote-floor button { display: flex; align-items: baseline; gap: 6px; padding: 7px 8px; border: 1px solid var(--border); background: var(--surface-soft); color: var(--ink-2); font-size: 10px; text-align: left; transition: border-color 140ms ease, background 140ms ease, color 140ms ease; }
+.connection-remote-floor button b { color: var(--ink-3); font: 8px var(--mono); }
+.connection-remote-floor button:hover { border-color: var(--structure); color: var(--ink); }
+.connection-remote-floor button.is-target { border-color: var(--accent); background: var(--accent-wash); color: var(--accent); }
+.connection-remote-floor button.is-target b { color: var(--accent); }
 .connection-targets button { height: 24px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--surface); color: var(--accent); }
 .connection-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 7px; margin-top: 20px; }
 .connection-actions button { padding: 10px; border: 1px solid var(--border); background: var(--surface); font: 500 9px var(--mono); text-transform: uppercase; }
@@ -365,6 +369,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .connection-actions button:disabled { opacity: .35; }
 .relation-direction { display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; gap: 7px; margin: 16px 0 22px; padding: 12px; background: var(--surface-soft); }
 .relation-direction strong { font-size: 11px; text-align: center; }
+.relation-direction > div { min-width: 0; }
+.relation-direction small { display: block; margin-top: 3px; overflow: hidden; color: var(--ink-3); font: 8px var(--mono); text-align: center; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.relation-floor-jump { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: -12px 0 18px; }
+.relation-floor-jump button { min-width: 0; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--surface); color: var(--accent); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease, border-color 140ms ease; }
+.relation-floor-jump button:hover { background: var(--accent-wash); }
 .relation-direction button { height: 30px; border: 1px solid var(--accent); background: var(--accent-wash); color: var(--accent); }
 .scenario-stages { display: flex; flex-direction: column; gap: 10px; }
 .scenario-stage { position: relative; border: 1px solid var(--border); background: var(--surface-soft); cursor: grab; touch-action: none; user-select: none; transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease, background 120ms ease; }
@@ -443,6 +452,25 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation.is-pickable .relation-hit { cursor: crosshair; }
 .relation.is-pick-disabled { opacity: .14; pointer-events: none; }
 .canvas-wrap.is-relation-picking .building, .canvas-wrap.is-relation-picking .district, .canvas-wrap.is-relation-picking .district-flag { cursor: default; }
+.floor-exit { cursor: pointer; transition: opacity 180ms ease; }
+.floor-exit:focus, .floor-exit-line, .exit-chip { outline: none; }
+.floor-exit .relation-line { opacity: .8; transition: stroke-width 140ms ease, opacity 140ms ease; }
+.floor-exit .relation-arrow { opacity: .8; }
+.floor-exit .exit-drop { stroke: var(--exit-stroke, var(--structure)); }
+.floor-exit:hover .exit-drop, .floor-exit:focus-visible .exit-drop, .floor-exit.is-selected .exit-drop, .floor-exit.is-pickable:hover .exit-drop, .floor-exit.is-pickable:focus-visible .exit-drop { stroke: var(--accent); }
+.exit-fade-from { stop-color: var(--structure); stop-opacity: .8; }
+.exit-fade-to { stop-color: var(--structure); stop-opacity: 0; }
+.floor-exit:hover .relation-line, .floor-exit:focus-visible .relation-line, .floor-exit.is-selected .relation-line, .floor-exit.is-pickable:hover .relation-line, .floor-exit.is-pickable:focus-visible .relation-line { stroke-width: 2; opacity: 1; }
+.floor-exit.is-pickable:hover .relation-line, .floor-exit.is-pickable:focus-visible .relation-line { stroke-width: 2.2; stroke: var(--accent); }
+.floor-exit:hover .relation-arrow, .floor-exit:focus-visible .relation-arrow, .floor-exit.is-selected .relation-arrow, .floor-exit.is-pickable:hover .relation-arrow { fill: var(--accent); opacity: 1; }
+.floor-exit:hover .relation-label, .floor-exit:focus-visible .relation-label, .floor-exit.is-selected .relation-label { opacity: 1; }
+.floor-exit.is-dimmed { opacity: .18; }
+.floor-exit.is-pick-disabled { opacity: .14; pointer-events: none; }
+.floor-exit.is-pickable .relation-hit { cursor: crosshair; }
+.exit-chip { cursor: pointer; }
+.exit-chip rect { fill: var(--surface-raised); stroke: var(--accent); transition: fill 140ms ease; }
+.exit-chip text { fill: var(--accent); font: 7px var(--mono); text-transform: uppercase; }
+.exit-chip:hover rect, .exit-chip:focus-visible rect { fill: var(--accent-wash); }
 .building { cursor: pointer; transition: opacity 180ms ease; }
 .building:focus, .building:focus-visible { outline: none; }
 .building:focus-visible .building-face { stroke: var(--accent); }

@@ -51,10 +51,10 @@ function districtsFor(groups: readonly OntologyGroup[], nodes: readonly VisualNo
   })
 }
 
-export function buildScene(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], key: string, flagWidths: ReadonlyMap<string, number> = new Map(), flagPositions: Readonly<Record<string, { gx: number; gy: number }>> = {}): Scene {
+export function buildScene(groups: readonly OntologyGroup[], nodes: readonly VisualNode[], key: string, flagWidths: ReadonlyMap<string, number> = new Map(), flagPositions: Readonly<Record<string, { gx: number; gy: number }>> = {}, extraExtents: readonly { footprint: Footprint; height: number }[] = []): Scene {
   const shapes = [...nodes].sort((a, b) => depthKey(a.footprint) - depthKey(b.footprint))
   const districts = districtsFor(groups, nodes, flagWidths, flagPositions)
-  const extents = [...shapes.map((node) => ({ footprint: node.footprint, height: node.height })), ...districts.map((district) => ({ footprint: district.rect, height: 0 }))]
+  const extents = [...shapes.map((node) => ({ footprint: node.footprint, height: node.height })), ...districts.map((district) => ({ footprint: district.rect, height: 0 })), ...extraExtents]
   const bounds = sceneBounds(extents)
   if (extents.length === 0) return { key, shapes, districts, grid: [], bounds }
   const minX = Math.floor(Math.min(...extents.map((item) => item.footprint.gx))) - 2

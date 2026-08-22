@@ -77,6 +77,10 @@ export function seekFlowStage(programId: string, stageId: string) {
   notify()
 }
 
+export function getClockState(): ClockState {
+  return state
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)

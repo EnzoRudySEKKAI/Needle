@@ -265,11 +265,14 @@ function routeFor(from: VisualNode, to: VisualNode, nodes: readonly VisualNode[]
   const starts = portOptions(from, nodes)
   const ends = portOptions(to, nodes)
   const core = routeCore(graph, starts, ends, from.id === to.id)
-  if (!core) return null
-  const start = starts.find((option) => option.side === core.fromSide)!
-  const end = ends.find((option) => option.side === core.toSide)!
-  const route = cleanRoute([start.anchor, ...core.points, end.anchor])
-  return { route, fromSide: core.fromSide, toSide: core.toSide }
+  if (core) {
+    const start = starts.find((option) => option.side === core.fromSide)!
+    const end = ends.find((option) => option.side === core.toSide)!
+    const route = cleanRoute([start.anchor, ...core.points, end.anchor])
+    return { route, fromSide: core.fromSide, toSide: core.toSide }
+  }
+  const pair = closestAnchorPair(from, to)
+  return { route: [pair.start, pair.end], fromSide: pair.fromSide, toSide: pair.toSide }
 }
 
 function longestSegmentMidpoint(points: readonly ScreenPoint[]): ScreenPoint {
