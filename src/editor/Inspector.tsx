@@ -234,11 +234,6 @@ function NodeInspector({ node, editable, commit, document, activeFloorId, onActi
       <label className="field"><span>Size</span><select value={node.size} onChange={(event) => patch({ size: event.target.value as BuildingSize })}>{(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label>
       <label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
       <label className="field"><span>Floor</span><select value={node.floorId} onChange={(event) => onMoveFloor(event.target.value)}>{document.floors.map((floor) => <option key={floor.id} value={floor.id}>{floor.name}</option>)}</select></label>
-      {connectedFloors.length ? <div className="node-connected-floors"><span>Connected floors</span><div className="relation-floor-jump">{connectedFloors.map(({ floor, relations }) => {
-        const up = document.floors.indexOf(floor) > currentIndex
-        const count = relations.length
-        return <button key={floor.id} type="button" title={relations.map((relation) => relation.label).join(', ')} onClick={() => onActiveFloor(floor.id)}>Go to {floor.name} {up ? '↑' : '↓'}{count > 1 ? ` · ${count}` : ''}</button>
-      })}</div></div> : null}
       <Field label="What it does" value={node.whatItDoes} multiline onChange={(value) => patch({ whatItDoes: value })} />
       <Field label="Why it is shaped this way" value={node.howItsBuilt} multiline onChange={(value) => patch({ howItsBuilt: value })} />
       <button type="button" className="secondary-button connect-button" onClick={() => onStartConnection(node.id)}>Connect from {node.name}</button>
