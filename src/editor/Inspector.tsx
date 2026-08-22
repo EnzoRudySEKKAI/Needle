@@ -92,6 +92,25 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, onActiveFlo
     )
   }
 
+  if (floor) {
+    const hoveredFloor = hoveredFloorId ? document.floors.find((candidate) => candidate.id === hoveredFloorId) ?? null : null
+    if (hoveredFloor && hoveredFloor.id !== floor.id) {
+      const index = document.floors.findIndex((candidate) => candidate.id === hoveredFloor.id)
+      const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
+      return (
+        <aside className="inspector">
+          <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
+          <h2>{hoveredFloor.name}</h2>
+          <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
+          <div className="inspector-preview">
+            <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
+          </div>
+          <button type="button" className="secondary-button" onClick={() => onActiveFloor(hoveredFloor.id)}>Enter {hoveredFloor.name}</button>
+        </aside>
+      )
+    }
+  }
+
   return <>
     <aside key={`${selection.kind}:${selection.id}`} className="inspector">
       {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
