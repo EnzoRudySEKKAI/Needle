@@ -10,6 +10,7 @@ import { useDocumentStore } from './document-store'
 import { ScenarioInspector, type RelationPickTarget, type StagePreviewTarget } from './ScenarioInspector'
 import type { RelationPreview } from './RelationCandidatePicker'
 import { StructureTypePicker } from './StructureTypePicker'
+import { FloorPreviewCard } from '../map/components/FloorPreviewCard'
 
 type Commit = ReturnType<typeof useDocumentStore>['commit']
 
@@ -29,7 +30,7 @@ function updateRelation(document: OntologyDocument, id: string, patch: Partial<O
   return { ...document, relations: document.relations.map((relation) => relation.id === id ? { ...relation, ...patch } : relation) }
 }
 
-export function Inspector({ editable, activeFloorId, onActiveFloor, onActiveFlow, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; activeFloorId: string; onActiveFloor: (id: string) => void; onActiveFlow: (id: string | null) => void; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
+export function Inspector({ editable, activeFloorId, hoveredFloorId, onActiveFloor, onActiveFlow, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; activeFloorId: string; hoveredFloorId?: string | null; onActiveFloor: (id: string) => void; onActiveFlow: (id: string | null) => void; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
   const diagnostics = validateDocument(document)
   const node = selection?.kind === 'node' ? document.nodes.find((item) => item.id === selection.id) : null
@@ -57,6 +58,26 @@ export function Inspector({ editable, activeFloorId, onActiveFloor, onActiveFlow
   }
 
   if (!selection) {
+    const hoveredFloor = hoveredFloorId ? document.floors.find((floor) => floor.id === hoveredFloorId) ?? null : null
+    if (hoveredFloor) {
+      const index = document.floors.findIndex((candidate) => candidate.id === hoveredFloor.id)
+      const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
+      return (
+        <aside className="inspector">
+          <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
+          <h2>{hoveredFloor.name}</h2>
+          <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
+          <div className="inspector-preview">
+            <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
+          </div>
+          <button type="button" className="secondary-button" onClick={() => onActiveFloor(hoveredFloor.id)}>Enter {hoveredFloor.name}</button>
+          <div className="divider" />
+          <span className="eyebrow">Ontology map</span>
+          <h2>{document.name}</h2>
+          <p className="lede">{document.description}</p>
+        </aside>
+      )
+    }
     return (
       <aside className="inspector intro-panel">
         <span className="eyebrow">Ontology map</span>
@@ -77,7 +98,7 @@ export function Inspector({ editable, activeFloorId, onActiveFloor, onActiveFlow
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}
       {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} relationPickTarget={relationPickTarget} onRelationPickTarget={onRelationPickTarget} onRelationPreview={onRelationPreview} onStagePreview={onStagePreview} /> : null}
-      {floor ? <FloorInspector floor={floor} editable={editable} commit={commit} document={document} /> : null}
+      {floor ? <FloorInspector floor={floor} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
       {editable ? <button type="button" className="danger-button" disabled={selection.kind === 'floor' && document.floors.length <= 1} onClick={() => selection.kind === 'group' && group ? setPendingGroupDelete(group) : selection.kind === 'floor' && floor ? setPendingFloorDelete(floor) : remove(selection)}>Delete {selection.kind}</button> : null}
     </aside>
     {pendingGroupDelete ? <GroupDeleteDialog group={pendingGroupDelete} document={document} onCancel={() => setPendingGroupDelete(null)} onConfirm={() => { remove({ kind: 'group', id: pendingGroupDelete.id }); setPendingGroupDelete(null) }} /> : null}
@@ -181,11 +202,21 @@ function NodeInspector({ node, editable, commit, document, activeFloorId, onActi
   </>
 }
 
-function FloorInspector({ floor, editable, commit, document }: { floor: OntologyFloor; editable: boolean; commit: Commit; document: OntologyDocument }) {
+function FloorInspector({ floor, editable, commit, document, activeFloorId, onActiveFloor }: { floor: OntologyFloor; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void }) {
   const patch = (value: Partial<OntologyFloor>) => commit((current) => ({ ...current, floors: current.floors.map((candidate) => candidate.id === floor.id ? { ...candidate, ...value } : candidate) }))
   const index = document.floors.findIndex((candidate) => candidate.id === floor.id)
   const count = document.nodes.filter((node) => node.floorId === floor.id).length
-  return <><span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span><h2>{floor.name}</h2><p className="lede">{count} concept{count === 1 ? '' : 's'}</p>{editable ? <div className="form-stack"><Field label="Name" value={floor.name} onChange={(name) => patch({ name })} /></div> : null}</>
+  const isActive = floor.id === activeFloorId
+  return <>
+    <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
+    <h2>{floor.name}</h2>
+    <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
+    <div className="inspector-preview">
+      <FloorPreviewCard document={document} floorId={floor.id} showHeader={false} />
+    </div>
+    {!isActive ? <button type="button" className="secondary-button" onClick={() => onActiveFloor(floor.id)}>Enter {floor.name}</button> : null}
+    {editable ? <div className="form-stack"><Field label="Name" value={floor.name} onChange={(name) => patch({ name })} /></div> : null}
+  </>
 }
 
 function RelationInspector({ relation, editable, commit, document, activeFloorId, onActiveFloor }: { relation: OntologyRelation; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void }) {

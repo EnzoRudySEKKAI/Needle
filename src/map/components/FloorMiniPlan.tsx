@@ -11,7 +11,7 @@ function neighborhoodTone(id: string): number {
   return Math.abs(hash) % 5
 }
 
-export function FloorMiniPlan({ document, floorId, x, y, width = 330, height = 200 }: { document: OntologyDocument; floorId: string; x: number; y: number; width?: number; height?: number }) {
+export function FloorMiniPlan({ document, floorId, x = 0, y = 0, width = 330, height = 200 }: { document: OntologyDocument; floorId: string; x?: number; y?: number; width?: number; height?: number }) {
   const projection = projectFloor(document, floorId)
   const nodes = projection ? visualiseNodes(projection.nodes).sort((a, b) => depthKey(a.footprint) - depthKey(b.footprint)) : []
   const neighborhoods = projection ? projection.groups.flatMap((group) => {

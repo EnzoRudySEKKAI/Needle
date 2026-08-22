@@ -287,6 +287,44 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .structure-view .mini-plan-empty { fill: var(--surface-soft); stroke: var(--structure); stroke-width: 1; stroke-dasharray: 5 5; }
 @keyframes structure-preview-in { from { opacity: 0; transform: translateX(8px); } }
 
+/* Floor preview — shared card (structure hover = map, navigator hover = same map, inspector = same map) */
+.floor-preview-card { display: flex; flex-direction: column; gap: 0; border-radius: 6px; overflow: hidden; background: var(--surface-raised); border: 1px solid var(--border); box-shadow: 0 10px 28px color-mix(in srgb, var(--ink) 10%, transparent); }
+.floor-preview-card-header { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.floor-preview-card-index { display: block; color: var(--accent); font: 500 9px var(--mono); letter-spacing: .7px; text-transform: uppercase; }
+.floor-preview-card-name { display: block; margin-top: 3px; color: var(--ink); font: 620 16px var(--body); letter-spacing: -.3px; line-height: 1.15; }
+.floor-preview-card-count { display: block; margin-top: 4px; color: var(--ink-3); font: 9px var(--mono); }
+.floor-preview-card-map { padding: 10px 10px 6px; background: var(--surface-soft); }
+.floor-preview-card-map .floor-mini-plan { width: 100%; height: auto; display: block; overflow: visible; }
+.floor-preview-card-action { width: 100%; padding: 9px 12px; border: 0; border-top: 1px solid var(--border); background: var(--accent); color: #fff; font: 600 9px var(--mono); letter-spacing: .6px; text-transform: uppercase; }
+.floor-preview-card-action:hover { filter: brightness(1.05); }
+.inspector-preview { margin: 14px 0 18px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.inspector-preview .floor-preview-card { border: 0; border-radius: 0; box-shadow: none; }
+.inspector-preview .floor-preview-card-header { padding: 10px 12px 8px; }
+.inspector-preview .floor-preview-card-name { font-size: 14px; }
+.inspector-preview .floor-preview-card-map { padding: 8px 8px 4px; }
+
+/* same mini-map graphics outside .structure-view */
+.floor-preview-card .mini-neighborhood,
+.inspector-preview .mini-neighborhood { stroke: none; opacity: .3; }
+.floor-preview-card .mini-relation-line,
+.inspector-preview .mini-relation-line { fill: none; stroke: var(--structure); stroke-width: 1.05; opacity: .78; }
+.floor-preview-card .mini-relation-arrow,
+.inspector-preview .mini-relation-arrow { fill: var(--structure); opacity: .86; }
+.floor-preview-card .mini-relation.relation-flow .mini-relation-line,
+.inspector-preview .mini-relation.relation-flow .mini-relation-line { stroke: var(--ink-2); }
+.floor-preview-card .mini-relation.relation-flow .mini-relation-arrow,
+.inspector-preview .mini-relation.relation-flow .mini-relation-arrow { fill: var(--ink-2); }
+.floor-preview-card .mini-concept-volume .building-face,
+.inspector-preview .mini-concept-volume .building-face { stroke: var(--structure); stroke-width: .8; }
+.floor-preview-card .mini-concept-volume .face-top,
+.inspector-preview .mini-concept-volume .face-top { fill: var(--surface-raised); }
+.floor-preview-card .mini-concept-volume .face-left, .floor-preview-card .mini-concept-volume .is-hatched.face-left,
+.inspector-preview .mini-concept-volume .face-left, .inspector-preview .mini-concept-volume .is-hatched.face-left { fill: var(--border); }
+.floor-preview-card .mini-concept-volume .face-right, .floor-preview-card .mini-concept-volume .is-hatched.face-right,
+.inspector-preview .mini-concept-volume .face-right, .inspector-preview .mini-concept-volume .is-hatched.face-right { fill: color-mix(in srgb, var(--structure) 38%, var(--surface)); }
+.floor-preview-card .mini-plan-empty,
+.inspector-preview .mini-plan-empty { fill: var(--surface-soft); stroke: var(--structure); stroke-width: 1; stroke-dasharray: 5 5; }
+
 /* Inspector */
 .inspector h2 { margin: 8px 0 0; font-size: 25px; line-height: 1.15; letter-spacing: -.035em; }
 .inspector h3 { margin: 20px 0 7px; font-size: 12px; }
