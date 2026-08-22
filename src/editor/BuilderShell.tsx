@@ -30,6 +30,9 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const [rightCollapsed, setRightCollapsed] = useState(() => {
     try { return localStorage.getItem('needle:rightCollapsed') === '1' } catch { return false }
   })
+  const [headerCollapsed, setHeaderCollapsed] = useState(() => {
+    try { return localStorage.getItem('needle:headerCollapsed') === '1' } catch { return false }
+  })
   const activeFloorId = document.floors.some((floor) => floor.id === requestedFloorId) ? requestedFloorId : document.floors[0]!.id
   const [previousFloorId, setPreviousFloorId] = useState<string | null>(null)
   const [floorDirection, setFloorDirection] = useState<'up' | 'down'>('up')
@@ -48,6 +51,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
 
   useEffect(() => { try { localStorage.setItem('needle:leftCollapsed', leftCollapsed ? '1' : '0') } catch {} }, [leftCollapsed])
   useEffect(() => { try { localStorage.setItem('needle:rightCollapsed', rightCollapsed ? '1' : '0') } catch {} }, [rightCollapsed])
+  useEffect(() => { try { localStorage.setItem('needle:headerCollapsed', headerCollapsed ? '1' : '0') } catch {} }, [headerCollapsed])
   const stepDisplayContext = editable ? 'build' : 'present'
   const stepDisplayMode = stepDisplayModes[stepDisplayContext]
   const setStepDisplayMode = (mode: StepDisplayMode) => setStepDisplayModes((current) => ({ ...current, [stepDisplayContext]: mode }))
@@ -86,6 +90,8 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       if (!typing && (event.metaKey || event.ctrlKey) && event.key === ']') { event.preventDefault(); setRightCollapsed((value) => !value) }
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key === '[') { setLeftCollapsed((value) => !value) }
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key === ']') { setRightCollapsed((value) => !value) }
+      if (!typing && (event.key === 'h' || event.key === 'H')) { setHeaderCollapsed((value) => !value) }
+      if (!typing && (event.metaKey || event.ctrlKey) && (event.key === 'h' || event.key === 'H')) { event.preventDefault(); setHeaderCollapsed((value) => !value) }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -215,9 +221,10 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
 
   if (!syncReady) return <main className="map-load-state"><span>Connecting to the shared workspace…</span></main>
 
-  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''}`}>
+  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''} ${headerCollapsed ? 'header-collapsed' : ''}`}>
     {persistenceError ? <div className="sync-error" role="alert">{persistenceError}</div> : null}
-    <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} leftCollapsed={leftCollapsed} rightCollapsed={rightCollapsed} onToggleLeft={() => setLeftCollapsed((value) => !value)} onToggleRight={() => setRightCollapsed((value) => !value)} />
+    {!headerCollapsed ? <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} leftCollapsed={leftCollapsed} rightCollapsed={rightCollapsed} headerCollapsed={headerCollapsed} onToggleLeft={() => setLeftCollapsed((value) => !value)} onToggleRight={() => setRightCollapsed((value) => !value)} onToggleHeader={() => setHeaderCollapsed((value) => !value)} /> : null}
+    {headerCollapsed ? <button type="button" className="header-restore" aria-label="Show header" title="Show header ( H )" onClick={() => setHeaderCollapsed(false)}><span aria-hidden="true">⌄</span></button> : null}
     <main className="map-workspace">
       {!leftCollapsed ? <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} onCollapse={() => setLeftCollapsed(true)} /> : null}
       <section className="stage-column">

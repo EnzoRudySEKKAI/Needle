@@ -151,6 +151,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .rail-toggle-button:hover { border-color: var(--structure); color: var(--ink); }
 .rail-toggle-button.is-collapsed { background: var(--surface-soft); color: var(--ink-3); opacity: .72; }
 .rail-toggle-button.is-collapsed:hover { opacity: 1; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+.header-restore { position: absolute; top: 0; left: 50%; z-index: 13; transform: translateX(-50%); width: 48px; height: 28px; display: grid; place-items: center; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 8px 8px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); backdrop-filter: blur(12px); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink-3); font: 14px var(--mono); line-height: 1; }
+.header-restore:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
+.map-app.header-collapsed .sync-error { top: 40px; }
 .map-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 232px minmax(340px, 1fr) 340px; position: relative; transition: grid-template-columns 220ms cubic-bezier(.22, 1, .36, 1); }
 .map-app.left-collapsed .map-workspace { grid-template-columns: 0 minmax(340px, 1fr) 340px; }
 .map-app.right-collapsed .map-workspace { grid-template-columns: 232px minmax(340px, 1fr) 0; }
