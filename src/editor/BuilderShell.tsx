@@ -37,6 +37,9 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const [previousFloorId, setPreviousFloorId] = useState<string | null>(null)
   const [floorDirection, setFloorDirection] = useState<'up' | 'down'>('up')
   const [workspaceView, setWorkspaceView] = useState<'floor' | 'structure'>('floor')
+  const [structureEntering, setStructureEntering] = useState(false)
+  const [enteringFloorId, setEnteringFloorId] = useState<string | null>(null)
+  const structureEnterTimer = useRef(0)
   const [exporting, setExporting] = useState(false)
   const [exportScope, setExportScope] = useState<'floor' | 'structure'>('floor')
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null)
@@ -68,6 +71,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   }, [])
 
   useEffect(() => () => window.clearTimeout(floorTimer.current), [])
+  useEffect(() => () => window.clearTimeout(structureEnterTimer.current), [])
 
   useEffect(() => {
     configureFlow(flowProgram, !editable)
@@ -151,13 +155,21 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     commit((current) => addFloor(current, activeFloorId, floorId).document)
     setSelection({ kind: 'floor', id: floorId })
     window.clearTimeout(floorTimer.current)
+    window.clearTimeout(structureEnterTimer.current)
+    const fromStructure = workspaceView === 'structure'
     const fromIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
     setFloorDirection('up')
-    setPreviousFloorId(workspaceView === 'structure' ? null : activeFloorId)
+    setPreviousFloorId(fromStructure ? null : activeFloorId)
+    setStructureEntering(fromStructure)
+    if (fromStructure) setEnteringFloorId(floorId)
     setWorkspaceView('floor')
     void fromIndex
     startTransition(() => setActiveFloorId(floorId))
-    floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
+    if (fromStructure) {
+      structureEnterTimer.current = window.setTimeout(() => { setStructureEntering(false); setEnteringFloorId(null) }, 520)
+    } else {
+      floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
+    }
   }
   const handleMoveFloor = (floorId: string, beforeFloorId: string | null) => {
     if (floorId === beforeFloorId) return
@@ -185,8 +197,12 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     const toIndex = document.floors.findIndex((floor) => floor.id === floorId)
     if (toIndex < 0) return
     window.clearTimeout(floorTimer.current)
+    window.clearTimeout(structureEnterTimer.current)
+    const enteringFromStructure = workspaceView === 'structure'
     setFloorDirection(toIndex >= fromIndex ? 'up' : 'down')
-    setPreviousFloorId(workspaceView === 'structure' ? null : activeFloorId)
+    setPreviousFloorId(enteringFromStructure ? null : activeFloorId)
+    setStructureEntering(enteringFromStructure)
+    if (enteringFromStructure) setEnteringFloorId(floorId)
     setWorkspaceView('floor')
     setRelationPickTarget(null)
     setRelationPreview(null)
@@ -194,7 +210,11 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     const selectedNode = selection?.kind === 'node' ? document.nodes.find((node) => node.id === selection.id) : null
     if (selectedNode && selectedNode.floorId !== floorId) setSelection(null)
     startTransition(() => setActiveFloorId(floorId))
-    floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
+    if (enteringFromStructure) {
+      structureEnterTimer.current = window.setTimeout(() => { setStructureEntering(false); setEnteringFloorId(null) }, 520)
+    } else {
+      floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
+    }
   }
   const followScenarioFloor = useEffectEvent((floorId: string) => openFloor(floorId))
   useEffect(() => {
@@ -229,9 +249,9 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       {!leftCollapsed ? <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} onCollapse={() => setLeftCollapsed(true)} /> : null}
       <section className="stage-column">
         <div className="floor-viewport">
-          {previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroupFlag={() => {}} /></div> : null}
-          {workspaceView === 'structure' ? <div className="floor-layer is-structure"><StructureView key={document.structureType} document={document} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div> : <div className={`floor-layer ${previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={activeFloorId} document={document} floorId={activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} /></div>}
-          <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} view={workspaceView} onFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} onStructure={() => { pauseFlow(); setPreviousFloorId(null); setWorkspaceView('structure'); setSelection(null); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }} editable={editable} onAddFloor={handleAddFloor} onMoveFloor={handleMoveFloor} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} />
+          {structureEntering ? <div className="floor-layer is-outgoing is-structure-exit"><StructureView key={`${document.structureType}-exit`} document={document} activeFloorId={enteringFloorId ?? activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div> : previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroupFlag={() => {}} /></div> : null}
+          {workspaceView === 'structure' ? <div className="floor-layer is-structure"><StructureView key={document.structureType} document={document} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div> : <div className={`floor-layer ${structureEntering ? 'is-incoming is-floor-enter' : previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={structureEntering && enteringFloorId ? enteringFloorId : activeFloorId} document={document} floorId={structureEntering && enteringFloorId ? enteringFloorId : activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId && !structureEntering} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} /></div>}
+          <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} view={workspaceView} onFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} onStructure={() => { pauseFlow(); setPreviousFloorId(null); setStructureEntering(false); setEnteringFloorId(null); window.clearTimeout(structureEnterTimer.current); setWorkspaceView('structure'); setSelection(null); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }} editable={editable} onAddFloor={handleAddFloor} onMoveFloor={handleMoveFloor} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} />
           {leftCollapsed ? <button type="button" className="rail-restore rail-restore-left" aria-label="Show left rail" title="Show left rail ( [ )" onClick={() => setLeftCollapsed(false)}><span aria-hidden="true">›</span></button> : null}
           {rightCollapsed ? <button type="button" className="rail-restore rail-restore-right" aria-label="Show detail rail" title="Show detail rail ( ] )" onClick={() => setRightCollapsed(false)}><span aria-hidden="true">‹</span></button> : null}
         </div>
