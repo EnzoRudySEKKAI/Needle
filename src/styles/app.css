@@ -218,7 +218,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .floor-row.is-active { background: var(--accent-wash); color: var(--accent); }
 
 /* Floor navigation */
-.floor-navigator { position: absolute; top: 18px; right: 18px; z-index: 7; width: 154px; padding: 10px; border-radius: 7px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); box-shadow: 0 14px 38px color-mix(in srgb, var(--ink) 12%, transparent); backdrop-filter: blur(14px); }
+.floor-navigator { position: absolute; top: 18px; right: 18px; z-index: 7; width: fit-content; min-width: 154px; max-width: min(380px, calc(100vw - 32px)); padding: 10px; border-radius: 7px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); box-shadow: 0 14px 38px color-mix(in srgb, var(--ink) 12%, transparent); backdrop-filter: blur(14px); }
 .floor-navigator-header { display: flex; align-items: center; justify-content: space-between; padding: 1px 2px 8px; }
 .floor-navigator-header span { color: var(--ink-3); font: 8px var(--mono); text-transform: uppercase; }
 .floor-add-button { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--ink-3); font: 12px var(--mono); }
@@ -646,7 +646,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .map-app.is-structure-view .structure-type-picker button { height: 76px; }
   .map-app.is-structure-view .structure-type-picker svg { height: 51px; }
   .camera-controls { bottom: 174px; }
-  .floor-navigator { top: 10px; right: 10px; width: 118px; }
+  .floor-navigator { top: 10px; right: 10px; width: fit-content; min-width: 118px; max-width: min(280px, calc(100vw - 20px)); }
   .floor-navigator-list span { font-size: 9px; }
   .map-footer { padding-right: 8px; }
   .map-footer b { display: none; }
