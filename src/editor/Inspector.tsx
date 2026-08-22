@@ -53,7 +53,7 @@ function updateRelation(document: OntologyDocument, id: string, patch: Partial<O
   return { ...document, relations: document.relations.map((relation) => relation.id === id ? { ...relation, ...patch } : relation) }
 }
 
-export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructureView = false, onActiveFloor, onActiveFlow, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection }: { editable: boolean; activeFloorId: string; hoveredFloorId?: string | null; isStructureView?: boolean; onActiveFloor: (id: string) => void; onActiveFlow: (id: string | null) => void; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void }) {
+export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructureView = false, onActiveFloor, onActiveFlow, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, connectionDraft, onStartConnection, onUpdateConnection, onCancelConnection, onCommitConnection, onCollapse }: { editable: boolean; activeFloorId: string; hoveredFloorId?: string | null; isStructureView?: boolean; onActiveFloor: (id: string) => void; onActiveFlow: (id: string | null) => void; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; connectionDraft: ConnectionDraft | null; onStartConnection: (sourceId: string) => void; onUpdateConnection: (draft: ConnectionDraft | null) => void; onCancelConnection: () => void; onCommitConnection: () => void; onCollapse?: () => void }) {
   const { document, selection, setSelection, commit } = useDocumentStore()
   const diagnostics = validateDocument(document)
   const node = selection?.kind === 'node' ? document.nodes.find((item) => item.id === selection.id) : null
@@ -77,7 +77,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
   }
 
   if (connectionDraft) {
-    return <aside key="connection" className="inspector"><ConnectionInspector draft={connectionDraft} document={document} onUpdate={onUpdateConnection} onCancel={onCancelConnection} onCommit={onCommitConnection} /></aside>
+    return <aside key="connection" className="inspector">{onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}<ConnectionInspector draft={connectionDraft} document={document} onUpdate={onUpdateConnection} onCancel={onCancelConnection} onCommit={onCommitConnection} /></aside>
   }
 
   if (!selection) {
@@ -87,6 +87,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
       const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
       return (
         <aside className="inspector">
+          {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
           <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
           <h2>{hoveredFloor.name}</h2>
           <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
@@ -101,6 +102,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
     }
     return (
       <aside className="inspector intro-panel">
+        {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
         <span className="eyebrow">Ontology map</span>
         <h2>{document.name}</h2>
         <p className="lede">{document.description}</p>
@@ -120,6 +122,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
       const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
       return (
         <aside className="inspector">
+          {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
           <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
           <h2>{hoveredFloor.name}</h2>
           <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
@@ -136,6 +139,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
 
   return <>
     <aside key={`${selection.kind}:${selection.id}`} className="inspector">
+      {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
       {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}

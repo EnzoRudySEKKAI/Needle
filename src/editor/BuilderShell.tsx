@@ -24,6 +24,12 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const [editable, setEditable] = useState(!presentation)
   const [activeFlowId, setActiveFlowId] = useState<string | null>(null)
   const [requestedFloorId, setActiveFloorId] = useState(document.floors[0]!.id)
+  const [leftCollapsed, setLeftCollapsed] = useState(() => {
+    try { return localStorage.getItem('needle:leftCollapsed') === '1' } catch { return false }
+  })
+  const [rightCollapsed, setRightCollapsed] = useState(() => {
+    try { return localStorage.getItem('needle:rightCollapsed') === '1' } catch { return false }
+  })
   const activeFloorId = document.floors.some((floor) => floor.id === requestedFloorId) ? requestedFloorId : document.floors[0]!.id
   const [previousFloorId, setPreviousFloorId] = useState<string | null>(null)
   const [floorDirection, setFloorDirection] = useState<'up' | 'down'>('up')
@@ -39,6 +45,9 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const [fullscreenError, setFullscreenError] = useState<string | null>(null)
   const [hoveredFloorId, setHoveredFloorId] = useState<string | null>(null)
   const floorTimer = useRef(0)
+
+  useEffect(() => { try { localStorage.setItem('needle:leftCollapsed', leftCollapsed ? '1' : '0') } catch {} }, [leftCollapsed])
+  useEffect(() => { try { localStorage.setItem('needle:rightCollapsed', rightCollapsed ? '1' : '0') } catch {} }, [rightCollapsed])
   const stepDisplayContext = editable ? 'build' : 'present'
   const stepDisplayMode = stepDisplayModes[stepDisplayContext]
   const setStepDisplayMode = (mode: StepDisplayMode) => setStepDisplayModes((current) => ({ ...current, [stepDisplayContext]: mode }))
@@ -73,6 +82,10 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       const target = event.target as HTMLElement | null
       const typing = target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')
       if (event.key === ' ' && activeFlowId && !typing) { event.preventDefault(); toggleFlow() }
+      if (!typing && (event.metaKey || event.ctrlKey) && event.key === '[') { event.preventDefault(); setLeftCollapsed((value) => !value) }
+      if (!typing && (event.metaKey || event.ctrlKey) && event.key === ']') { event.preventDefault(); setRightCollapsed((value) => !value) }
+      if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key === '[') { setLeftCollapsed((value) => !value) }
+      if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key === ']') { setRightCollapsed((value) => !value) }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -202,20 +215,21 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
 
   if (!syncReady) return <main className="map-load-state"><span>Connecting to the shared workspace…</span></main>
 
-  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''}`}>
+  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''}`}>
     {persistenceError ? <div className="sync-error" role="alert">{persistenceError}</div> : null}
-    <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} />
+    <MapHeader activeFlowId={activeFlowId} editable={editable} stepDisplayMode={stepDisplayMode} fullscreen={fullscreen} fullscreenError={fullscreenError} onStepDisplayMode={setStepDisplayMode} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} leftCollapsed={leftCollapsed} rightCollapsed={rightCollapsed} onToggleLeft={() => setLeftCollapsed((value) => !value)} onToggleRight={() => setRightCollapsed((value) => !value)} />
     <main className="map-workspace">
-      <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} />
+      {!leftCollapsed ? <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} onCollapse={() => setLeftCollapsed(true)} /> : null}
       <section className="stage-column">
         <div className="floor-viewport">
           {previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroupFlag={() => {}} /></div> : null}
           {workspaceView === 'structure' ? <div className="floor-layer is-structure"><StructureView key={document.structureType} document={document} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div> : <div className={`floor-layer ${previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={activeFloorId} document={document} floorId={activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} /></div>}
           <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} view={workspaceView} onFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} onStructure={() => { pauseFlow(); setPreviousFloorId(null); setWorkspaceView('structure'); setSelection(null); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }} editable={editable} onAddFloor={handleAddFloor} onMoveFloor={handleMoveFloor} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} />
+          {leftCollapsed ? <button type="button" className="rail-restore rail-restore-left" aria-label="Show left rail" title="Show left rail ( [ )" onClick={() => setLeftCollapsed(false)}><span aria-hidden="true">›</span></button> : null}
+          {rightCollapsed ? <button type="button" className="rail-restore rail-restore-right" aria-label="Show detail rail" title="Show detail rail ( ] )" onClick={() => setRightCollapsed(false)}><span aria-hidden="true">‹</span></button> : null}
         </div>
-        <footer className="map-footer"><span className="legend-key flow-key" /> flow <span className="legend-key support-key" /> support <span className="legend-key retry-key" /> retry <span className="payload-key" /> payload <b>{workspaceView === 'structure' ? 'hover to preview · select a floor to enter' : editable ? 'drag buildings or flags · scroll to zoom · drag ground to pan' : 'choose a scenario · space plays · scroll to zoom'}</b></footer>
       </section>
-      <Inspector editable={editable} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} isStructureView={workspaceView === 'structure'} onActiveFloor={openFloor} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} onStagePreview={setStagePreviewTarget} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} />
+      {!rightCollapsed ? <Inspector editable={editable} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} isStructureView={workspaceView === 'structure'} onActiveFloor={openFloor} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} onStagePreview={setStagePreviewTarget} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} onCollapse={() => setRightCollapsed(true)} /> : null}
     </main>
     {exporting ? <ExportDialog filename={document.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} scope={exportScope} onScope={(scope) => { setExportScope(scope); setPreviousFloorId(null); setWorkspaceView(scope) }} onClose={() => setExporting(false)} /> : null}
   </div>

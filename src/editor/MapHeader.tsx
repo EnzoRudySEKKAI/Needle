@@ -36,7 +36,7 @@ function StepNavigator({ flow, program, started, time }: { flow: OntologyFlow; p
   </nav>
 }
 
-export function MapHeader({ activeFlowId, editable, stepDisplayMode, fullscreen, fullscreenError, onStepDisplayMode, onFullscreen, onEditable, onExport }: { activeFlowId: string | null; editable: boolean; stepDisplayMode: StepDisplayMode; fullscreen: boolean; fullscreenError: string | null; onStepDisplayMode: (mode: StepDisplayMode) => void; onFullscreen: () => void; onEditable?: (editable: boolean) => void; onExport?: () => void }) {
+export function MapHeader({ activeFlowId, editable, stepDisplayMode, fullscreen, fullscreenError, onStepDisplayMode, onFullscreen, onEditable, onExport, leftCollapsed = false, rightCollapsed = false, onToggleLeft, onToggleRight }: { activeFlowId: string | null; editable: boolean; stepDisplayMode: StepDisplayMode; fullscreen: boolean; fullscreenError: string | null; onStepDisplayMode: (mode: StepDisplayMode) => void; onFullscreen: () => void; onEditable?: (editable: boolean) => void; onExport?: () => void; leftCollapsed?: boolean; rightCollapsed?: boolean; onToggleLeft?: () => void; onToggleRight?: () => void }) {
   const { document, undo, redo, canUndo, canRedo } = useDocumentStore()
   const clock = useClockState()
   const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
@@ -52,6 +52,8 @@ export function MapHeader({ activeFlowId, editable, stepDisplayMode, fullscreen,
       <button type="button" disabled={!activeProgram} onClick={stepFlow}>Step</button>
       <label className="step-display-control"><span>Steps</span><select aria-label="Step labels" value={stepDisplayMode} disabled={!activeFlowId} onChange={(event) => onStepDisplayMode(event.target.value as StepDisplayMode)}><option value="all">All</option><option value="current">Current</option><option value="none">None</option></select></label>
       <div className="speed-control">{[0.5, 1, 2].map((speed) => <button type="button" key={speed} className={clock.speed === speed ? 'is-active' : ''} onClick={() => setFlowSpeed(speed)}>{speed}×</button>)}</div>
+      {onToggleLeft ? <button type="button" className={`rail-toggle-button ${leftCollapsed ? 'is-collapsed' : ''}`} aria-label={leftCollapsed ? 'Show concepts rail' : 'Hide concepts rail'} aria-pressed={!leftCollapsed} title={leftCollapsed ? 'Show left rail [  —  ⌘[' : 'Hide left rail [  —  ⌘['} onClick={onToggleLeft}><span aria-hidden="true">{leftCollapsed ? '◧' : '◧'}</span></button> : null}
+      {onToggleRight ? <button type="button" className={`rail-toggle-button ${rightCollapsed ? 'is-collapsed' : ''}`} aria-label={rightCollapsed ? 'Show detail rail' : 'Hide detail rail'} aria-pressed={!rightCollapsed} title={rightCollapsed ? 'Show detail rail ]  —  ⌘]' : 'Hide detail rail ]  —  ⌘]'} onClick={onToggleRight}><span aria-hidden="true">{rightCollapsed ? '◨' : '◨'}</span></button> : null}
       <button type="button" onClick={toggleTheme} title="Toggle theme">◐</button>
       <button type="button" className="fullscreen-button" onClick={onFullscreen} title={fullscreenError ?? (fullscreen ? 'Exit fullscreen' : 'Enter fullscreen')}>{fullscreen ? 'Exit full' : 'Fullscreen'}</button>
       {onExport ? <button type="button" className="export-button" onClick={onExport}>Export</button> : null}

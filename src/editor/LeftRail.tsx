@@ -5,7 +5,7 @@ import type { Selection } from '../domain/types'
 import { nextFreePosition } from '../map/core/layout'
 import { useDocumentStore } from './document-store'
 
-export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; activeFloorId: string; onActiveFloor: (id: string) => void; editable: boolean }) {
+export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable, onCollapse }: { activeFlowId: string | null; onActiveFlow: (id: string | null) => void; activeFloorId: string; onActiveFloor: (id: string) => void; editable: boolean; onCollapse?: () => void }) {
   void onActiveFloor
   const { document, selection, setSelection, commit } = useDocumentStore()
   const [tabChoice, setTabChoice] = useState<{ tab: 'scenarios' | 'relations' | 'concepts'; selection: Selection | null }>({ tab: 'concepts', selection })
@@ -49,8 +49,11 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
 
   return (
     <aside className="left-rail">
-      <div className="rail-tabs" role="tablist" aria-label="Map content">
-        {(['concepts', 'relations', 'scenarios'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
+      <div className="rail-tabs-wrap">
+        <div className="rail-tabs" role="tablist" aria-label="Map content">
+          {(['concepts', 'relations', 'scenarios'] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? 'is-active' : ''} onClick={() => setTabChoice({ tab, selection })}>{tab}</button>)}
+        </div>
+        {onCollapse ? <button type="button" className="rail-collapse-button" aria-label="Hide left rail" title="Hide left rail [" onClick={onCollapse}><span aria-hidden="true">‹</span></button> : null}
       </div>
       {activeTab === 'scenarios' ? <section className="rail-section rail-flows" role="tabpanel">
         <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario">+</button> : null}</div>
