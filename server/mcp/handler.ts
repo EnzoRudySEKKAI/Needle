@@ -6,11 +6,118 @@ import { EXAMPLE_MAPS } from '../../src/domain/examples.js'
 import { validateDocument } from '../../src/domain/validation.js'
 import { migrateDocument } from '../../src/domain/migration.js'
 import { makeId, codeFromName } from '../../src/domain/id.js'
-import { nextFreePosition } from '../../src/map/core/layout.js'
+import { nextFreePosition, deriveSize, deriveArchetype, visualiseNodes } from '../../src/map/core/layout.js'
+import { footprintsOverlap } from '../../src/map/core/iso.js'
+import { buildScene } from '../../src/map/core/scene.js'
 import { addFloor, deleteFloorCascade, moveFloorContents, setFloorFlagPosition, deleteGroupCascade, deleteNodeCascade, deleteRelationsCascade, addFlowTraversal, moveFlowStage } from '../../src/domain/commands.js'
-import type { OntologyDocument } from '../../src/domain/types.js'
+import type { OntologyDocument, GridPoint } from '../../src/domain/types.js'
 
 await store.initialize()
+
+const DISTRICT_GAP = 3
+
+function findFreePositionWithDistrictGap(
+  doc: OntologyDocument,
+  floorId: string,
+  groupId: string,
+  size: 'xs' | 's' | 'm' | 'l' | 'xl',
+  archetype: string | undefined,
+  propCount: number,
+  explicitPos?: GridPoint,
+): { position: GridPoint; corrected: boolean } {
+  const floor = doc.floors.find(f => f.id === floorId)
+  if (!floor) return { position: explicitPos ?? { gx: 0, gy: 0 }, corrected: false }
+  const nodesOnFloor = doc.nodes.filter(n => n.floorId === floorId)
+  // If explicit position provided, check it first
+  if (explicitPos) {
+    const candidateNode: OntologyDocument['nodes'][number] = {
+      id: 'candidate',
+      code: 'CA',
+      name: 'candidate',
+      groupId,
+      floorId,
+      size,
+      position: explicitPos,
+      whatItDoes: '',
+      howItsBuilt: '',
+      faceTexture: 'auto',
+      properties: Array.from({ length: propCount }, (_, i) => ({ id: `p-${i}`, key: 'k', value: 'v' })),
+      ...(archetype ? { archetypeOverride: archetype as any } : {}),
+    } as any
+    const testNodes = [...nodesOnFloor, candidateNode]
+    const testVisuals = visualiseNodes(testNodes)
+    const testGroups = doc.groups
+    // check node overlap
+    const candidateVisual = testVisuals.find(v => v.id === 'candidate')!
+    const nodeOverlap = testVisuals.some(v => v.id !== 'candidate' && footprintsOverlap(candidateVisual.footprint, v.footprint, 0.8))
+    if (!nodeOverlap) {
+      // check district overlap
+      const scene = buildScene(testGroups, testVisuals, 'check', new Map(), floor.groupFlagPositions)
+      const candDistrict = scene.districts.find(d => d.id === groupId)
+      if (candDistrict) {
+        const otherDistricts = scene.districts.filter(d => d.id !== groupId)
+        const districtOverlap = otherDistricts.some(d => footprintsOverlap(candDistrict.rect, d.rect, DISTRICT_GAP))
+        if (!districtOverlap) return { position: explicitPos, corrected: false }
+      } else if (!nodeOverlap) {
+        return { position: explicitPos, corrected: false }
+      }
+    }
+    // explicit position would overlap -> fall through to auto search and mark corrected
+  }
+
+  // Auto search: try grid around group's existing members, otherwise rightmost + gap
+  const visuals = visualiseNodes(nodesOnFloor)
+  const members = visuals.filter(v => v.groupId === groupId)
+  const baseX = members.length ? Math.min(...members.map(v => v.footprint.gx)) : undefined
+  const baseY = members.length ? Math.min(...members.map(v => v.footprint.gy)) : undefined
+  const candidates: GridPoint[] = []
+  if (members.length === 0) {
+    const rightmost = visuals.reduce((max, v) => Math.max(max, v.footprint.gx + v.footprint.w), -8)
+    for (let row = 0; row < 10; row += 1) {
+      for (let col = 0; col < 6; col += 1) {
+        candidates.push({ gx: rightmost + 8 + col * 5, gy: row * 5 })
+      }
+    }
+  } else {
+    for (let row = 0; row < 12; row += 1) {
+      for (let col = 0; col < 6; col += 1) {
+        candidates.push({ gx: baseX! + col * 5, gy: baseY! + row * 5 })
+      }
+    }
+  }
+  // also try far fallback
+  candidates.push({ gx: (baseX ?? 0) + 52, gy: (baseY ?? 0) })
+
+  for (const cand of candidates) {
+    const candidateNode: OntologyDocument['nodes'][number] = {
+      id: 'candidate',
+      code: 'CA',
+      name: 'candidate',
+      groupId,
+      floorId,
+      size,
+      position: cand,
+      whatItDoes: '',
+      howItsBuilt: '',
+      faceTexture: 'auto',
+      properties: Array.from({ length: propCount }, (_, i) => ({ id: `p-${i}`, key: 'k', value: 'v' })),
+      ...(archetype ? { archetypeOverride: archetype as any } : {}),
+    } as any
+    const testNodes = [...nodesOnFloor, candidateNode]
+    const testVisuals = visualiseNodes(testNodes)
+    const candidateVisual = testVisuals.find(v => v.id === 'candidate')!
+    if (testVisuals.some(v => v.id !== 'candidate' && footprintsOverlap(candidateVisual.footprint, v.footprint, 0.8))) continue
+    const scene = buildScene(doc.groups, testVisuals, 'check', new Map(), floor.groupFlagPositions)
+    const candDistrict = scene.districts.find(d => d.id === groupId)
+    if (!candDistrict) continue
+    const otherDistricts = scene.districts.filter(d => d.id !== groupId)
+    if (otherDistricts.some(d => footprintsOverlap(candDistrict.rect, d.rect, DISTRICT_GAP))) continue
+    return { position: cand, corrected: !!explicitPos }
+  }
+  // fallback to original nextFreePosition
+  const fallback = nextFreePosition(nodesOnFloor, groupId)
+  return { position: fallback, corrected: !!explicitPos }
+}
 
 function notFound(id: string) {
   return {
@@ -312,14 +419,14 @@ export const handler = createMcpHandler(({
   // ---- NODES ----
   server.registerTool('add_node', {
     title: 'Add concept',
-    description: 'Add a concept (node) to a floor/neighborhood. Position auto-assigned if omitted using nextFreePosition.',
+    description: 'Add a concept (node) to a floor/neighborhood. Position auto-assigned if omitted. Guarantees gap 3 between neighborhoods and 0.8 between nodes; explicit positions are auto-corrected to the nearest free spot if they would cause overlap.',
     inputSchema: z.object({
       mapId: z.string(),
       name: z.string().min(1).describe('Concept name'),
       groupId: z.string().describe('Neighborhood ID'),
       floorId: z.string().describe('Floor ID'),
       size: z.enum(['xs','s','m','l','xl']).optional().describe('Size, default m'),
-      position: z.object({ gx: z.number(), gy: z.number() }).optional().describe('Position, auto if omitted'),
+      position: z.object({ gx: z.number(), gy: z.number() }).optional().describe('Position, auto if omitted. If it would cause district overlap (gap <3) it will be auto-corrected.'),
       whatItDoes: z.string().optional(),
       howItsBuilt: z.string().optional(),
       code: z.string().max(3).optional().describe('Roof code 1-3 chars, auto from name if omitted'),
@@ -336,7 +443,8 @@ export const handler = createMcpHandler(({
     const id = makeId('node')
     const usedCodes = new Set(doc.nodes.map(n=>n.code))
     const finalCode = code ? code.toUpperCase().slice(0,3) : codeFromName(name, usedCodes)
-    const pos = position ?? nextFreePosition(doc.nodes.filter(n=> n.floorId===floorId), groupId)
+    const propCount = properties?.length ?? 0
+    const { position: pos, corrected } = findFreePositionWithDistrictGap(doc, floorId, groupId, (size ?? 'm') as any, archetype, propCount, position)
     const node = {
       id, code: finalCode, name, groupId, floorId,
       size: size ?? 'm' as const,
@@ -351,6 +459,9 @@ export const handler = createMcpHandler(({
     const diag = validateDocument(next).filter(d=>d.level==='error')
     if (diag.length) return badRequest(`Validation: ${diag.map(d=>d.message).join('; ')}`)
     const saved = await store.save(next)
+    if (corrected && position) {
+      return okJson({ nodeId: id, node, document: saved, warning: `Position auto-corrected to ${pos.gx},${pos.gy} to keep gap 3 between neighborhoods` }, `Position corrected to keep gap 3 between neighborhoods`)
+    }
     return okJson({ nodeId: id, node, document: saved })
   })
 
@@ -380,7 +491,7 @@ export const handler = createMcpHandler(({
     if (!doc.nodes.some(n=>n.id===nodeId)) return badRequest(`Node ${nodeId} not found`)
     if (patch.groupId && !doc.groups.some(g=>g.id===patch.groupId)) return badRequest(`Group ${patch.groupId} not found`)
     if (patch.floorId && !doc.floors.some(f=>f.id===patch.floorId)) return badRequest(`Floor ${patch.floorId} not found`)
-    const next = {
+    let next = {
       ...doc,
       nodes: doc.nodes.map(n=> n.id!==nodeId ? n : {
         ...n,
@@ -395,6 +506,29 @@ export const handler = createMcpHandler(({
         ...(patch.faceTexture!==undefined?{faceTexture: patch.faceTexture}:{}),
         ...(patch.archetype!==undefined?{archetypeOverride: patch.archetype ?? undefined}:{}),
       }),
+    }
+    // If position/group/floor/size/archetype changed, ensure gap 3 between districts
+    const needsCheck = patch.position !== undefined || patch.groupId !== undefined || patch.floorId !== undefined || patch.size !== undefined || patch.archetype !== undefined
+    if (needsCheck) {
+      const updated = next.nodes.find(n=> n.id===nodeId)!
+      const floorId = updated.floorId
+      const floor = next.floors.find(f=> f.id===floorId)!
+      const nodesOnFloor = next.nodes.filter(n=> n.floorId===floorId)
+      const visuals = visualiseNodes(nodesOnFloor)
+      const updatedVisual = visuals.find(v=> v.id===nodeId)!
+      // check node overlap
+      const nodeOverlap = visuals.some(v=> v.id!==nodeId && footprintsOverlap(updatedVisual.footprint, v.footprint, 0.8))
+      // check district overlap
+      const scene = buildScene(next.groups, visuals, 'check', new Map(), floor.groupFlagPositions)
+      const updDistrict = scene.districts.find(d=> d.id===updated.groupId)
+      const districtOverlap = updDistrict ? scene.districts.some(d=> d.id!==updated.groupId && footprintsOverlap(updDistrict.rect, d.rect, DISTRICT_GAP)) : false
+      if (nodeOverlap || districtOverlap) {
+        const propCount = updated.properties.length
+        const { position: correctedPos } = findFreePositionWithDistrictGap(next, floorId, updated.groupId, updated.size as any, updated.archetypeOverride, propCount)
+        next = { ...next, nodes: next.nodes.map(n=> n.id===nodeId ? { ...n, position: correctedPos } : n) }
+        const saved = await store.save(next)
+        return okJson(saved, `Position auto-corrected to ${correctedPos.gx},${correctedPos.gy} to keep gap 3 between neighborhoods`)
+      }
     }
     const saved = await store.save(next)
     return okJson(saved)
