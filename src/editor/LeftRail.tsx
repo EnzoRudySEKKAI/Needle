@@ -78,20 +78,21 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         </div>
       </section> : null}
       {activeTab === 'concepts' ? <div className="rail-neighborhoods" role="tabpanel">
-        {document.groups
-          .filter((group) => document.nodes.some((node) => node.groupId === group.id && node.floorId === activeFloorId))
-          .map((group) => (
+        {document.groups.length === 0 ? <section className="rail-section"><p className="rail-empty">No neighborhoods yet. Create one to add your first concept.</p></section> : document.groups.map((group) => {
+          const nodesOnFloor = document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId)
+          return (
           <section className="rail-section" key={group.id}>
-            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId).length}</span></button>
+            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{nodesOnFloor.length}</span></button>
             <div className="node-list">
-              {document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId).map((node) => (
+              {nodesOnFloor.map((node) => (
                 <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>
               ))}
+              {nodesOnFloor.length === 0 ? <p className="rail-empty" style={{ padding: '4px 0', fontSize: '11px', opacity: 0.6 }}>No concepts in this neighborhood on this floor.</p> : null}
               {editable ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
             </div>
           </section>
-        ))}
-        {document.groups.filter((group) => document.nodes.some((node) => node.groupId === group.id && node.floorId === activeFloorId)).length === 0 ? <section className="rail-section"><p className="rail-empty">No concepts on this floor.</p></section> : null}
+        )})}
+        {document.groups.length > 0 && document.nodes.filter((node) => node.floorId === activeFloorId).length === 0 ? <p className="rail-empty" style={{ marginTop: 8, fontSize: '11px', opacity: 0.5 }}>This floor is empty — add a concept to any neighborhood above.</p> : null}
         {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
       </div> : null}
     </aside>
