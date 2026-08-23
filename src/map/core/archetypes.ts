@@ -119,6 +119,106 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     }
     return result
   }
+  if (archetype === 'server-rack') {
+    const modules = 4
+    const gap = height * 0.05
+    const moduleH = (height - gap * (modules - 1)) / modules
+    const result: Face[] = []
+    for (let i = 0; i < modules; i += 1) {
+      const z0 = i * (moduleH + gap)
+      const z1 = z0 + moduleH
+      result.push(...boxFaces(footprint, z0, z1, true))
+      if (i < modules - 1) {
+        const ventY = footprint.gy + footprint.d * 0.18
+        const ventH = gap * 0.55
+        result.push(...boxFaces({ gx: footprint.gx + 0.08, gy: ventY, w: footprint.w - 0.16, d: 0.08 }, z1 + (gap - ventH) / 2, z1 + (gap + ventH) / 2))
+      }
+    }
+    return result
+  }
+  if (archetype === 'monitor') {
+    const baseH = Math.max(0.18, height * 0.14)
+    const standH = baseH + 0.42
+    const screenTh = 0.16
+    const screenH = height - standH - 0.18
+    const standW = footprint.w * 0.26
+    const standD = footprint.d * 0.24
+    const standX = footprint.gx + (footprint.w - standW) / 2
+    const standY = footprint.gy + footprint.d * 0.52
+    const screenY = footprint.gy + 0.14
+    const screenBottom = standH
+    const screenTop = screenBottom + screenH
+    return [
+      ...boxFaces({ gx: footprint.gx + footprint.w * 0.18, gy: footprint.gy + footprint.d * 0.68, w: footprint.w * 0.64, d: footprint.d * 0.22 }, 0, baseH * 0.65),
+      ...boxFaces({ gx: standX, gy: standY, w: standW, d: standD }, baseH * 0.65, standH),
+      ...boxFaces({ gx: footprint.gx + 0.06, gy: screenY, w: footprint.w - 0.12, d: screenTh }, screenBottom, screenTop, true),
+    ]
+  }
+  if (archetype === 'phone') {
+    const bodyH = height
+    const inset = 0.1
+    const screenH = height * 0.84
+    const screenTop = height - 0.12
+    const screenBottom = screenTop - screenH
+    const notchW = footprint.w * 0.36
+    const notchH = footprint.d * 0.08
+    return [
+      ...boxFaces(footprint, 0, bodyH),
+      ...boxFaces({ gx: footprint.gx + inset, gy: footprint.gy + inset, w: footprint.w - inset * 2, d: footprint.d - inset * 2 }, screenBottom, screenTop, true),
+      ...boxFaces({ gx: footprint.gx + (footprint.w - notchW) / 2, gy: footprint.gy + 0.06, w: notchW, d: notchH }, screenTop, screenTop + 0.1),
+    ]
+  }
+  if (archetype === 'tablet') {
+    const inset = 0.12
+    const screenH = height * 0.78
+    return [
+      ...boxFaces(footprint, 0, height * 0.38),
+      ...boxFaces({ gx: footprint.gx + inset, gy: footprint.gy + inset, w: footprint.w - inset * 2, d: footprint.d - inset * 2 }, height * 0.08, height * 0.08 + screenH, true),
+      topFace([
+        { gx: footprint.gx + footprint.w * 0.42, gy: footprint.gy + footprint.d * 0.5 - 0.06 },
+        { gx: footprint.gx + footprint.w * 0.58, gy: footprint.gy + footprint.d * 0.5 - 0.06 },
+        { gx: footprint.gx + footprint.w * 0.58, gy: footprint.gy + footprint.d * 0.5 + 0.06 },
+        { gx: footprint.gx + footprint.w * 0.42, gy: footprint.gy + footprint.d * 0.5 + 0.06 },
+      ], height * 0.38),
+    ]
+  }
+  if (archetype === 'laptop') {
+    const baseH = height * 0.26
+    const screenTh = 0.14
+    const keyInset = 0.14
+    return [
+      ...boxFaces(footprint, 0, baseH),
+      ...boxFaces({ gx: footprint.gx + keyInset, gy: footprint.gy + 0.18, w: footprint.w - keyInset * 2, d: footprint.d - 0.32 }, baseH * 0.72, baseH, true),
+      ...boxFaces({ gx: footprint.gx + 0.05, gy: footprint.gy, w: footprint.w - 0.1, d: screenTh }, baseH, height, true),
+    ]
+  }
+  if (archetype === 'database') {
+    const cx = footprint.gx + footprint.w / 2
+    const cy = footprint.gy + footprint.d / 2
+    const rx = footprint.w * 0.44
+    const ry = footprint.d * 0.44
+    const ring = (rScale: number, yScale = 1) => Array.from({ length: 8 }, (_, i) => {
+      const a = (i * Math.PI) / 4
+      return { gx: cx + Math.cos(a) * rx * rScale, gy: cy + Math.sin(a) * ry * rScale * yScale }
+    })
+    const h1 = height * 0.38
+    const h2 = height * 0.82
+    const lower = ring(1)
+    const upper = ring(1)
+    const result: Face[] = []
+    for (let i = 0; i < 8; i += 1) {
+      const a = lower[i]!
+      const b = lower[(i + 1) % 8]!
+      const shade: 'left' | 'right' = i < 2 || i === 7 ? 'right' : 'left'
+      result.push(verticalFace(a, b, 0, h1, shade, i % 2 === 0))
+      result.push(verticalFace(a, b, h1 + 0.06, h2, shade, i % 2 === 0))
+    }
+    result.push(topFace(lower, h1))
+    result.push(topFace(upper, h2))
+    result.push(topFace(ring(0.72), h1 + 0.03))
+    result.push(topFace(ring(0.72), h2 + 0.03))
+    return result
+  }
   return boxFaces(footprint, 0, height)
 }
 
