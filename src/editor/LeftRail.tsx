@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { codeFromName, makeId } from '../domain/id'
 import { deleteRelationsCascade } from '../domain/commands'
-import type { RelationKind, Selection } from '../domain/types'
+import type { Selection } from '../domain/types'
 import { nextFreePosition } from '../map/core/layout'
 import { AppSelect, SelectField } from './AppSelect'
 import { useDocumentStore } from './document-store'
@@ -20,7 +20,6 @@ type LeftRailProps = {
 }
 
 const tabs: RailTab[] = ['concepts', 'relations', 'scenarios']
-const relationKinds: Array<'all' | RelationKind> = ['all', 'flow', 'data', 'support', 'retry']
 
 export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable, onCollapse, onStartConnection }: LeftRailProps) {
   void onActiveFloor
@@ -28,7 +27,6 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
   const [activeTab, setActiveTab] = useState<RailTab>('concepts')
   const [search, setSearch] = useState('')
   const [relationScope, setRelationScope] = useState<RelationScope>('floor')
-  const [relationKind, setRelationKind] = useState<'all' | RelationKind>('all')
   const [hiddenGroupId, setHiddenGroupId] = useState('')
   const [isChoosingRelationSource, setIsChoosingRelationSource] = useState(false)
   const [relationSourceId, setRelationSourceId] = useState('')
@@ -102,9 +100,8 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
     const isOnFloor = from?.floorId === activeFloorId || to?.floorId === activeFloorId
     const isCrossFloor = Boolean(from && to && from.floorId !== to.floorId)
     const isInScope = relationScope === 'all' || (relationScope === 'floor' ? isOnFloor : isCrossFloor)
-    const matchesKind = relationKind === 'all' || relation.kind === relationKind
     const matchesSearch = !normalizedSearch || [relation.label, from?.name ?? '', to?.name ?? ''].some((value) => value.toLocaleLowerCase().includes(normalizedSearch))
-    return isInScope && matchesKind && matchesSearch
+    return isInScope && matchesSearch
   })
 
   return (
@@ -132,7 +129,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         {onCollapse ? <button type="button" className="rail-collapse-button" aria-label="Hide left rail" title="Hide left rail [" onClick={onCollapse}><span aria-hidden="true">‹</span></button> : null}
       </div>
 
-      <div className="rail-section" style={{ paddingTop: 8 }}>
+      <div className="rail-section rail-search-section">
         <label className="field">
           <span>Search {activeTab}</span>
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${activeTab}`} aria-label={`Search ${activeTab}`} />
@@ -140,13 +137,13 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
       </div>
 
       {activeTab === 'scenarios' ? <section id="left-rail-panel-scenarios" aria-labelledby="left-rail-tab-scenarios" className="rail-section rail-flows" role="tabpanel">
-        <div className="rail-heading"><span>Scenarios</span>{editable ? <button type="button" onClick={addFlow} aria-label="Add scenario" title="Add scenario">+</button> : null}</div>
+        <div className="rail-panel-heading"><div><span>Scenarios</span><small>{filteredFlows.length}</small></div>{editable ? <button type="button" className="rail-create-action" onClick={addFlow}><i aria-hidden="true">+</i><span>Scenario</span></button> : null}</div>
         <div className="flow-list">
           {filteredFlows.map((flow) => {
             const index = document.flows.findIndex((candidate) => candidate.id === flow.id)
             return (
-              <button key={flow.id} type="button" className={`flow-row ${activeFlowId === flow.id ? 'is-active' : ''}`} title={`${flow.name} · ${flow.payload} · ${flow.summary}`} onClick={() => { const next = activeFlowId === flow.id ? null : flow.id; onActiveFlow(next); setSelection(next ? { kind: 'flow', id: flow.id } : null) }}>
-                <span className="flow-index">{String(index + 1).padStart(2, '0')}</span><span className="flow-name" title={flow.name}>{flow.name}</span><span className="flow-payload" title={flow.payload}>{flow.payload}</span>
+              <button key={flow.id} type="button" className={`flow-row ${activeFlowId === flow.id ? 'is-active' : ''}`} title={`${flow.name} · ${flow.summary}`} onClick={() => { const next = activeFlowId === flow.id ? null : flow.id; onActiveFlow(next); setSelection(next ? { kind: 'flow', id: flow.id } : null) }}>
+                <span className="flow-index">{String(index + 1).padStart(2, '0')}</span><span className="flow-name" title={flow.name}>{flow.name}</span><span className="flow-meta">{flow.stages.length} {flow.stages.length === 1 ? 'step' : 'steps'}</span>
               </button>
             )
           })}
@@ -155,25 +152,24 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
       </section> : null}
 
       {activeTab === 'relations' ? <section id="left-rail-panel-relations" aria-labelledby="left-rail-tab-relations" className="rail-section rail-relations" role="tabpanel">
-        <div className="rail-heading"><span>Relations</span><span>{filteredRelations.length}</span></div>
-        <div className="segmented" aria-label="Relation scope" style={{ marginTop: 10 }}>
-          {(['floor', 'all', 'cross-floor'] as const).map((scope) => <button key={scope} type="button" className={relationScope === scope ? 'is-active' : ''} aria-pressed={relationScope === scope} onClick={() => setRelationScope(scope)}>{scope === 'cross-floor' ? 'Cross-floor' : scope}</button>)}
+        <div className="rail-panel-heading"><div><span>Relations</span><small>{filteredRelations.length}</small></div>{editable && document.nodes.length > 0 ? <button type="button" className="rail-create-action" onClick={beginRelation}><i aria-hidden="true">+</i><span>Relation</span></button> : null}</div>
+        <div className="segmented rail-scope-filter" aria-label="Relation scope">
+          {(['all', 'floor', 'cross-floor'] as const).map((scope) => <button key={scope} type="button" className={relationScope === scope ? 'is-active' : ''} aria-pressed={relationScope === scope} onClick={() => setRelationScope(scope)}>{scope === 'cross-floor' ? 'Cross-floor' : scope}</button>)}
         </div>
-        <div style={{ marginTop: 10 }}><SelectField label="Relation kind" ariaLabel="Relation kind" value={relationKind} options={relationKinds.map((kind) => ({ value: kind, label: kind === 'all' ? 'All kinds' : kind }))} onChange={(value) => setRelationKind(value as 'all' | RelationKind)} /></div>
-        {editable && document.nodes.length > 0 ? <button type="button" className="secondary-button" style={{ marginTop: 10 }} onClick={beginRelation}>+ Create relation</button> : null}
-        <div className="relation-list" style={{ marginTop: 8 }}>
+        <div className="relation-list">
           {filteredRelations.map((relation) => {
             const from = nodeById.get(relation.from)
             const to = nodeById.get(relation.to)
             const direction = `FROM ${from?.name ?? 'Unknown'} → TO ${to?.name ?? 'Unknown'}`
             return <div className={`relation-row ${selection?.kind === 'relation' && selection.id === relation.id ? 'is-active' : ''}`} key={relation.id}><button type="button" title={`${direction} · ${relation.kind} · ${relation.label}`} onClick={() => select({ kind: 'relation', id: relation.id })}><span title={from?.name ?? 'Unknown source'}>{from?.code ?? '?'}</span><strong title={`${direction} · ${relation.label}`}>{direction} · {relation.label}</strong><span title={`${relation.kind} relation`}>{relation.kind}</span></button>{editable ? <button type="button" className="relation-row-delete" aria-label={`Delete ${relation.label}`} title={`Delete ${relation.label}`} onClick={() => deleteRelation(relation.id)}>×</button> : null}</div>
           })}
-          {filteredRelations.length === 0 ? <div><p className="rail-empty">{document.relations.length === 0 ? 'No relations yet.' : 'No relations match these filters.'}</p>{document.relations.length > 0 ? <button type="button" className="add-row" onClick={() => { setSearch(''); setRelationScope('floor'); setRelationKind('all') }}>Reset filters</button> : null}{editable && document.nodes.length > 0 ? <button type="button" className="add-row" onClick={beginRelation}>+ Create relation</button> : null}</div> : null}
+          {filteredRelations.length === 0 ? <div><p className="rail-empty">{document.relations.length === 0 ? 'No relations yet.' : 'No relations match these filters.'}</p>{document.relations.length > 0 ? <button type="button" className="add-row" onClick={() => { setSearch(''); setRelationScope('all') }}>Reset filters</button> : null}{editable && document.nodes.length > 0 ? <button type="button" className="rail-empty-action" onClick={beginRelation}>+ Create relation</button> : null}</div> : null}
           {editable && document.nodes.length === 0 ? <div><p className="rail-empty">Add a concept before creating a relation.</p><button type="button" className="add-row" onClick={() => chooseTab('concepts')}>Go to concepts</button></div> : null}
         </div>
       </section> : null}
 
       {activeTab === 'concepts' ? <div id="left-rail-panel-concepts" aria-labelledby="left-rail-tab-concepts" className="rail-neighborhoods" role="tabpanel">
+        <section className="rail-section rail-concepts-heading"><div className="rail-panel-heading"><div><span>Concepts</span><small>{document.nodes.filter((node) => node.floorId === activeFloorId).length}</small></div>{editable ? <button type="button" className="rail-create-action" onClick={addGroup}><i aria-hidden="true">+</i><span>Neighborhood</span></button> : null}</div></section>
         {isChoosingRelationSource ? <section className="rail-section" aria-live="polite">
           <div className="rail-heading"><span>Choose relation source</span><button type="button" aria-label="Cancel relation creation" title="Cancel" onClick={() => setIsChoosingRelationSource(false)}>×</button></div>
           {sourceNodes.length > 0 ? <div style={{ marginTop: 8 }}>
@@ -206,7 +202,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
                       {nodesForGroup.map((node) => (
                         <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} title={`${node.code} · ${node.name}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code" title={node.code}>{node.code}</span><span title={node.name}>{node.name}</span><span className="node-size" title={`Size ${node.size.toUpperCase()}`}>{node.size.toUpperCase()}</span></button>
                       ))}
-                      {editable && !normalizedSearch ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
+                      {editable && !normalizedSearch ? <button type="button" className="rail-add-concept" onClick={() => addNode(group.id)}><i aria-hidden="true">+</i><span>Add concept</span></button> : null}
                     </div>
                   </section>
                 )
@@ -216,14 +212,13 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
                   <p className="rail-empty" style={{ fontSize: 10, marginBottom: 6 }}>Add concept to another neighborhood</p>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <AppSelect compact className="rail-inline-select" ariaLabel="Neighborhood for new concept" value={selectedHiddenGroupId} options={hiddenGroups.map((group) => ({ value: group.id, label: group.name }))} onChange={setHiddenGroupId} />
-                    <button type="button" className="add-row" style={{ flex: '0 0 auto', padding: '6px 10px', background: 'var(--surface-soft)' }} onClick={() => addNode(selectedHiddenGroupId)}>+ Add</button>
+                    <button type="button" className="rail-inline-add" onClick={() => addNode(selectedHiddenGroupId)}>+ Add</button>
                   </div>
                 </section>
               ) : null}
             </>
           )
         })()}
-        {editable && document.groups.length > 0 ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
       </div> : null}
     </aside>
   )

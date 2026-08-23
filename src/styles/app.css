@@ -300,6 +300,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .node-size { text-align: right; }
 .add-row, .add-group { border: 0; background: transparent; color: var(--ink-3); padding: 7px 3px; text-align: left; font: 9px var(--mono); text-transform: uppercase; }
 .add-group { margin: 20px 16px; }
+
+/* Current rail actions */
+.rail-search-section { padding-top: 8px; }
+.rail-search-section .field > span { margin-bottom: 6px; font-size: 8px; letter-spacing: .55px; }
+.rail-search-section .field input { height: 40px; padding: 0 12px; border-radius: 12px; }
+.rail-panel-heading { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rail-panel-heading > div { min-width: 0; display: flex; align-items: baseline; gap: 7px; }
+.rail-panel-heading > div > span { color: var(--ink); font: 600 10px var(--mono); letter-spacing: .55px; text-transform: uppercase; }
+.rail-panel-heading > div > small { color: var(--ink-3); font: 8px var(--mono); }
+.rail-create-action { min-width: 0; height: 32px; display: flex; align-items: center; gap: 6px; padding: 4px 9px 4px 5px; border: 0; border-radius: 16px; background: var(--ink); color: var(--surface); font: 600 8px var(--mono); text-transform: uppercase; box-shadow: 0 5px 14px color-mix(in srgb, var(--ink) 14%, transparent); transition: background 150ms ease, box-shadow 150ms ease, transform 180ms cubic-bezier(.22,1,.36,1); }
+.rail-create-action i { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--surface) 14%, transparent); font: 14px/1 var(--mono); font-style: normal; }
+.rail-create-action:hover { background: var(--accent); box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 20%, transparent); transform: translateY(-1px); }
+.rail-concepts-heading { padding-top: 14px; }
+.rail-add-concept, .rail-empty-action { width: 100%; min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 7px 10px; border: 0; border-radius: 11px; background: color-mix(in srgb, var(--accent-wash) 52%, var(--surface-soft)); color: var(--accent); font: 600 8px var(--mono); text-transform: uppercase; transition: background 150ms ease, transform 180ms cubic-bezier(.22,1,.36,1); }
+.rail-add-concept i { width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent) 10%, transparent); font: 12px/1 var(--mono); font-style: normal; }
+.rail-add-concept:hover, .rail-empty-action:hover { background: var(--accent-wash); transform: translateY(-1px); }
+.rail-inline-add { flex: 0 0 auto; padding: 6px 11px; border: 0; border-radius: 10px; background: var(--ink); color: var(--surface); font: 600 8px var(--mono); text-transform: uppercase; }
+.rail-scope-filter { display: grid; grid-template-columns: .8fr .9fr 1.4fr; gap: 4px; margin-top: 12px; padding: 3px; border-radius: 11px; background: var(--surface-soft); }
+.rail-scope-filter button { min-width: 0; padding: 8px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 500 8px var(--mono); text-transform: uppercase; }
+.rail-scope-filter button.is-active { background: var(--surface-raised); color: var(--accent); box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 7%, transparent); }
+.rail-flows .flow-list, .rail-relations .relation-list { margin-top: 12px; }
+.flow-meta { overflow: hidden; color: var(--ink-3); font: 8px var(--mono); text-align: right; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
 .rail-floors { padding-bottom: 20px; }
 .floor-list { display: flex; flex-direction: column; gap: 4px; margin-top: 9px; }
 .floor-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; background: var(--surface-soft); }
@@ -522,14 +544,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .route-builder button.is-selected { color: var(--accent); background: var(--accent-wash); }
 .flow-steps { padding-left: 20px; color: var(--ink-2); font-size: 12px; line-height: 1.9; }
 .rail-relations { padding-bottom: 15px; }
-.relation-list { display: flex; flex-direction: column; gap: 3px; }
-.relation-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px; }
-.relation-row > button:first-child { min-width: 0; display: grid; grid-template-columns: 25px minmax(0, 1fr) 25px; align-items: center; gap: 5px; padding: 7px 5px; border: 0; background: transparent; text-align: left; }
+.rail-scope-filter { display: grid; grid-template-columns: .8fr .9fr 1.4fr; gap: 4px; margin-top: 12px; padding: 3px; border-radius: 11px; background: var(--surface-soft); }
+.rail-scope-filter button { min-width: 0; padding: 8px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 500 8px var(--mono); text-transform: uppercase; }
+.rail-scope-filter button.is-active { background: var(--surface-raised); color: var(--accent); box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 7%, transparent); }
+.relation-list { display: flex; flex-direction: column; gap: 5px; margin-top: 12px; }
+.relation-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px; overflow: hidden; border-radius: 11px; background: var(--surface-soft); }
+.relation-row > button:first-child { min-width: 0; display: grid; grid-template-columns: 25px minmax(0, 1fr) 28px; align-items: center; gap: 5px; padding: 9px 6px; border: 0; background: transparent; text-align: left; }
 .relation-row > button:first-child span { color: var(--ink-3); font: 8px var(--mono); text-align: center; }
 .relation-row > button:first-child strong { overflow: hidden; color: var(--ink-2); font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.relation-row:hover:not(.is-active) { background: color-mix(in srgb, var(--surface-soft) 72%, var(--accent-wash)); }
 .relation-row.is-active { background: var(--accent-wash); }
 .relation-row.is-active strong, .relation-row.is-active span { color: var(--accent) !important; }
-.relation-row-delete { border: 0; background: transparent; color: var(--ink-3); }
+.relation-row-delete { border: 0; border-radius: 9px; background: transparent; color: var(--ink-3); }
 .relation-row-delete:hover { color: var(--danger); }
 .connection-targets { display: flex; flex-direction: column; gap: 6px; margin: 18px 0; }
 .connection-targets > p { padding: 12px; background: var(--surface-soft); color: var(--ink-3); font: 9px var(--mono); text-transform: uppercase; }
