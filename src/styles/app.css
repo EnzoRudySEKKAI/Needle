@@ -404,10 +404,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .mini-neighborhood.tone-4 { fill: #d15f83; }
 .structure-view .mini-relation-line { fill: none; stroke: var(--structure); stroke-width: 1.05; opacity: .78; }
 .structure-view .mini-relation-arrow { fill: var(--structure); opacity: .86; }
-.structure-view .mini-relation.relation-flow .mini-relation-line { stroke: var(--ink-2); }
-.structure-view .mini-relation.relation-flow .mini-relation-arrow { fill: var(--ink-2); }
-.mini-relation.relation-data .mini-relation-line { stroke-width: 1.35; }
-.mini-relation.relation-support .mini-relation-line, .mini-relation.relation-retry .mini-relation-line { stroke-dasharray: 4 4; }
+.structure-view .mini-relation.relation-full .mini-relation-line { stroke: var(--ink-2); }
+.structure-view .mini-relation.relation-full .mini-relation-arrow { fill: var(--ink-2); }
+.mini-relation.relation-full .mini-relation-line { stroke: var(--ink-2); stroke-width: 1.25; opacity: .9; }
+.mini-relation.relation-full .mini-relation-arrow { fill: var(--ink-2); opacity: .9; }
+.mini-relation.relation-dotted .mini-relation-line { stroke: var(--ink-2); stroke-width: 1.35; stroke-dasharray: 3 3; opacity: .92; }
+.mini-relation.relation-dotted .mini-relation-arrow { fill: var(--ink-2); opacity: .92; }
 .mini-concept-volume { pointer-events: none; }
 .structure-view .mini-concept-volume .building-face { stroke: var(--structure); stroke-width: .8; }
 .structure-view .mini-concept-volume .face-top { fill: var(--surface-raised); }
@@ -439,10 +441,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .inspector-preview .mini-relation-line { fill: none; stroke: var(--structure); stroke-width: 1.05; opacity: .78; }
 .floor-preview-card .mini-relation-arrow,
 .inspector-preview .mini-relation-arrow { fill: var(--structure); opacity: .86; }
-.floor-preview-card .mini-relation.relation-flow .mini-relation-line,
-.inspector-preview .mini-relation.relation-flow .mini-relation-line { stroke: var(--ink-2); }
-.floor-preview-card .mini-relation.relation-flow .mini-relation-arrow,
-.inspector-preview .mini-relation.relation-flow .mini-relation-arrow { fill: var(--ink-2); }
+.floor-preview-card .mini-relation.relation-full .mini-relation-line,
+.inspector-preview .mini-relation.relation-full .mini-relation-line { stroke: var(--ink-2); }
+.floor-preview-card .mini-relation.relation-full .mini-relation-arrow,
+.inspector-preview .mini-relation.relation-full .mini-relation-arrow { fill: var(--ink-2); }
 .floor-preview-card .mini-concept-volume .building-face,
 .inspector-preview .mini-concept-volume .building-face { stroke: var(--structure); stroke-width: .8; }
 .floor-preview-card .mini-concept-volume .face-top,
@@ -670,6 +672,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .district-flags .is-selected text { fill: var(--accent); }
 .relation-line { fill: none; stroke: var(--structure); stroke-width: 1.1; opacity: .75; }
 .relation-arrow { fill: var(--structure); opacity: .75; }
+.relation-full .relation-line { stroke: var(--ink-2); stroke-width: 1.35; opacity: .88; }
+.relation-full .relation-arrow { fill: var(--ink-2); opacity: .88; }
 .relation:focus, .relation:focus-visible { outline: none; }
 .relation:focus-visible .relation-line { stroke: var(--accent); stroke-width: 2; opacity: 1; }
 .relation:focus-visible .relation-arrow { fill: var(--accent); opacity: 1; }
@@ -678,9 +682,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation-label rect { fill: var(--surface-raised); stroke: var(--structure); stroke-width: 1; }
 .relation-label text { fill: var(--ink); font: 8px var(--mono); }
 .relation:hover .relation-label, .relation:focus .relation-label, .relation.is-selected .relation-label { opacity: 1; }
-.relation-support .relation-line { stroke-width: .75; }
-.relation-retry .relation-line, .relation-support .relation-line { stroke-dasharray: 4 5; }
-.relation-data .relation-line { stroke-width: 1.5; }
+.relation-dotted .relation-line { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 3 4; opacity: .9; }
+.relation-dotted .relation-arrow { fill: var(--ink-2); opacity: .9; }
 .relation.is-selected .relation-line { stroke: var(--accent); stroke-width: 2; opacity: 1; }
 .relation.is-selected .relation-arrow { fill: var(--accent); opacity: 1; }
 .relation.is-dimmed .relation-line { opacity: .18; }

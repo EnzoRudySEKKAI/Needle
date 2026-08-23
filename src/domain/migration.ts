@@ -3,22 +3,32 @@ import { SCHEMA_VERSION, type BuildingSize, type OntologyDocument } from './type
 
 const MIGRATED_FLOOR_ID = 'floor-1'
 
+function migrateRelationKinds(relations: unknown): unknown {
+  if (!Array.isArray(relations)) return relations
+  return relations.map((relation) => {
+    if (!relation || typeof relation !== 'object') return relation
+    const fields = relation as Record<string, unknown>
+    const kind = fields.kind === 'support' || fields.kind === 'retry' || fields.kind === 'dotted' ? 'dotted' : 'full'
+    return { ...fields, kind }
+  })
+}
+
 export function migrateDocument(value: unknown): OntologyDocument | null {
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
   const legacyVersion = legacy.schemaVersion as number
   if (legacyVersion === SCHEMA_VERSION) {
-    const current = { ...legacy }
+    const current: Record<string, unknown> = { ...legacy, relations: migrateRelationKinds(legacy.relations) }
     delete current.comments
     return isOntologyDocument(current) ? current : null
   }
   if (legacyVersion === 8) {
-    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION }
+    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, relations: migrateRelationKinds(legacy.relations) }
     delete migrated.comments
     return isOntologyDocument(migrated) ? migrated : null
   }
   if (legacyVersion === 7) {
-    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower' }
+    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower', relations: migrateRelationKinds(legacy.relations) }
     delete migrated.comments
     return isOntologyDocument(migrated) ? migrated : null
   }
@@ -59,7 +69,7 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
       const current = legacyVersion >= 4 ? nodeFields : { faceTexture: 'auto', ...nodeFields, size: sizeFromMetric(metric) }
       return { ...current, floorId: MIGRATED_FLOOR_ID }
     }),
-    relations: legacy.relations.map((relation) => {
+    relations: (migrateRelationKinds(legacy.relations) as unknown[]).map((relation) => {
       const relationFields = { ...relation as Record<string, unknown> }
       delete relationFields.via
       return relationFields

@@ -279,70 +279,70 @@ export const ATLAS_TOWER = {
       "id": "r-fleeting-inbox",
       "from": "fleeting",
       "to": "inbox",
-      "kind": "flow",
+      "kind": "full",
       "label": "quick capture"
     },
     {
       "id": "r-recorder-inbox",
       "from": "recorder",
       "to": "inbox",
-      "kind": "data",
+      "kind": "full",
       "label": "field trace"
     },
     {
       "id": "r-inbox-canvas",
       "from": "inbox",
       "to": "canvas",
-      "kind": "flow",
+      "kind": "full",
       "label": "triage to canvas"
     },
     {
       "id": "r-canvas-graph",
       "from": "canvas",
       "to": "graph",
-      "kind": "flow",
+      "kind": "full",
       "label": "spatial links"
     },
     {
       "id": "r-graph-queue",
       "from": "graph",
       "to": "queue",
-      "kind": "support",
+      "kind": "dotted",
       "label": "candidate maps"
     },
     {
       "id": "r-queue-garden",
       "from": "queue",
       "to": "garden",
-      "kind": "flow",
+      "kind": "full",
       "label": "tended map"
     },
     {
       "id": "r-garden-studio",
       "from": "garden",
       "to": "studio",
-      "kind": "support",
+      "kind": "dotted",
       "label": "source atlas"
     },
     {
       "id": "r-studio-feed",
       "from": "studio",
       "to": "feed",
-      "kind": "flow",
+      "kind": "full",
       "label": "published piece"
     },
     {
       "id": "r-feed-commons",
       "from": "feed",
       "to": "commons",
-      "kind": "flow",
+      "kind": "full",
       "label": "reading"
     },
     {
       "id": "r-commons-fleeting",
       "from": "commons",
       "to": "fleeting",
-      "kind": "retry",
+      "kind": "dotted",
       "label": "new spark"
     }
   ],
@@ -799,91 +799,91 @@ export const HARBOR_CAMPUS = {
       "id": "r-lecture-library",
       "from": "lecture",
       "to": "library",
-      "kind": "support",
+      "kind": "dotted",
       "label": "reading lists"
     },
     {
       "id": "r-library-studio",
       "from": "library",
       "to": "studio",
-      "kind": "data",
+      "kind": "full",
       "label": "collection scans"
     },
     {
       "id": "r-studio-lecture",
       "from": "studio",
       "to": "lecture",
-      "kind": "flow",
+      "kind": "full",
       "label": "studio provocation"
     },
     {
       "id": "r-library-vault",
       "from": "library",
       "to": "vault",
-      "kind": "flow",
+      "kind": "full",
       "label": "catalogued datasets"
     },
     {
       "id": "r-observatory-vault",
       "from": "observatory",
       "to": "vault",
-      "kind": "data",
+      "kind": "full",
       "label": "time series"
     },
     {
       "id": "r-wetlab-fab",
       "from": "wetlab",
       "to": "fab",
-      "kind": "flow",
+      "kind": "full",
       "label": "instrument brief"
     },
     {
       "id": "r-fab-boatyard",
       "from": "fab",
       "to": "boatyard",
-      "kind": "flow",
+      "kind": "full",
       "label": "custom hull fittings"
     },
     {
       "id": "r-vault-pier",
       "from": "vault",
       "to": "pier",
-      "kind": "data",
+      "kind": "full",
       "label": "harbor archive"
     },
     {
       "id": "r-boatyard-pier",
       "from": "boatyard",
       "to": "pier",
-      "kind": "support",
+      "kind": "dotted",
       "label": "boats ready"
     },
     {
       "id": "r-pier-market",
       "from": "pier",
       "to": "market",
-      "kind": "flow",
+      "kind": "full",
       "label": "field samples"
     },
     {
       "id": "r-market-dorms",
       "from": "market",
       "to": "dorms",
-      "kind": "data",
+      "kind": "full",
       "label": "staples and stories"
     },
     {
       "id": "r-dorms-cafe",
       "from": "dorms",
       "to": "cafe",
-      "kind": "retry",
+      "kind": "dotted",
       "label": "nightly return"
     },
     {
       "id": "r-cafe-studio",
       "from": "cafe",
       "to": "studio",
-      "kind": "support",
+      "kind": "dotted",
       "label": "overheard critiques"
     }
   ],
@@ -1416,98 +1416,98 @@ export const AURORA_LINER = {
       "id": "r-fuel-engine",
       "from": "fuel",
       "to": "engine-room",
-      "kind": "support",
+      "kind": "dotted",
       "label": "fuel feed"
     },
     {
       "id": "r-cold-galley",
       "from": "cold",
       "to": "galley",
-      "kind": "flow",
+      "kind": "full",
       "label": "provisions"
     },
     {
       "id": "r-laundry-quarters",
       "from": "laundry",
       "to": "crew-quarters",
-      "kind": "support",
+      "kind": "dotted",
       "label": "fresh linens"
     },
     {
       "id": "r-galley-dining",
       "from": "galley",
       "to": "dining",
-      "kind": "flow",
+      "kind": "full",
       "label": "plated service"
     },
     {
       "id": "r-quarters-galley",
       "from": "crew-quarters",
       "to": "galley",
-      "kind": "support",
+      "kind": "dotted",
       "label": "hands on deck"
     },
     {
       "id": "r-dining-lounge",
       "from": "dining",
       "to": "lounge",
-      "kind": "flow",
+      "kind": "full",
       "label": "evening drift"
     },
     {
       "id": "r-lounge-pool",
       "from": "lounge",
       "to": "pool",
-      "kind": "flow",
+      "kind": "full",
       "label": "day returns"
     },
     {
       "id": "r-cabins-dining",
       "from": "cabins",
       "to": "dining",
-      "kind": "flow",
+      "kind": "full",
       "label": "guests to dinner"
     },
     {
       "id": "r-cabins-spa",
       "from": "cabins",
       "to": "spa",
-      "kind": "flow",
+      "kind": "full",
       "label": "seek calm"
     },
     {
       "id": "r-bridge-engine",
       "from": "bridge",
       "to": "engine-room",
-      "kind": "data",
+      "kind": "full",
       "label": "course orders"
     },
     {
       "id": "r-lookout-bridge",
       "from": "lookout",
       "to": "bridge",
-      "kind": "data",
+      "kind": "full",
       "label": "visual report"
     },
     {
       "id": "r-spa-promenade",
       "from": "spa",
       "to": "promenade",
-      "kind": "flow",
+      "kind": "full",
       "label": "steady feet"
     },
     {
       "id": "r-promenade-lookout",
       "from": "promenade",
       "to": "lookout",
-      "kind": "support",
+      "kind": "dotted",
       "label": "horizon watch"
     },
     {
       "id": "r-pool-cabins",
       "from": "pool",
       "to": "cabins",
-      "kind": "retry",
+      "kind": "dotted",
       "label": "return to cabin"
     }
   ],
@@ -2045,98 +2045,98 @@ export const NORTHWIND_COMMERCE = {
       "id": "r-catalog-data",
       "from": "catalog",
       "to": "storefront",
-      "kind": "support",
+      "kind": "dotted",
       "label": "product data"
     },
     {
       "id": "r-cart-add",
       "from": "storefront",
       "to": "cart",
-      "kind": "flow",
+      "kind": "full",
       "label": "add to cart"
     },
     {
       "id": "r-cart-submit",
       "from": "cart",
       "to": "checkout-api",
-      "kind": "flow",
+      "kind": "full",
       "label": "submitted cart"
     },
     {
       "id": "r-pricing-quote",
       "from": "pricing",
       "to": "checkout-api",
-      "kind": "support",
+      "kind": "dotted",
       "label": "price quotes"
     },
     {
       "id": "r-checkout-fraud",
       "from": "checkout-api",
       "to": "fraud",
-      "kind": "flow",
+      "kind": "full",
       "label": "charge for screening"
     },
     {
       "id": "r-fraud-gateway",
       "from": "fraud",
       "to": "gateway",
-      "kind": "flow",
+      "kind": "full",
       "label": "cleared charge"
     },
     {
       "id": "r-gateway-ledger",
       "from": "gateway",
       "to": "ledger",
-      "kind": "data",
+      "kind": "full",
       "label": "settlement record"
     },
     {
       "id": "r-ledger-inventory",
       "from": "ledger",
       "to": "inventory",
-      "kind": "flow",
+      "kind": "full",
       "label": "order to pick"
     },
     {
       "id": "r-inventory-picker",
       "from": "inventory",
       "to": "picking",
-      "kind": "flow",
+      "kind": "full",
       "label": "pick list"
     },
     {
       "id": "r-picker-packer",
       "from": "picking",
       "to": "packing",
-      "kind": "flow",
+      "kind": "full",
       "label": "picked items"
     },
     {
       "id": "r-packer-dock",
       "from": "packing",
       "to": "dock",
-      "kind": "flow",
+      "kind": "full",
       "label": "sealed parcels"
     },
     {
       "id": "r-dock-courier",
       "from": "dock",
       "to": "courier",
-      "kind": "flow",
+      "kind": "full",
       "label": "parcel handoff"
     },
     {
       "id": "r-doorstep-attempt",
       "from": "courier",
       "to": "doorstep",
-      "kind": "retry",
+      "kind": "dotted",
       "label": "delivery attempts"
     },
     {
       "id": "r-tracking-updates",
       "from": "courier",
       "to": "storefront",
-      "kind": "data",
+      "kind": "full",
       "label": "tracking updates"
     }
   ],

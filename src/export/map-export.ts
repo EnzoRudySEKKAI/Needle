@@ -180,7 +180,7 @@ export function exportMermaid(source: OntologyDocument, filename: string, active
     lines.push('  end')
   })
   value.relations.forEach((relation) => {
-    const arrow = relation.kind === 'data' ? '-.->' : relation.kind === 'support' ? '---' : '-->'
+    const arrow = relation.kind === 'dotted' ? '-.->' : '-->'
     lines.push(`  ${mermaidId(relation.from)} ${arrow}|"${mermaidText(relation.label || relation.kind)}"| ${mermaidId(relation.to)}`)
   })
   download(new Blob([`${lines.join('\n')}\n`], { type: 'text/plain;charset=utf-8' }), `${filename}.mmd`)

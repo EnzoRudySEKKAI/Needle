@@ -556,7 +556,7 @@ export const handler = createMcpHandler(() => {
       mapId: z.string(),
       from: z.string().describe('Source node ID'),
       to: z.string().describe('Target node ID'),
-      kind: z.enum(['flow','data','support','retry']).optional().describe('default flow'),
+      kind: z.enum(['full','dotted']).optional().describe('default full'),
       label: z.string().min(1).describe('Relation label'),
       relationId: z.string().regex(/^[a-zA-Z0-9_-]+$/).optional().describe('Custom ID'),
     }),
@@ -568,7 +568,7 @@ export const handler = createMcpHandler(() => {
     if (!doc.nodes.some(n=>n.id===to)) return badRequest(`to node ${to} not found`)
     const id = relationId ?? makeId('relation')
     if (doc.relations.some(r=>r.id===id)) return badRequest(`Relation ${id} exists`)
-    const next = { ...doc, relations: [...doc.relations, { id, from, to, kind: kind ?? 'flow', label }] }
+    const next = { ...doc, relations: [...doc.relations, { id, from, to, kind: kind ?? 'full', label }] }
     const saved = await store.save(next)
     return okJson({ relationId: id, document: saved })
   })
@@ -582,7 +582,7 @@ export const handler = createMcpHandler(() => {
       patch: z.object({
         from: z.string().optional(),
         to: z.string().optional(),
-        kind: z.enum(['flow','data','support','retry']).optional(),
+        kind: z.enum(['full','dotted']).optional(),
         label: z.string().optional(),
       }),
     }),

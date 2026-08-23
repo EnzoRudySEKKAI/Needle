@@ -12,7 +12,7 @@ export const Archetype = z.enum([
   'cube','tower','low-slab','slab-stack','fin-row','podium-tower','twin-towers','courtyard','bridge','stepped-pyramid','server-rack','monitor','database',
 ])
 export const FaceTexture = z.enum(['auto','plain','hatched'])
-export const RelationKind = z.enum(['flow','data','support','retry'])
+export const RelationKind = z.enum(['full','dotted'])
 export const StructureType = z.enum(['tower','campus','cruise-ship'])
 export const FlowDirection = z.enum(['forward','reverse'])
 export const OntologyProperty = z.object({

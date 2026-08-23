@@ -2,6 +2,7 @@ import { SCHEMA_VERSION, STRUCTURE_TYPES, type BuildingSize, type OntologyDocume
 
 const BUILDING_SIZES = new Set<BuildingSize>(['xs', 's', 'm', 'l', 'xl'])
 const VALID_STRUCTURE_TYPES = new Set<StructureType>(STRUCTURE_TYPES)
+const RELATION_KINDS = new Set(['full', 'dotted'])
 
 export type Diagnostic = {
   level: 'error' | 'warning'
@@ -73,5 +74,5 @@ export function isOntologyDocument(value: unknown): value is OntologyDocument {
     const node = value as unknown as Record<string, unknown>
     return typeof node.id === 'string' && typeof node.floorId === 'string' && BUILDING_SIZES.has(node.size as BuildingSize) && Array.isArray(node.properties) && !('metric' in node) && !('unit' in node) && !('role' in node) && !('kind' in node)
   })
-  return floorsValid && nodesValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value)))
+  return floorsValid && nodesValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value) && RELATION_KINDS.has((value as { kind?: unknown }).kind as string)))
 }

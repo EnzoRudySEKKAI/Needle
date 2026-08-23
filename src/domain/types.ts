@@ -18,7 +18,7 @@ export type Archetype =
   | 'monitor'
   | 'database'
 export type FaceTexture = 'auto' | 'plain' | 'hatched'
-export type RelationKind = 'flow' | 'data' | 'support' | 'retry'
+export type RelationKind = 'full' | 'dotted'
 export type BuildingSize = 'xs' | 's' | 'm' | 'l' | 'xl'
 export type StructureType = typeof STRUCTURE_TYPES[number]
 

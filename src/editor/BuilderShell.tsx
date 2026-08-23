@@ -209,7 +209,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const startConnection = (sourceId: string) => {
     const activeFlow = document.flows.find((flow) => flow.id === activeFlowId)
     const flowId = activeFlow?.id ?? null
-    setConnectionDraft({ sourceId, targets: [], label: 'new relation', kind: 'flow', flowId })
+    setConnectionDraft({ sourceId, targets: [], label: 'new relation', kind: 'full', flowId })
   }
   const toggleConnectionTarget = (nodeId: string) => setConnectionDraft((draft) => {
     if (!draft || nodeId === draft.sourceId) return draft

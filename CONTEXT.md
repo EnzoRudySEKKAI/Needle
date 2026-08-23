@@ -15,3 +15,7 @@ A semantic grouping of concepts. A neighborhood may span several floors and has 
 ## Structure View
 
 An architectural overview of the complete structure. Its interactive cutaway previews one simplified floor at a time; editing remains in the focused floor view.
+
+## Relation
+
+A directed connection between two concepts. A relation is either full, drawn as a continuous path, or dotted, drawn as a visibly broken path.
