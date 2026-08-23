@@ -8,6 +8,7 @@ import { structureGeometry } from '../map/core/structure-geometry'
 import * as repository from '../persistence/map-repository'
 import type { MapSummary } from '../persistence/map-repository'
 import { HeroMiniMap } from './HeroMiniMap'
+import { McpSetupDialog } from './McpSetupDialog'
 
 type TrashSummary = MapSummary & { deletedAt?: string }
 type RepositoryCapabilities = Pick<typeof repository, 'createBlankMap' | 'deleteMap' | 'listLegacyMaps' | 'listMaps' | 'publishLegacyMaps' | 'subscribeToLibrary'> & {
@@ -59,6 +60,7 @@ export function HomePage() {
   const [templateOpen, setTemplateOpen] = useState(false)
   const [creationMode, setCreationMode] = useState<'blank' | 'templates' | null>(null)
   const [trashOpen, setTrashOpen] = useState(false)
+  const [mcpOpen, setMcpOpen] = useState(false)
   const [mapName, setMapName] = useState('')
   const [blankStructureType, setBlankStructureType] = useState<StructureType>('tower')
   const [working, setWorking] = useState<string | null>(null)
@@ -214,7 +216,7 @@ export function HomePage() {
   }
 
   return <main className="home-page">
-    <header className="home-header"><div className="brand"><strong>Needle</strong><span>ONTOLOGY</span></div><span className="home-version">DMA STUDIO · V1.0</span></header>
+    <header className="home-header"><div className="brand"><strong>Needle</strong><span>ONTOLOGY</span></div><div className="home-header-actions"><button type="button" onClick={() => setMcpOpen(true)}>Connect MCP</button><span className="home-version">DMA STUDIO · V1.0</span></div></header>
     <section className="home-hero"><div className="hero-copy"><h1>Build ideas<br />you can <i>walk through.</i></h1><p>Turn complex ideas into something people can understand and act on. Connect concepts, build scenarios, map decisions and actions, and present the whole picture clearly.</p><button type="button" className="primary-button" onClick={() => { setCreationMode(null); setTemplateOpen(true) }}>Create a map <span>→</span></button></div><div className="hero-diagram"><div className="diagram-grid" /><HeroMiniMap /></div></section>
     <section className="map-library">
       <div className="library-heading">
@@ -282,5 +284,6 @@ export function HomePage() {
     </section></div> : null}
     {trashOpen ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => setTrashOpen(false)}><section ref={dialogRef} className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="trash-title" onMouseDown={(event) => event.stopPropagation()}><div className="dialog-heading"><div><span className="eyebrow">Library</span><h2 id="trash-title">Trash</h2></div><button type="button" onClick={() => setTrashOpen(false)} aria-label="Close">×</button></div><p>Restore maps to the atlas or permanently delete them.</p><div className="map-cards">{trash.map((map, index) => <article className="map-card" key={map.id}><div className="card-index">{String(index + 1).padStart(2, '0')}</div><div><h3>{map.name}</h3><p>{map.description}</p></div><div className="card-actions"><button type="button" disabled={working !== null} onClick={() => void restoreMap(map.id)}>Restore</button><button type="button" className="delete-map-button" disabled={working !== null} onClick={() => void permanentlyDelete(map.id)}>{pendingPermanentId === map.id ? 'Confirm delete' : 'Delete forever'}</button></div></article>)}{working === 'trash' ? <p className="library-empty">Loading Trash…</p> : trash.length === 0 ? <p className="library-empty">Trash is empty.</p> : null}</div></section></div> : null}
     {pendingDelete ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => setPendingDelete(null)}><section ref={dialogRef} className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-map-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Move to Trash</span><h2 id="delete-map-title">Trash “{pendingDelete.name}”?</h2><p>The map will be moved to Trash. You can restore it later until it is permanently deleted from Trash.</p><div><button type="button" onClick={() => setPendingDelete(null)}>Cancel</button><button type="button" className="confirm-delete" disabled={working !== null} onClick={() => void confirmDelete()}>Move to Trash</button></div></section></div> : null}
+    {mcpOpen ? <McpSetupDialog onClose={() => setMcpOpen(false)} /> : null}
   </main>
 }

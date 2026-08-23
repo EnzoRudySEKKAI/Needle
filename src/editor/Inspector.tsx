@@ -137,7 +137,7 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
   return <>
     <aside key={`${selection.kind}:${selection.id}`} className="inspector">
       {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
-      {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
+      {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} onStartConnection={onStartConnection} /> : null}
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
       {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} setSelection={setSelection} onActiveFloor={onActiveFloor} /> : null}
       {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} relationPickTarget={relationPickTarget} onRelationPickTarget={onRelationPickTarget} onRelationPreview={onRelationPreview} onStagePreview={onStagePreview} /> : null}
@@ -219,7 +219,7 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
   </>
 }
 
-function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void; onMoveFloor: (id: string) => void; onStartConnection: (sourceId: string) => void }) {
+function NodeInspector({ node, editable, commit, document, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; onStartConnection: (sourceId: string) => void }) {
   const patch = (value: Partial<OntologyNode>) => commit((current) => updateNode(current, node.id, value))
   return <>
     {!editable ? <><span className="eyebrow">{node.code}</span><h2>{node.name}</h2><p className="lede">{node.size.toUpperCase()}</p></> : null}
@@ -228,13 +228,11 @@ function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartC
       <Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} />
       <SelectField label="Size" ariaLabel="Concept size" value={node.size} options={(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => ({ value: size, label: size.toUpperCase() }))} onChange={(size) => patch({ size: size as BuildingSize })} />
       <SelectField label="Neighborhood" ariaLabel="Concept neighborhood" value={node.groupId} options={document.groups.map((group) => ({ value: group.id, label: group.name }))} onChange={(groupId) => patch({ groupId })} />
-      <SelectField label="Floor" ariaLabel="Concept floor" value={node.floorId} options={document.floors.map((floor) => ({ value: floor.id, label: floor.name }))} onChange={onMoveFloor} />
       <Field label="What it does" value={node.whatItDoes} multiline onChange={(value) => patch({ whatItDoes: value })} />
-      <Field label="Why it is shaped this way" value={node.howItsBuilt} multiline onChange={(value) => patch({ howItsBuilt: value })} />
       <button type="button" className="secondary-button connect-button" onClick={() => onStartConnection(node.id)}>Connect from {node.name}</button>
       <BuildingAppearancePicker archetype={node.archetypeOverride} texture={node.faceTexture} onArchetype={(value) => patch({ archetypeOverride: value })} onTexture={(value) => patch({ faceTexture: value })} />
       <fieldset className="property-editor"><legend>Properties</legend>{node.properties.map((property) => <div key={property.id}><input aria-label="Property name" value={property.key} onChange={(event) => patch({ properties: node.properties.map((item) => item.id === property.id ? { ...item, key: event.target.value } : item) })} /><input aria-label="Property value" value={property.value} onChange={(event) => patch({ properties: node.properties.map((item) => item.id === property.id ? { ...item, value: event.target.value } : item) })} /><button type="button" aria-label="Remove property" onClick={() => patch({ properties: node.properties.filter((item) => item.id !== property.id) })}>×</button></div>)}<button type="button" onClick={() => patch({ properties: [...node.properties, { id: makeId('property'), key: 'property', value: 'value' }] })}>+ Add property</button></fieldset>
-    </div> : <><p>{node.whatItDoes}</p><p className="lede">{node.howItsBuilt}</p>{node.properties.length ? <dl className="property-readout">{node.properties.map((property) => <div key={property.id}><dt>{property.key}</dt><dd>{property.value}</dd></div>)}</dl> : null}</>}
+    </div> : <><p>{node.whatItDoes}</p>{node.properties.length ? <dl className="property-readout">{node.properties.map((property) => <div key={property.id}><dt>{property.key}</dt><dd>{property.value}</dd></div>)}</dl> : null}</>}
   </>
 }
 

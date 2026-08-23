@@ -52,6 +52,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .home-page { min-height: 100vh; background: var(--surface); }
 .home-header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 5vw; border-bottom: 1px solid var(--border); }
 .home-version { color: var(--ink-3); font: 10px var(--mono); letter-spacing: .7px; }
+.home-header-actions { display: flex; align-items: center; gap: 14px; }
+.home-header-actions button { padding: 8px 11px; border: 0; border-radius: 8px; background: var(--surface-soft); color: var(--ink-2); font: 500 9px var(--mono); text-transform: uppercase; }
+.home-header-actions button:hover { background: var(--accent-wash); color: var(--accent); }
 .home-hero { min-height: 610px; display: grid; grid-template-columns: minmax(380px, .8fr) 1.2fr; border-bottom: 1px solid var(--border); overflow: hidden; }
 .hero-copy { padding: 86px 5vw 64px; border-right: 1px solid var(--border); }
 .hero-copy h1 { margin: 22px 0 24px; font-size: clamp(52px, 6vw, 90px); line-height: .91; letter-spacing: -.065em; font-weight: 590; }
@@ -406,8 +409,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .structure-view .mini-relation-arrow { fill: var(--structure); opacity: .86; }
 .structure-view .mini-relation.relation-full .mini-relation-line { stroke: var(--ink-2); }
 .structure-view .mini-relation.relation-full .mini-relation-arrow { fill: var(--ink-2); }
-.mini-relation.relation-full .mini-relation-line { stroke: var(--ink-2); stroke-width: 1.25; opacity: .9; }
-.mini-relation.relation-full .mini-relation-arrow { fill: var(--ink-2); opacity: .9; }
+.mini-relation.relation-full .mini-relation-line { stroke: var(--ink-2); stroke-width: 1.05; opacity: .77; }
+.mini-relation.relation-full .mini-relation-arrow { fill: var(--ink-2); opacity: .77; }
 .mini-relation.relation-dotted .mini-relation-line { stroke: var(--ink-2); stroke-width: 1.35; stroke-dasharray: 3 3; opacity: .92; }
 .mini-relation.relation-dotted .mini-relation-arrow { fill: var(--ink-2); opacity: .92; }
 .mini-concept-volume { pointer-events: none; }
@@ -672,8 +675,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .district-flags .is-selected text { fill: var(--accent); }
 .relation-line { fill: none; stroke: var(--structure); stroke-width: 1.1; opacity: .75; }
 .relation-arrow { fill: var(--structure); opacity: .75; }
-.relation-full .relation-line { stroke: var(--ink-2); stroke-width: 1.35; opacity: .88; }
-.relation-full .relation-arrow { fill: var(--ink-2); opacity: .88; }
+.relation-full .relation-line { stroke: var(--ink-2); stroke-width: 1.12; opacity: .76; }
+.relation-full .relation-arrow { fill: var(--ink-2); opacity: .76; }
 .relation:focus, .relation:focus-visible { outline: none; }
 .relation:focus-visible .relation-line { stroke: var(--accent); stroke-width: 2; opacity: 1; }
 .relation:focus-visible .relation-arrow { fill: var(--accent); opacity: 1; }
@@ -686,6 +689,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation-dotted .relation-arrow { fill: var(--ink-2); opacity: .9; }
 .relation.is-selected .relation-line { stroke: var(--accent); stroke-width: 2; opacity: 1; }
 .relation.is-selected .relation-arrow { fill: var(--accent); opacity: 1; }
+.relation-full.is-selected .relation-line { stroke-width: 1.45; opacity: .88; }
+.relation-full.is-selected .relation-arrow { opacity: .88; }
 .relation.is-dimmed .relation-line { opacity: .18; }
 .relation-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
 .relation.is-pickable .relation-line { opacity: .95; }
@@ -783,6 +788,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .dialog-heading h2 { margin: 6px 0 0; font-size: 26px; line-height: 1.15; letter-spacing: -.035em; }
 .dialog-heading > button { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--surface-soft); color: var(--ink-3); font-size: 17px; line-height: 1; transition: background 140ms ease, color 140ms ease; }
 .dialog-heading > button:hover { background: var(--accent-wash); color: var(--ink); }
+.mcp-setup-dialog { width: min(560px, calc(100vw - 32px)); }
+.mcp-setup-dialog > p { margin: 14px 0 18px; color: var(--ink-2); font-size: 12px; line-height: 1.6; }
+.mcp-endpoint { display: grid; gap: 5px; margin-bottom: 10px; }
+.mcp-endpoint span { color: var(--ink-3); font: 8px var(--mono); text-transform: uppercase; }
+.mcp-endpoint code { overflow: hidden; color: var(--ink-2); font: 10px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.mcp-setup-dialog pre { margin: 0; overflow-x: auto; padding: 16px; border-radius: 12px; background: var(--ink); color: var(--surface); font: 10px/1.65 var(--mono); }
+.mcp-copy-button { width: 100%; margin-top: 10px; padding: 11px 14px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font: 600 9px var(--mono); text-transform: uppercase; }
+.mcp-copy-button:hover { filter: brightness(1.05); }
 .export-dialog > p { margin: 10px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 .export-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 20px; padding: 3px; border-radius: 10px; background: var(--surface-soft); }
 .export-scope button { min-height: 34px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease; }
@@ -1042,6 +1055,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 @media (max-width: 760px) {
+  .home-header-actions .home-version { display: none; }
   .home-header { padding: 0 20px; }
   .home-hero { display: block; }
   .hero-copy { padding: 64px 20px; border-right: 0; border-bottom: 1px solid var(--border); }

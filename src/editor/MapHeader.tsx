@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { McpSetupDialog } from '../app/McpSetupDialog'
 import { useDocumentStore } from './document-store'
 
 type IconName = 'undo' | 'redo' | 'search' | 'left-panel' | 'right-panel' | 'header' | 'fullscreen' | 'fullscreen-exit' | 'settings'
@@ -23,6 +24,7 @@ function setTheme(dark: boolean) {
 export function MapHeader({ editable, fullscreen, fullscreenError, historyOpen = false, onFullscreen, onEditable, onExport, onSearch, onHistory, onShortcuts, leftCollapsed = false, rightCollapsed = false, headerCollapsed = false, onToggleLeft, onToggleRight, onToggleHeader }: { editable: boolean; fullscreen: boolean; fullscreenError: string | null; historyOpen?: boolean; onFullscreen: () => void; onEditable?: (editable: boolean) => void; onExport?: () => void; onSearch?: () => void; onHistory?: () => void; onShortcuts?: () => void; leftCollapsed?: boolean; rightCollapsed?: boolean; headerCollapsed?: boolean; onToggleLeft?: () => void; onToggleRight?: () => void; onToggleHeader?: () => void }) {
   const { document: map, undo, redo, canUndo, canRedo } = useDocumentStore()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [mcpOpen, setMcpOpen] = useState(false)
   const [dark, setDark] = useState(() => window.document.documentElement.dataset.theme === 'dark')
   const settingsRef = useRef<HTMLDivElement>(null)
 
@@ -35,7 +37,7 @@ export function MapHeader({ editable, fullscreen, fullscreenError, historyOpen =
     return () => { window.document.removeEventListener('pointerdown', close); window.removeEventListener('keydown', escape) }
   }, [settingsOpen])
 
-  return <header className="map-header">
+  return <><header className="map-header">
     <Link to="/" className="brand"><strong>Needle</strong><span>ONTOLOGY</span></Link>
     <div className="header-cell repository-cell"><span>Map</span><strong>{map.name} · {map.version}</strong></div>
     <div className="header-spacer" />
@@ -54,8 +56,9 @@ export function MapHeader({ editable, fullscreen, fullscreenError, historyOpen =
           {onExport ? <button type="button" role="menuitem" onClick={() => { setSettingsOpen(false); onExport() }}><span>Export</span><small>Files and images</small></button> : null}
           <button type="button" role="menuitemcheckbox" aria-checked={dark} onClick={() => { const next = !dark; setDark(next); setTheme(next) }}><span>{dark ? 'Dark appearance' : 'Light appearance'}</span><i className={dark ? 'is-on' : ''} aria-hidden="true"><b /></i></button>
           {onHistory ? <button type="button" role="menuitem" className={historyOpen ? 'is-active' : ''} onClick={() => { setSettingsOpen(false); onHistory() }}><span>History</span><small>{historyOpen ? 'Close versions' : 'Saved versions'}</small></button> : null}
+          <button type="button" role="menuitem" onClick={() => { setSettingsOpen(false); setMcpOpen(true) }}><span>Connect MCP</span><small>Copy client JSON</small></button>
         </div> : null}
       </div>
     </div>
-  </header>
+  </header>{mcpOpen ? <McpSetupDialog onClose={() => setMcpOpen(false)} /> : null}</>
 }

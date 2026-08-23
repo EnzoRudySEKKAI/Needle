@@ -45,7 +45,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
     const name = 'New concept'
     const code = codeFromName(name, new Set(document.nodes.map((node) => node.code)))
     const position = nextFreePosition(document.nodes.filter((node) => node.floorId === activeFloorId), groupId)
-    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, groupId, floorId: activeFloorId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
+    commit((current) => ({ ...current, nodes: [...current.nodes, { id, code, name, groupId, floorId: activeFloorId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: '', size: 'm', properties: [], position, faceTexture: 'auto' }] }))
     setSelection({ kind: 'node', id })
   }
 
@@ -179,7 +179,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         </section> : null}
         {(() => {
           const nodesOnFloor = document.nodes.filter((node) => node.floorId === activeFloorId)
-          const matchingNodes = nodesOnFloor.filter((node) => !normalizedSearch || [node.code, node.name, node.whatItDoes, node.howItsBuilt, ...node.properties.map((property) => property.value)].some((value) => value.toLocaleLowerCase().includes(normalizedSearch)))
+          const matchingNodes = nodesOnFloor.filter((node) => !normalizedSearch || [node.code, node.name, node.whatItDoes, ...node.properties.map((property) => property.value)].some((value) => value.toLocaleLowerCase().includes(normalizedSearch)))
           const groupsWithNodes = document.groups.filter((group) => nodesOnFloor.some((node) => node.groupId === group.id))
           const selectedGroupId = selection?.kind === 'group' ? selection.id : null
           const selectedGroup = selectedGroupId ? document.groups.find((group) => group.id === selectedGroupId) : null

@@ -377,7 +377,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     if (!group) return
     const id = makeId('node')
     const name = 'New concept'
-    const node = { id, code: codeFromName(name, new Set(document.nodes.map((candidate) => candidate.code))), name, groupId: group.id, floorId: activeFloorId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: 'Explain the decision that shapes it.', size: 'm' as const, properties: [], position: nextFreePosition(document.nodes.filter((candidate) => candidate.floorId === activeFloorId), group.id), faceTexture: 'auto' as const }
+    const node = { id, code: codeFromName(name, new Set(document.nodes.map((candidate) => candidate.code))), name, groupId: group.id, floorId: activeFloorId, whatItDoes: 'Explain what this concept changes or makes possible.', howItsBuilt: '', size: 'm' as const, properties: [], position: nextFreePosition(document.nodes.filter((candidate) => candidate.floorId === activeFloorId), group.id), faceTexture: 'auto' as const }
     commit((current) => ({ ...current, nodes: [...current.nodes, node] }))
     setSelection({ kind: 'node', id })
   }

@@ -55,7 +55,7 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
       key: `node:${node.id}`,
       label: node.name,
       detail: `${node.code} - ${groupById.get(node.groupId)?.name ?? 'Unknown neighborhood'} - ${floorById.get(node.floorId)?.name ?? 'Unknown floor'}`,
-      searchText: [node.id, node.code, node.name, node.whatItDoes, node.howItsBuilt, node.size, node.archetypeOverride, node.faceTexture, groupById.get(node.groupId)?.name, floorById.get(node.floorId)?.name, ...node.properties.flatMap((property) => [property.id, property.key, property.value])].filter(Boolean).join(' '),
+      searchText: [node.id, node.code, node.name, node.whatItDoes, node.size, node.archetypeOverride, node.faceTexture, groupById.get(node.groupId)?.name, floorById.get(node.floorId)?.name, ...node.properties.flatMap((property) => [property.id, property.key, property.value])].filter(Boolean).join(' '),
       selection: { kind: 'node' as const, id: node.id },
       floorId: node.floorId,
     })),
