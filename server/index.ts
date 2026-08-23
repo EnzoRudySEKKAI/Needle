@@ -5,7 +5,9 @@ import { WebSocket, WebSocketServer } from 'ws'
 import { createServer as createViteServer, type ViteDevServer } from 'vite'
 import { isOntologyDocument } from '../src/domain/validation'
 import type { OntologyDocument } from '../src/domain/types'
-import { MapStore } from './map-store'
+import { store } from './store.js'
+import { handler as mcpHandler } from './mcp/handler.js'
+import { toNodeHandler } from '@modelcontextprotocol/node'
 
 type SyncMessage =
   | { type: 'map-updated'; document: OntologyDocument; revision: number; clientId: string | null }
@@ -16,13 +18,15 @@ const port = Number(process.env.PORT ?? (production ? 4173 : 5173))
 const app = express()
 const server = createServer(app)
 const sockets = new WebSocketServer({ noServer: true })
-const store = new MapStore()
 let revision = Date.now()
 let vite: ViteDevServer | null = null
 
 await store.initialize()
 app.disable('x-powered-by')
 app.use('/api', express.json({ limit: '2mb' }))
+app.use('/mcp', express.json({ limit: '2mb' }))
+const mcpNodeHandler = toNodeHandler(mcpHandler)
+app.all('/mcp', (req, res) => mcpNodeHandler(req, res, req.body))
 
 const broadcast = (message: SyncMessage) => {
   const payload = JSON.stringify(message)

@@ -9,5 +9,5 @@
     "noEmit": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js", "server/**/*.ts", "src/domain/**/*.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js", "server/**/*.ts", "src/domain/**/*.ts", "src/map/core/**/*.ts"]
 }
