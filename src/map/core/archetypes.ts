@@ -137,59 +137,97 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     return result
   }
   if (archetype === 'monitor') {
-    const baseH = Math.max(0.18, height * 0.14)
-    const standH = baseH + 0.42
-    const screenTh = 0.16
-    const screenH = height - standH - 0.18
-    const standW = footprint.w * 0.26
-    const standD = footprint.d * 0.24
-    const standX = footprint.gx + (footprint.w - standW) / 2
-    const standY = footprint.gy + footprint.d * 0.52
-    const screenY = footprint.gy + 0.14
-    const screenBottom = standH
+    const baseH = height * 0.14
+    const standColH = baseH + height * 0.22
+    const screenTh = 0.11
+    const screenH = height * 0.62
+    const screenW = footprint.w * 0.82
+    const screenX = footprint.gx + (footprint.w - screenW) / 2
+    const screenY = footprint.gy + 0.12
+    const screenBottom = standColH + 0.06
     const screenTop = screenBottom + screenH
+    const footW = footprint.w * 0.52
+    const footD = footprint.d * 0.28
+    const footX = footprint.gx + (footprint.w - footW) / 2
+    const footY = footprint.gy + footprint.d * 0.62
+    const standW = footprint.w * 0.14
+    const standD = footprint.d * 0.13
+    const standX = footprint.gx + (footprint.w - standW) / 2
+    const standY = footprint.gy + footprint.d * 0.45
     return [
-      ...boxFaces({ gx: footprint.gx + footprint.w * 0.18, gy: footprint.gy + footprint.d * 0.68, w: footprint.w * 0.64, d: footprint.d * 0.22 }, 0, baseH * 0.65),
-      ...boxFaces({ gx: standX, gy: standY, w: standW, d: standD }, baseH * 0.65, standH),
-      ...boxFaces({ gx: footprint.gx + 0.06, gy: screenY, w: footprint.w - 0.12, d: screenTh }, screenBottom, screenTop, true),
+      ...boxFaces({ gx: footX, gy: footY, w: footW, d: footD }, 0, baseH),
+      ...boxFaces({ gx: standX, gy: standY, w: standW, d: standD }, baseH, standColH),
+      ...boxFaces({ gx: screenX, gy: screenY, w: screenW, d: screenTh }, screenBottom, screenTop, true),
+      topFace(
+        [
+          { gx: screenX + screenW * 0.38, gy: screenY + screenTh * 0.5 },
+          { gx: screenX + screenW * 0.62, gy: screenY + screenTh * 0.5 },
+          { gx: screenX + screenW * 0.62, gy: screenY + screenTh * 0.5 + 0.04 },
+          { gx: screenX + screenW * 0.38, gy: screenY + screenTh * 0.5 + 0.04 },
+        ],
+        screenTop,
+      ),
     ]
   }
   if (archetype === 'phone') {
-    const bodyH = height
-    const inset = 0.1
-    const screenH = height * 0.84
-    const screenTop = height - 0.12
-    const screenBottom = screenTop - screenH
-    const notchW = footprint.w * 0.36
-    const notchH = footprint.d * 0.08
+    const bodyH = height * 0.34
+    const inset = footprint.w * 0.07
+    const insetD = footprint.d * 0.06
+    const screenBottom = bodyH * 0.18
+    const screenTop = bodyH - 0.08
+    const notchW = footprint.w * 0.32
+    const notchD = footprint.d * 0.07
+    const notchX = footprint.gx + (footprint.w - notchW) / 2
+    const notchY = footprint.gy + 0.07
+    const homeW = footprint.w * 0.26
+    const homeD = footprint.d * 0.035
+    const homeX = footprint.gx + (footprint.w - homeW) / 2
+    const homeY = footprint.gy + footprint.d - homeD - 0.09
     return [
       ...boxFaces(footprint, 0, bodyH),
-      ...boxFaces({ gx: footprint.gx + inset, gy: footprint.gy + inset, w: footprint.w - inset * 2, d: footprint.d - inset * 2 }, screenBottom, screenTop, true),
-      ...boxFaces({ gx: footprint.gx + (footprint.w - notchW) / 2, gy: footprint.gy + 0.06, w: notchW, d: notchH }, screenTop, screenTop + 0.1),
+      ...boxFaces({ gx: footprint.gx + inset, gy: footprint.gy + insetD, w: footprint.w - inset * 2, d: footprint.d - insetD * 2 }, screenBottom, screenTop, true),
+      ...boxFaces({ gx: notchX, gy: notchY, w: notchW, d: notchD }, screenTop, screenTop + 0.07),
+      ...boxFaces({ gx: homeX, gy: homeY, w: homeW, d: homeD }, screenBottom - 0.06, screenBottom - 0.02),
     ]
   }
   if (archetype === 'tablet') {
-    const inset = 0.12
-    const screenH = height * 0.78
+    const bodyH = height * 0.33
+    const inset = footprint.w * 0.055
+    const insetD = footprint.d * 0.07
+    const btnR = Math.min(footprint.w, footprint.d) * 0.08
+    const btnX = footprint.gx + footprint.w / 2 - btnR / 2
+    const btnY = footprint.gy + footprint.d - btnR - 0.14
+    const camR = btnR * 0.55
+    const camX = footprint.gx + footprint.w / 2 - camR / 2
+    const camY = footprint.gy + 0.08
     return [
-      ...boxFaces(footprint, 0, height * 0.38),
-      ...boxFaces({ gx: footprint.gx + inset, gy: footprint.gy + inset, w: footprint.w - inset * 2, d: footprint.d - inset * 2 }, height * 0.08, height * 0.08 + screenH, true),
-      topFace([
-        { gx: footprint.gx + footprint.w * 0.42, gy: footprint.gy + footprint.d * 0.5 - 0.06 },
-        { gx: footprint.gx + footprint.w * 0.58, gy: footprint.gy + footprint.d * 0.5 - 0.06 },
-        { gx: footprint.gx + footprint.w * 0.58, gy: footprint.gy + footprint.d * 0.5 + 0.06 },
-        { gx: footprint.gx + footprint.w * 0.42, gy: footprint.gy + footprint.d * 0.5 + 0.06 },
-      ], height * 0.38),
+      ...boxFaces(footprint, 0, bodyH),
+      ...boxFaces({ gx: footprint.gx + inset, gy: footprint.gy + insetD, w: footprint.w - inset * 2, d: footprint.d - insetD * 2 }, bodyH * 0.18, bodyH - 0.06, true),
+      ...boxFaces({ gx: btnX, gy: btnY, w: btnR, d: btnR * 0.72 }, bodyH, bodyH + 0.06),
+      ...boxFaces({ gx: camX, gy: camY, w: camR, d: camR * 0.72 }, bodyH, bodyH + 0.06),
     ]
   }
   if (archetype === 'laptop') {
-    const baseH = height * 0.26
-    const screenTh = 0.14
-    const keyInset = 0.14
+    const baseH = height * 0.28
+    const screenTh = 0.11
+    const screenW = footprint.w * 0.94
+    const screenX = footprint.gx + (footprint.w - screenW) / 2
+    const screenH = height - baseH - 0.08
+    const screenY = footprint.gy + 0.04
+    const screenBottom = baseH + 0.04
+    const screenTop = screenBottom + screenH
+    const keyInset = footprint.w * 0.09
+    const keyInsetD = footprint.d * 0.12
+    const padW = footprint.w * 0.32
+    const padD = footprint.d * 0.18
+    const padX = footprint.gx + (footprint.w - padW) / 2
+    const padY = footprint.gy + footprint.d * 0.62
     return [
       ...boxFaces(footprint, 0, baseH),
-      ...boxFaces({ gx: footprint.gx + keyInset, gy: footprint.gy + 0.18, w: footprint.w - keyInset * 2, d: footprint.d - 0.32 }, baseH * 0.72, baseH, true),
-      ...boxFaces({ gx: footprint.gx + 0.05, gy: footprint.gy, w: footprint.w - 0.1, d: screenTh }, baseH, height, true),
+      ...boxFaces({ gx: footprint.gx + keyInset, gy: footprint.gy + keyInsetD, w: footprint.w - keyInset * 2, d: footprint.d - keyInsetD - 0.38 }, baseH * 0.45, baseH, true),
+      ...boxFaces({ gx: padX, gy: padY, w: padW, d: padD }, baseH * 0.45, baseH + 0.04),
+      ...boxFaces({ gx: screenX, gy: screenY, w: screenW, d: screenTh }, screenBottom, screenTop, true),
+      verticalFace({ gx: screenX, gy: screenY }, { gx: screenX + screenW, gy: screenY }, screenBottom, screenTop, 'right'),
     ]
   }
   if (archetype === 'database') {
