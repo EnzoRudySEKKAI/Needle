@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Archetype } from '../../domain/types'
 import { buildingFaces } from './archetypes'
 
-const FORMS: Archetype[] = ['cube', 'tower', 'low-slab', 'slab-stack', 'fin-row', 'podium-tower', 'twin-towers', 'courtyard', 'bridge', 'stepped-pyramid', 'server-rack', 'monitor', 'phone', 'tablet', 'laptop', 'database']
+const FORMS: Archetype[] = ['cube', 'tower', 'low-slab', 'slab-stack', 'fin-row', 'podium-tower', 'twin-towers', 'courtyard', 'bridge', 'stepped-pyramid', 'server-rack', 'monitor', 'database']
 
 describe('building archetypes', () => {
   it.each(FORMS)('builds finite faces for %s', (archetype) => {

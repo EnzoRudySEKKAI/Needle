@@ -15,15 +15,12 @@ const FORMS: { value: Archetype | null; label: string }[] = [
   { value: 'bridge', label: 'Bridge' },
   { value: 'stepped-pyramid', label: 'Stepped pyramid' },
   { value: 'server-rack', label: 'Server rack' },
-  { value: 'monitor', label: 'Monitor' },
-  { value: 'phone', label: 'Phone' },
-  { value: 'tablet', label: 'Tablet' },
-  { value: 'laptop', label: 'Laptop' },
   { value: 'database', label: 'Database' },
+  { value: 'monitor', label: 'Monitor' },
 ]
 
 function FormPreview({ archetype }: { archetype: Archetype | null }) {
-  const previewHeight = archetype === 'low-slab' ? 0.7 : archetype === 'tablet' ? 0.85 : archetype === 'laptop' ? 1.25 : archetype === 'phone' ? 1.9 : archetype === 'database' ? 1.6 : archetype === 'monitor' ? 1.95 : 3.2
+  const previewHeight = archetype === 'low-slab' ? 0.7 : archetype === 'monitor' ? 1.85 : archetype === 'database' ? 1.6 : 3.2
   const faces = buildingFaces(archetype ?? 'cube', { gx: 0, gy: 0, w: 4, d: 3 }, previewHeight, 4)
   const points = faces.flatMap((face) => face.points)
   const minX = Math.min(...points.map((point) => point.x)) - 8

@@ -26,11 +26,8 @@ const HEIGHT_FACTOR: Record<Archetype, number> = {
   bridge: 0.75,
   'stepped-pyramid': 0.9,
   'server-rack': 1.45,
-  monitor: 0.72,
-  phone: 0.52,
-  laptop: 0.58,
+  monitor: 0.78,
   database: 0.78,
-  tablet: 0.38,
 }
 
 export function deriveHeight(size: BuildingSize, archetype: Archetype): number {
@@ -48,12 +45,9 @@ export function deriveSize(node: OntologyNode, archetype: Archetype): { w: numbe
                 : archetype === 'bridge' ? { w: 3.5, d: 2.4 }
                   : archetype === 'stepped-pyramid' ? { w: 3.5, d: 3.2 }
                     : archetype === 'server-rack' ? { w: 1.9, d: 2.1 }
-                      : archetype === 'monitor' ? { w: 2.45, d: 1.65 }
-                        : archetype === 'phone' ? { w: 1.25, d: 1.9 }
-                          : archetype === 'laptop' ? { w: 2.65, d: 1.95 }
-                            : archetype === 'database' ? { w: 2.0, d: 2.0 }
-                              : archetype === 'tablet' ? { w: 2.05, d: 1.55 }
-                                : { w: 2.6, d: 2.2 }
+                      : archetype === 'monitor' ? { w: 2.55, d: 1.75 }
+                        : archetype === 'database' ? { w: 2.0, d: 2.0 }
+                          : { w: 2.6, d: 2.2 }
   const scale = SIZE_PROFILES[node.size].footprint
   return { w: base.w * scale, d: base.d * scale }
 }
