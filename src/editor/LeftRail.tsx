@@ -82,9 +82,13 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
           const nodesOnFloor = document.nodes.filter((n) => n.floorId === activeFloorId)
           const groupsWithNodes = document.groups.filter((g) => nodesOnFloor.some((n) => n.groupId === g.id))
           const totalOnFloor = nodesOnFloor.length
-          const displayGroups = totalOnFloor === 0 ? document.groups : groupsWithNodes
+          const selectedGroupId = selection?.kind === 'group' ? selection.id : null
+          const selectedGroup = selectedGroupId ? document.groups.find((g) => g.id === selectedGroupId) : null
+          const shouldShowSelected = selectedGroup && totalOnFloor > 0 && !groupsWithNodes.some((g) => g.id === selectedGroup.id)
+          const displayGroups = totalOnFloor === 0 ? document.groups : shouldShowSelected ? [...groupsWithNodes, selectedGroup!] : groupsWithNodes
           if (document.groups.length === 0) return <section className="rail-section"><p className="rail-empty">No neighborhoods yet. Create one to add your first concept.</p></section>
           if (displayGroups.length === 0) return <section className="rail-section"><p className="rail-empty">No concepts on this floor.</p></section>
+          const hiddenGroups = document.groups.filter((g) => !displayGroups.some((h) => h.id === g.id))
           return (
             <>
               {displayGroups.map((group) => {
@@ -101,17 +105,17 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
                   </section>
                 )
               })}
-              {editable && totalOnFloor > 0 && document.groups.length > displayGroups.length ? (
+              {editable && hiddenGroups.length > 0 ? (
                 <section className="rail-section" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                   <p className="rail-empty" style={{ fontSize: '10px', marginBottom: 6 }}>Add to another neighborhood</p>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <select
                       aria-label="Neighborhood for new concept"
-                      defaultValue={document.groups.find((g) => !groupsWithNodes.some((h) => h.id === g.id))?.id ?? document.groups[0]?.id}
+                      defaultValue={hiddenGroups[0]?.id}
                       id="add-concept-group-select"
                       style={{ flex: 1, minWidth: 0, padding: '6px 8px', border: 0, borderRadius: 8, background: 'var(--surface-soft)', fontSize: 11 }}
                     >
-                      {document.groups.filter((g) => !groupsWithNodes.some((h) => h.id === g.id)).map((g) => (
+                      {hiddenGroups.map((g) => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
                     </select>
@@ -121,7 +125,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
                       style={{ flex: '0 0 auto', padding: '6px 10px', background: 'var(--surface-soft)', borderRadius: 8 }}
                       onClick={() => {
                         const sel = (typeof window !== 'undefined' ? window.document.getElementById('add-concept-group-select') : null) as HTMLSelectElement | null
-                        const groupId = sel?.value ?? document.groups.find((g) => !groupsWithNodes.some((h) => h.id === g.id))?.id ?? document.groups[0]?.id
+                        const groupId = sel?.value ?? hiddenGroups[0]?.id ?? document.groups[0]?.id
                         if (groupId) addNode(groupId)
                       }}
                     >
