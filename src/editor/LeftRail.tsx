@@ -107,7 +107,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
               })}
               {editable && hiddenGroups.length > 0 ? (
                 <section className="rail-section" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                  <p className="rail-empty" style={{ fontSize: '10px', marginBottom: 6 }}>Add to another neighborhood</p>
+                  <p className="rail-empty" style={{ fontSize: '10px', marginBottom: 6 }}>Add other floor neighbor</p>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <select
                       aria-label="Neighborhood for new concept"
