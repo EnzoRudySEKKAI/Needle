@@ -209,6 +209,20 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const handler = (event: WheelEvent) => {
+      event.preventDefault()
+      if (!camera || (interaction.current && interaction.current.kind !== 'pan')) return
+      const rect = svg.getBoundingClientRect()
+      updateCamera(zoomAbout(camera, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top))
+    }
+    svg.addEventListener('wheel', handler, { passive: false })
+    return () => svg.removeEventListener('wheel', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera])
+
   const flowNodeIds = program ? new Set(program.nodeIds) : null
   const activeParts = activeClockKey.split(':')
   const activeNodeSet = program && activeParts[0] === program.id
@@ -352,12 +366,6 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
         onClick={() => {
           if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
           if (!relationPicking) onSelect(null)
-        }}
-        onWheel={(event) => {
-          event.preventDefault()
-          if (!camera || (interaction.current && interaction.current.kind !== 'pan')) return
-          const rect = event.currentTarget.getBoundingClientRect()
-          updateCamera(zoomAbout(camera, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top))
         }}
         onPointerDown={(event) => {
           if (event.button !== 0 || !camera || interaction.current) return
