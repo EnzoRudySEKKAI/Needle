@@ -462,8 +462,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation-direction strong { font-size: 11px; text-align: center; }
 .relation-direction > div { min-width: 0; }
 .relation-direction small { display: block; margin-top: 3px; overflow: hidden; color: var(--ink-3); font: 8px var(--mono); text-align: center; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
-.relation-floor-jump { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: -12px 0 18px; }
-.relation-floor-jump button { min-width: 0; padding: 9px 10px; border: 0; border-radius: 8px; background: var(--surface-soft); color: var(--accent); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease; }
+.relation-floor-jump { display: flex; gap: 7px; margin: -12px 0 18px; }
+.relation-floor-jump button { flex: 1; min-width: 0; padding: 9px 10px; border: 0; border-radius: 8px; background: var(--surface-soft); color: var(--accent); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease; }
 .relation-floor-jump button:hover { background: var(--accent-wash); }
 .relation-direction button { height: 30px; border: 0; border-radius: 8px; background: var(--accent-wash); color: var(--accent); }
 .scenario-stages { display: flex; flex-direction: column; gap: 10px; }
