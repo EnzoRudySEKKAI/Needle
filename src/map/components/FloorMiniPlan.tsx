@@ -1,4 +1,4 @@
-import type { OntologyDocument } from '../../domain/types'
+import type { OntologyDocument, Selection } from '../../domain/types'
 import { projectFloor } from '../../domain/floors'
 import { visualiseNodes } from '../core/layout'
 import { depthKey, pointsAttribute, sceneBounds, toScreen } from '../core/iso'
@@ -11,9 +11,13 @@ function neighborhoodTone(id: string): number {
   return Math.abs(hash) % 5
 }
 
-export function FloorMiniPlan({ document, floorId, x = 0, y = 0, width = 330, height = 200 }: { document: OntologyDocument; floorId: string; x?: number; y?: number; width?: number; height?: number }) {
+export function FloorMiniPlan({ document, floorId, selection = null, x = 0, y = 0, width = 330, height = 200 }: { document: OntologyDocument; floorId: string; selection?: Selection | null; x?: number; y?: number; width?: number; height?: number }) {
   const projection = projectFloor(document, floorId)
   const nodes = projection ? visualiseNodes(projection.nodes).sort((a, b) => depthKey(a.footprint) - depthKey(b.footprint)) : []
+  const selectedRelation = selection?.kind === 'relation' ? document.relations.find((relation) => relation.id === selection.id) : null
+  const emphasizedNodeIds = selection?.kind === 'node' ? new Set([selection.id])
+    : selection?.kind === 'group' ? new Set(document.nodes.filter((node) => node.groupId === selection.id).map((node) => node.id))
+      : selectedRelation ? new Set([selectedRelation.from, selectedRelation.to]) : null
   const neighborhoods = projection ? projection.groups.flatMap((group) => {
     const members = nodes.filter((node) => node.groupId === group.id)
     if (members.length === 0) return []
@@ -31,7 +35,7 @@ export function FloorMiniPlan({ document, floorId, x = 0, y = 0, width = 330, he
       <g className="mini-neighborhoods">{neighborhoods.map((neighborhood) => {
         const { gx, gy, w, d } = neighborhood.footprint
         const corners = [toScreen(gx, gy), toScreen(gx + w, gy), toScreen(gx + w, gy + d), toScreen(gx, gy + d)]
-        return <polygon key={neighborhood.id} points={pointsAttribute(corners)} className={`mini-neighborhood tone-${neighborhood.tone}`} />
+         return <polygon key={neighborhood.id} points={pointsAttribute(corners)} className={`mini-neighborhood tone-${neighborhood.tone} ${selection?.kind === 'group' && selection.id === neighborhood.id ? 'is-selected' : selection?.kind === 'group' ? 'is-dimmed' : ''}`} />
       })}</g>
       <g className="mini-relations">{projection?.relations.map((relation) => {
         const route = geometry.get(relation.id)
@@ -39,9 +43,9 @@ export function FloorMiniPlan({ document, floorId, x = 0, y = 0, width = 330, he
         const end = route.points[route.points.length - 1]!
         const before = route.points[route.points.length - 2] ?? end
         const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
-        return <g key={relation.id} className={`mini-relation relation-${relation.kind}`}><polyline points={pointsAttribute(route.points)} className="mini-relation-line" vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -6 3 L -6 -3 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="mini-relation-arrow" vectorEffect="non-scaling-stroke" /></g>
-      })}</g>
-      {nodes.map((node) => <ConceptVolume key={node.id} node={node} className="mini-concept-volume" />)}
+         return <g key={relation.id} className={`mini-relation relation-${relation.kind} ${selection?.kind === 'relation' && selection.id === relation.id ? 'is-selected' : selection?.kind === 'relation' ? 'is-dimmed' : ''}`}><polyline points={pointsAttribute(route.points)} className="mini-relation-line" vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -6 3 L -6 -3 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="mini-relation-arrow" vectorEffect="non-scaling-stroke" /></g>
+       })}</g>
+       {nodes.map((node) => <ConceptVolume key={node.id} node={node} className={`mini-concept-volume ${emphasizedNodeIds ? emphasizedNodeIds.has(node.id) ? 'is-selected' : 'is-dimmed' : ''}`} />)}
     </> : <polygon points={pointsAttribute(emptyPad)} className="mini-plan-empty" vectorEffect="non-scaling-stroke" />}
   </svg>
 }

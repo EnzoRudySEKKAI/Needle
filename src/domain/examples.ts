@@ -1,7 +1,7 @@
 import type { OntologyDocument } from './types'
 
 export const ATLAS_TOWER = {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "atlas-tower",
   "name": "Atlas Tower",
   "version": "v1.0",
@@ -475,7 +475,7 @@ export const ATLAS_TOWER = {
 } as const;
 
 export const HARBOR_CAMPUS = {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "harbor-campus",
   "name": "Harbor Campus",
   "version": "v1.0",
@@ -1036,7 +1036,7 @@ export const HARBOR_CAMPUS = {
 } as const;
 
 export const AURORA_LINER = {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "aurora-liner",
   "name": "Aurora Liner",
   "version": "v1.0",
@@ -1640,7 +1640,7 @@ export const AURORA_LINER = {
 } as const;
 
 export const NORTHWIND_COMMERCE = {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "id": "northwind-commerce",
   "name": "Northwind Commerce",
   "version": "v1.0",

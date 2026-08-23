@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import type { GridPoint, OntologyDocument, Selection, VisualNode } from '../../domain/types'
 import { projectFloor } from '../../domain/floors'
 import type { ConnectionDraft } from '../../editor/connection'
@@ -41,12 +41,34 @@ type Props = {
   onHoverFloor?: (floorId: string | null) => void
   viewportInsets?: { left: number; right: number; top: number; bottom: number }
   dezoom?: number
+  onAddConcept?: () => void
+}
+
+function EmptyFloorPrompt({ onAddConcept }: { onAddConcept?: () => void }) {
+  return <div className="canvas-empty">
+    <div className="empty-floor-scene">
+      <svg viewBox="0 0 440 250" aria-hidden="true">
+        <defs><clipPath id="empty-floor-ground"><polygon points="34,131 218,35 406,130 220,230" /></clipPath></defs>
+        <polygon className="empty-floor-shadow" points="42,141 218,49 398,140 220,238" />
+        <polygon className="empty-floor-ground" points="34,131 218,35 406,130 220,230" />
+        <g className="empty-floor-grid" clipPath="url(#empty-floor-ground)">
+          <line x1="79" y1="107" x2="265" y2="203" /><line x1="125" y1="83" x2="312" y2="178" /><line x1="171" y1="59" x2="359" y2="154" />
+          <line x1="80" y1="156" x2="266" y2="59" /><line x1="126" y1="181" x2="313" y2="83" /><line x1="173" y1="206" x2="360" y2="107" />
+        </g>
+        <polygon className="empty-floor-edge" points="34,131 218,35 406,130 220,230" />
+        <ellipse className="empty-floor-target" cx="220" cy="132" rx="34" ry="17" />
+      </svg>
+      {onAddConcept ? <button type="button" className="empty-floor-action" onClick={onAddConcept}><i aria-hidden="true">+</i><span>Place first concept</span></button> : <span className="empty-floor-readonly">Add a concept from the left rail</span>}
+    </div>
+  </div>
 }
 
 type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera: Camera; moved: boolean; deferCapture: boolean }
-type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; alignments: GridPoint[]; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
+type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; alignments: GridPoint[]; camera: Camera; pending: GridPoint; centerOffset: GridPoint; guides: { gx?: number; gy?: number } | null; moved: boolean; frame: number }
 type FlagDragSession = { kind: 'flag'; pointerId: number; groupId: string; startX: number; startY: number; start: GridPoint; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
 type InteractionSession = PanSession | NodeDragSession | FlagDragSession
+type PointerPoint = { x: number; y: number }
+type PinchSession = { pointerIds: [number, number]; distance: number; midpoint: PointerPoint; camera: Camera }
 
 const ALIGNMENT_SNAP_DISTANCE = 0.6
 
@@ -91,8 +113,7 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId: propHighlightedFloorId, onHoverFloor, viewportInsets, dezoom }: Props) {
-  void propHighlightedFloorId
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, onHoverFloor, viewportInsets, dezoom, onAddConcept }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -101,9 +122,12 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const [dragPositions, setDragPositions] = useState<ReadonlyMap<string, { gx: number; gy: number }>>(() => new Map())
   const [dragFlagPositions, setDragFlagPositions] = useState<ReadonlyMap<string, GridPoint>>(() => new Map())
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
+  const [alignmentGuides, setAlignmentGuides] = useState<{ gx?: number; gy?: number } | null>(null)
   const [draggingFlagId, setDraggingFlagId] = useState<string | null>(null)
   const [hoveredDistrictId, setHoveredDistrictId] = useState<string | null>(null)
   const interaction = useRef<InteractionSession | null>(null)
+  const activePointers = useRef(new Map<number, PointerPoint>())
+  const pinch = useRef<PinchSession | null>(null)
   const suppressCanvasClick = useRef(false)
   const clickSuppressionTimer = useRef(0)
   const projection = useMemo(() => projectFloor(document, floorId), [document, floorId])
@@ -157,6 +181,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   }
   const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
   const relationById = useMemo(() => new Map(document.relations.map((relation) => [relation.id, relation])), [document.relations])
+  const nodeById = useMemo(() => new Map(document.nodes.map((node) => [node.id, node])), [document.nodes])
   const program = useMemo(() => flowProgram ? {
     ...flowProgram,
     stages: flowProgram.stages.map((stage) => ({
@@ -198,6 +223,19 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     setCameraOverride(next)
     onCameraChange?.(next)
   }
+  const zoomAtCenter = (factor: number) => {
+    if (!camera) return
+    const cx = insets.left + (size.width - insets.left - insets.right) / 2
+    const cy = insets.top + (size.height - insets.top - insets.bottom) / 2
+    updateCamera(zoomAbout(camera, factor, cx, cy))
+  }
+  const selectNode = (id: string) => onSelect({ kind: 'node', id })
+  const conceptLabel = (id: string) => {
+    const node = nodeById.get(id)
+    if (!node) return 'Unknown concept'
+    const code = node.code.trim()
+    return code ? `${code} ${node.name}` : node.name
+  }
 
   useLayoutEffect(() => {
     const element = containerRef.current
@@ -228,12 +266,12 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const activeNodeSet = program && activeParts[0] === program.id
     ? nodeIdsForStageState(program, Number(activeParts[1]), 'travel')
     : new Set<string>()
-  const measureFlag = (id: string, width: number) => setFlagWidths((current) => {
+  const measureFlag = useCallback((id: string, width: number) => setFlagWidths((current) => {
     if (Math.abs((current.get(id) ?? 0) - width) < 0.5) return current
     const next = new Map(current)
     next.set(id, width)
     return next
-  })
+  }), [])
   const previewNodePosition = (id: string, gx: number, gy: number) => setDragPositions((current) => {
     const existing = current.get(id)
     if (existing?.gx === gx && existing.gy === gy) return current
@@ -282,11 +320,12 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     releasePointer(session.pointerId)
     if (session.kind === 'node') {
       setDraggingNodeId(null)
+      setAlignmentGuides(null)
       if (!commit || !session.moved) {
         cancelNodePosition(session.nodeId)
         if (commit && !session.moved) {
           suppressNextClick()
-          onSelect({ kind: 'node', id: session.nodeId })
+          selectNode(session.nodeId)
         }
         return
       }
@@ -310,7 +349,17 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     suppressNextClick()
     onMoveGroupFlag(session.groupId, position.gx, position.gy)
   }
-  const cancelInteraction = useEffectEvent(() => endInteraction(false))
+  const cancelInteraction = useEffectEvent(() => {
+    const pointerIds = pinch.current?.pointerIds
+    pinch.current = null
+    activePointers.current.clear()
+    if (pointerIds) {
+      interaction.current = null
+      for (const pointerId of pointerIds) releasePointer(pointerId)
+      return
+    }
+    endInteraction(false)
+  })
 
   useEffect(() => {
     const cancel = () => cancelInteraction()
@@ -335,7 +384,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
       gy: candidate.footprint.gy + candidate.footprint.d / 2 - node.footprint.d / 2,
     }))
     updateCamera(camera)
-    interaction.current = { kind: 'node', pointerId: event.pointerId, nodeId: node.id, startX: event.clientX, startY: event.clientY, start: node.position, alignments, camera, pending: node.position, moved: false, frame: 0 }
+    interaction.current = { kind: 'node', pointerId: event.pointerId, nodeId: node.id, startX: event.clientX, startY: event.clientY, start: node.position, alignments, camera, pending: node.position, centerOffset: { gx: node.footprint.w / 2, gy: node.footprint.d / 2 }, guides: null, moved: false, frame: 0 }
     setDraggingNodeId(node.id)
     svg.setPointerCapture(event.pointerId)
   }
@@ -352,29 +401,69 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const orderedShapes = draggingNodeId
     ? [...scene.shapes.filter((node) => node.id !== draggingNodeId), ...scene.shapes.filter((node) => node.id === draggingNodeId)]
     : scene.shapes
+  const guideExtent = useMemo(() => {
+    if (!nodes.length) return null
+    return {
+      minGx: Math.floor(Math.min(...nodes.map((node) => node.footprint.gx))) - 2,
+      minGy: Math.floor(Math.min(...nodes.map((node) => node.footprint.gy))) - 2,
+      maxGx: Math.ceil(Math.max(...nodes.map((node) => node.footprint.gx + node.footprint.w))) + 2,
+      maxGy: Math.ceil(Math.max(...nodes.map((node) => node.footprint.gy + node.footprint.d))) + 2,
+    }
+  }, [nodes])
 
   return (
     <div className={`canvas-wrap ${relationPicking ? 'is-relation-picking' : ''}`} ref={containerRef}>
       {nodes.length === 0 ? (
-        <div className="canvas-empty"><span>Empty floor</span><strong>Add a concept from the left rail.</strong></div>
+        <EmptyFloorPrompt onAddConcept={editable ? onAddConcept : undefined} />
       ) : null}
       <svg
         ref={svgRef}
         id={svgId}
         className="iso-canvas"
+        tabIndex={0}
         aria-label="Interactive ontology map"
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return
+          if (event.key === '+' || event.key === '=') { event.preventDefault(); zoomAtCenter(1.25) }
+          else if (event.key === '-') { event.preventDefault(); zoomAtCenter(0.8) }
+          else if (event.key === '0') { event.preventDefault(); updateCamera(null) }
+        }}
         onClick={() => {
           if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
           if (!relationPicking) onSelect(null)
         }}
         onPointerDown={(event) => {
-          if (event.button !== 0 || !camera || interaction.current) return
+          if (event.button !== 0 || !camera) return
+          activePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+          const session = interaction.current
+          if (session?.kind === 'pan' && session.pointerId !== event.pointerId) {
+            const first = activePointers.current.get(session.pointerId)
+            if (!first) return
+            const dx = event.clientX - first.x
+            const dy = event.clientY - first.y
+            pinch.current = { pointerIds: [session.pointerId, event.pointerId], distance: Math.max(1, Math.hypot(dx, dy)), midpoint: { x: (first.x + event.clientX) / 2, y: (first.y + event.clientY) / 2 }, camera }
+            if (!event.currentTarget.hasPointerCapture(session.pointerId)) event.currentTarget.setPointerCapture(session.pointerId)
+            event.currentTarget.setPointerCapture(event.pointerId)
+            return
+          }
+          if (interaction.current) return
           const target = event.target as Element
           const deferCapture = Boolean(target.closest('.district, .district-flag'))
           interaction.current = { kind: 'pan', pointerId: event.pointerId, x: event.clientX, y: event.clientY, camera, moved: false, deferCapture }
           if (!deferCapture) event.currentTarget.setPointerCapture(event.pointerId)
         }}
         onPointerMove={(event) => {
+          if (activePointers.current.has(event.pointerId)) activePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+          const pinchSession = pinch.current
+          if (pinchSession?.pointerIds.includes(event.pointerId)) {
+            const first = activePointers.current.get(pinchSession.pointerIds[0])
+            const second = activePointers.current.get(pinchSession.pointerIds[1])
+            if (!first || !second) return
+            const midpoint = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }
+            const next = zoomAbout(pinchSession.camera, Math.hypot(second.x - first.x, second.y - first.y) / pinchSession.distance, pinchSession.midpoint.x, pinchSession.midpoint.y)
+            updateCamera({ ...next, x: next.x + midpoint.x - pinchSession.midpoint.x, y: next.y + midpoint.y - pinchSession.midpoint.y })
+            return
+          }
           const session = interaction.current
           if (!session || session.pointerId !== event.pointerId) return
           if (event.buttons === 0) { endInteraction(session.kind !== 'pan'); return }
@@ -392,16 +481,47 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
           session.moved ||= Math.hypot(event.clientX - session.startX, event.clientY - session.startY) > 4
           if (!session.moved) return
           const pending = snapGridPoint({ gx: session.start.gx + dx / 48 + dy / 24, gy: session.start.gy + dy / 24 - dx / 48 })
-          session.pending = session.kind === 'node' ? snapToConnectedAxes(pending, session.alignments) : pending
+          if (session.kind === 'node') {
+            session.pending = snapToConnectedAxes(pending, session.alignments)
+            session.guides = {
+              gx: session.pending.gx !== pending.gx ? session.pending.gx + session.centerOffset.gx : undefined,
+              gy: session.pending.gy !== pending.gy ? session.pending.gy + session.centerOffset.gy : undefined,
+            }
+          } else session.pending = pending
           if (!session.frame) session.frame = requestAnimationFrame(() => {
             if (interaction.current !== session) return
             session.frame = 0
-            if (session.kind === 'node') previewNodePosition(session.nodeId, session.pending.gx, session.pending.gy)
-            else previewFlagPosition(session.groupId, session.pending)
+            if (session.kind === 'node') {
+              previewNodePosition(session.nodeId, session.pending.gx, session.pending.gy)
+              setAlignmentGuides(session.guides)
+            } else previewFlagPosition(session.groupId, session.pending)
           })
         }}
-        onPointerUp={(event) => { if (interaction.current?.pointerId === event.pointerId) endInteraction(true) }}
-        onPointerCancel={(event) => { if (interaction.current?.pointerId === event.pointerId) endInteraction(false) }}
+        onPointerUp={(event) => {
+          activePointers.current.delete(event.pointerId)
+          if (pinch.current?.pointerIds.includes(event.pointerId)) {
+            const pointerIds = pinch.current.pointerIds
+            pinch.current = null
+            interaction.current = null
+            activePointers.current.clear()
+            for (const pointerId of pointerIds) releasePointer(pointerId)
+            suppressNextClick()
+            return
+          }
+          if (interaction.current?.pointerId === event.pointerId) endInteraction(true)
+        }}
+        onPointerCancel={(event) => {
+          activePointers.current.delete(event.pointerId)
+          if (pinch.current?.pointerIds.includes(event.pointerId)) {
+            const pointerIds = pinch.current.pointerIds
+            pinch.current = null
+            interaction.current = null
+            activePointers.current.clear()
+            for (const pointerId of pointerIds) releasePointer(pointerId)
+            return
+          }
+          if (interaction.current?.pointerId === event.pointerId) endInteraction(false)
+        }}
         onLostPointerCapture={(event) => { if (interaction.current?.pointerId === event.pointerId) endInteraction(false) }}
       >
         <defs>
@@ -410,6 +530,10 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
         {camera ? (
           <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.k})`}>
             <g className="floor-grid">{scene.grid.map((line) => <line key={line.key} x1={line.a.x} y1={line.a.y} x2={line.b.x} y2={line.b.y} vectorEffect="non-scaling-stroke" />)}</g>
+            {alignmentGuides && guideExtent ? <g className="floor-grid alignment-guides" aria-hidden="true">
+              {alignmentGuides.gx !== undefined ? (() => { const a = toScreen(alignmentGuides.gx, guideExtent.minGy); const b = toScreen(alignmentGuides.gx, guideExtent.maxGy); return <line className="alignment-guide alignment-guide-x" x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={{ stroke: 'var(--accent)', strokeWidth: 1.5 }} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /> })() : null}
+              {alignmentGuides.gy !== undefined ? (() => { const a = toScreen(guideExtent.minGx, alignmentGuides.gy); const b = toScreen(guideExtent.maxGx, alignmentGuides.gy); return <line className="alignment-guide alignment-guide-y" x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={{ stroke: 'var(--accent)', strokeWidth: 1.5 }} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /> })() : null}
+            </g> : null}
             <g className="districts">
               {scene.districts.map((district) => {
                 const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
@@ -426,7 +550,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                 const before = route.points[route.points.length - 2] ?? end
                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
                 const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
-                return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program && !relationPicking ? 'is-dimmed' : ''} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${relation.from} to ${relation.to}`} aria-disabled={relationPicking && !pickable ? true : undefined} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) } }} onClick={(event) => { event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
+                 return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program && !relationPicking ? 'is-dimmed' : ''} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${conceptLabel(relation.from)} to ${conceptLabel(relation.to)}`} aria-disabled={relationPicking && !pickable ? true : undefined} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) } }} onClick={(event) => { event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
               })}
               {previewRelations.map((relation) => {
                 const route = previewGeometry.get(relation.id)
@@ -444,7 +568,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
             {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} previewed={previewNodeIds.has(node.id)} editable={editable && !connectionDraft && !relationPicking} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
               if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
               if (connectionDraft) onToggleConnectionTarget(node.id)
-              else if (!relationPicking) onSelect({ kind: 'node', id: node.id })
+              else if (!relationPicking) selectNode(node.id)
             }} onDragStart={(event) => startNodeDrag(event, node)} />)}
             <g className="floor-exits" onPointerDown={(event) => event.stopPropagation()}>{groupedExits.map((group) => {
               return <g key={group.floorId} className="floor-exit-group" onPointerEnter={() => onHoverFloor?.(group.floorId)} onPointerLeave={() => onHoverFloor?.(null)}>
@@ -452,8 +576,10 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                   const relation = relationById.get(exit.relationId)
                   if (!relation) return null
                   const selected = selection?.kind === 'relation' && selection.id === exit.relationId
-                  const pickable = relationPickIds?.has(exit.relationId) ?? false
-                  const dimmed = program !== null && !relationPicking
+                   const pickable = relationPickIds?.has(exit.relationId) ?? false
+                   const dimmed = program !== null && !relationPicking
+                   const matchesHoveredFloor = highlightedFloorId === floorId || highlightedFloorId === group.floorId
+                   const floorHoverClass = highlightedFloorId ? matchesHoveredFloor ? 'is-floor-hovered' : 'is-floor-hover-dimmed' : ''
                   const gradientId = `${svgId}-exit-fade-${exit.relationId}`
                   const isOutgoing = relation.from === exit.localNodeId
                   const arrowAngle = isOutgoing
@@ -464,12 +590,12 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                     if (relationPicking) { if (pickable) onPickRelation(exit.relationId) }
                     else onSelect({ kind: 'relation', id: exit.relationId })
                   }
-                  return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`}>
+                   return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${floorHoverClass} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`}>
                     <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={exit.dropStart.x} y1={exit.dropStart.y} x2={exit.dropEnd.x} y2={exit.dropEnd.y}>
                       <stop offset="0" className="exit-fade-from" />
                       <stop offset="1" className="exit-fade-to" />
                     </linearGradient>
-                    <g role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label} ${isOutgoing ? '→' : '←'} ${group.floorName}`} aria-disabled={relationPicking && !pickable ? true : undefined} className="floor-exit-line" onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleSelect() } }}>
+                     <g role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${conceptLabel(relation.from)} to ${conceptLabel(relation.to)}, ${group.floorName}`} aria-disabled={relationPicking && !pickable ? true : undefined} className="floor-exit-line" onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleSelect() } }}>
                       <polyline points={pointsAttribute([exit.points[0]!, exit.points[1]!])} className="relation-line" vectorEffect="non-scaling-stroke" />
                       <polyline points={pointsAttribute([exit.dropStart, exit.dropEnd])} className={`relation-line exit-drop ${isOutgoing ? '' : 'is-incoming'}`} style={{ '--exit-stroke': `url(#${gradientId})` } as CSSProperties} vectorEffect="non-scaling-stroke" />
                       <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${exit.dropEnd.x} ${exit.dropEnd.y}) rotate(${arrowAngle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" />
@@ -491,7 +617,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
           </g>
         ) : null}
       </svg>
-      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} title="Recenter">⌾</button><button type="button" onClick={() => { if (!camera) return; const cx = insets.left + (size.width - insets.left - insets.right) / 2; const cy = insets.top + (size.height - insets.top - insets.bottom) / 2; updateCamera(zoomAbout(camera, 1.25, cx, cy)) }}>+</button><button type="button" onClick={() => { if (!camera) return; const cx = insets.left + (size.width - insets.left - insets.right) / 2; const cy = insets.top + (size.height - insets.top - insets.bottom) / 2; updateCamera(zoomAbout(camera, 0.8, cx, cy)) }}>−</button></div>
+      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} aria-label="Recenter map" title="Recenter">⌾</button><button type="button" onClick={() => zoomAtCenter(1.25)} aria-label="Zoom in">+</button><button type="button" onClick={() => zoomAtCenter(0.8)} aria-label="Zoom out">−</button></div>
     </div>
   )
 }

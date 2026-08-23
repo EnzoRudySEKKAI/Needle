@@ -12,7 +12,8 @@ export function codeFromName(name: string, used: ReadonlySet<string>): string {
     .toUpperCase() || 'ND'
   if (!used.has(base)) return base
   for (let i = 2; i < 100; i += 1) {
-    const candidate = `${base.slice(0, 2)}${i}`
+    const suffix = String(i)
+    const candidate = `${base.slice(0, Math.max(1, 3 - suffix.length))}${suffix}`
     if (!used.has(candidate)) return candidate
   }
   return base

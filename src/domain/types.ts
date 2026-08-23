@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 8 as const
+export const SCHEMA_VERSION = 9 as const
 export const STRUCTURE_TYPES = ['tower', 'campus', 'cruise-ship'] as const
 
 export type GridPoint = { gx: number; gy: number }
@@ -73,6 +73,8 @@ export type FlowTraversal = {
 
 export type FlowStage = {
   id: string
+  name?: string
+  note?: string
   traversals: FlowTraversal[]
 }
 
@@ -82,6 +84,23 @@ export type OntologyFlow = {
   payload: string
   summary: string
   stages: FlowStage[]
+}
+
+export type Selection =
+  | { kind: 'floor'; id: string }
+  | { kind: 'node'; id: string }
+  | { kind: 'relation'; id: string }
+  | { kind: 'group'; id: string }
+  | { kind: 'flow'; id: string }
+
+export type MapPresence = {
+  mapId: string
+  clientId: string
+  selection: Selection | null
+  activeFloorId: string | null
+  activeFlowId: string | null
+  presenter: boolean
+  displayName: string
 }
 
 export type OntologyDocument = {
@@ -105,10 +124,3 @@ export type VisualNode = OntologyNode & {
   footprint: Footprint
   height: number
 }
-
-export type Selection =
-  | { kind: 'floor'; id: string }
-  | { kind: 'node'; id: string }
-  | { kind: 'relation'; id: string }
-  | { kind: 'group'; id: string }
-  | { kind: 'flow'; id: string }

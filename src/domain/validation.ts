@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION, STRUCTURE_TYPES, type BuildingSize, type OntologyDocument, type StructureType } from './types'
+import { SCHEMA_VERSION, STRUCTURE_TYPES, type BuildingSize, type OntologyDocument, type Selection, type StructureType } from './types'
 
 const BUILDING_SIZES = new Set<BuildingSize>(['xs', 's', 'm', 'l', 'xl'])
 const VALID_STRUCTURE_TYPES = new Set<StructureType>(STRUCTURE_TYPES)
@@ -6,7 +6,7 @@ const VALID_STRUCTURE_TYPES = new Set<StructureType>(STRUCTURE_TYPES)
 export type Diagnostic = {
   level: 'error' | 'warning'
   message: string
-  target?: { kind: 'node' | 'relation' | 'flow'; id: string }
+  target?: Selection
 }
 
 function duplicates(values: string[]): Set<string> {
@@ -25,7 +25,6 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
   const groupIds = new Set(document.groups.map((group) => group.id))
   const nodeIds = new Set(document.nodes.map((node) => node.id))
   const relationById = new Map(document.relations.map((relation) => [relation.id, relation]))
-
   for (const id of duplicates(document.nodes.map((node) => node.id))) diagnostics.push({ level: 'error', message: `Duplicate node id: ${id}` })
   for (const code of duplicates(document.nodes.map((node) => node.code))) diagnostics.push({ level: 'warning', message: `Duplicate roof code: ${code}` })
   for (const node of document.nodes) {

@@ -13,8 +13,15 @@ export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructu
   const dragSession = useRef<DragSession | null>(null)
   const [draggingFloorId, setDraggingFloorId] = useState<string | null>(null)
   const [dropBeforeFloorId, setDropBeforeFloorId] = useState<string | null>(null)
+  const [compact, setCompact] = useState(() => {
+    try { return localStorage.getItem('needle:floorNavigatorCompact') === '1' } catch { return false }
+  })
   useEffect(() => () => window.clearTimeout(wheelTimer.current), [])
+  useEffect(() => { try { localStorage.setItem('needle:floorNavigatorCompact', compact ? '1' : '0') } catch { /* Storage can be disabled. */ } }, [compact])
   const displayFloors = [...floors].reverse()
+  const activeFloor = floors[activeIndex]
+  const floorBelow = floors[activeIndex - 1]
+  const floorAbove = floors[activeIndex + 1]
   const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
     if (wheelLocked.current || Math.abs(event.deltaY) < 8 || floors.length < 2) return
@@ -92,10 +99,16 @@ export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructu
     updateDropTarget(event.clientY)
   }
 
+  if (compact) return <div className="floor-navigator is-compact" aria-label="Floor navigation" onWheel={onWheel}>
+    <button type="button" className="floor-compact-name" onClick={() => setCompact(false)} title="Show all floors"><span>{activeFloor?.name ?? 'Floor'}</span><i aria-hidden="true">≡</i></button>
+    <button type="button" className="floor-step-button" disabled={!floorBelow} aria-label={floorBelow ? `Go down to ${floorBelow.name}` : 'No floor below'} title={floorBelow ? `Down to ${floorBelow.name}` : 'No floor below'} onClick={() => { if (floorBelow) onFloor(floorBelow.id) }}><span aria-hidden="true">↓</span></button>
+    <button type="button" className="floor-step-button" disabled={!floorAbove} aria-label={floorAbove ? `Go up to ${floorAbove.name}` : 'No floor above'} title={floorAbove ? `Up to ${floorAbove.name}` : 'No floor above'} onClick={() => { if (floorAbove) onFloor(floorAbove.id) }}><span aria-hidden="true">↑</span></button>
+  </div>
+
   return <div className="floor-navigator" aria-label="Floors" onWheel={onWheel}>
     <div className="floor-navigator-header">
       <span>Floors</span>
-      {editable && onAddFloor ? <button type="button" className="floor-add-button" aria-label="Add floor" onClick={onAddFloor}>+</button> : null}
+      <div><button type="button" className="floor-compact-button" aria-label="Minimize floor navigation" title="Minimize floors" onClick={() => setCompact(true)}>−</button>{editable && onAddFloor ? <button type="button" className="floor-add-button" aria-label="Add floor" onClick={onAddFloor}>+</button> : null}</div>
     </div>
     <div className="floor-navigator-list">
       {displayFloors.map((floor) => {

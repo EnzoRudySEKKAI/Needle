@@ -15,7 +15,6 @@ export const FaceTexture = z.enum(['auto','plain','hatched'])
 export const RelationKind = z.enum(['flow','data','support','retry'])
 export const StructureType = z.enum(['tower','campus','cruise-ship'])
 export const FlowDirection = z.enum(['forward','reverse'])
-
 export const OntologyProperty = z.object({
   id: z.string(),
   key: z.string(),
@@ -65,6 +64,8 @@ export const FlowTraversal = z.object({
 
 export const FlowStage = z.object({
   id: z.string(),
+  name: z.string().optional(),
+  note: z.string().optional(),
   traversals: z.array(FlowTraversal),
 })
 
@@ -77,7 +78,7 @@ export const OntologyFlow = z.object({
 })
 
 export const OntologyDocument = z.object({
-  schemaVersion: z.literal(8),
+  schemaVersion: z.literal(9),
   id: z.string(),
   name: z.string(),
   version: z.string(),

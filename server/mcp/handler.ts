@@ -6,11 +6,11 @@ import { EXAMPLE_MAPS } from '../../src/domain/examples.js'
 import { validateDocument } from '../../src/domain/validation.js'
 import { migrateDocument } from '../../src/domain/migration.js'
 import { makeId, codeFromName } from '../../src/domain/id.js'
-import { nextFreePosition, deriveSize, deriveArchetype, visualiseNodes } from '../../src/map/core/layout.js'
+import { nextFreePosition, visualiseNodes } from '../../src/map/core/layout.js'
 import { footprintsOverlap } from '../../src/map/core/iso.js'
 import { buildScene } from '../../src/map/core/scene.js'
 import { addFloor, deleteFloorCascade, moveFloorContents, setFloorFlagPosition, deleteGroupCascade, deleteNodeCascade, deleteRelationsCascade, addFlowTraversal, moveFlowStage } from '../../src/domain/commands.js'
-import type { OntologyDocument, GridPoint } from '../../src/domain/types.js'
+import { SCHEMA_VERSION, type Archetype, type BuildingSize, type OntologyDocument, type GridPoint } from '../../src/domain/types.js'
 
 await store.initialize()
 
@@ -21,7 +21,7 @@ function findFreePositionWithDistrictGap(
   floorId: string,
   groupId: string,
   size: 'xs' | 's' | 'm' | 'l' | 'xl',
-  archetype: string | undefined,
+  archetype: Archetype | undefined,
   propCount: number,
   explicitPos?: GridPoint,
 ): { position: GridPoint; corrected: boolean } {
@@ -42,8 +42,8 @@ function findFreePositionWithDistrictGap(
       howItsBuilt: '',
       faceTexture: 'auto',
       properties: Array.from({ length: propCount }, (_, i) => ({ id: `p-${i}`, key: 'k', value: 'v' })),
-      ...(archetype ? { archetypeOverride: archetype as any } : {}),
-    } as any
+      ...(archetype ? { archetypeOverride: archetype } : {}),
+    }
     const testNodes = [...nodesOnFloor, candidateNode]
     const testVisuals = visualiseNodes(testNodes)
     const testGroups = doc.groups
@@ -101,8 +101,8 @@ function findFreePositionWithDistrictGap(
       howItsBuilt: '',
       faceTexture: 'auto',
       properties: Array.from({ length: propCount }, (_, i) => ({ id: `p-${i}`, key: 'k', value: 'v' })),
-      ...(archetype ? { archetypeOverride: archetype as any } : {}),
-    } as any
+      ...(archetype ? { archetypeOverride: archetype } : {}),
+    }
     const testNodes = [...nodesOnFloor, candidateNode]
     const testVisuals = visualiseNodes(testNodes)
     const candidateVisual = testVisuals.find(v => v.id === 'candidate')!
@@ -141,9 +141,7 @@ function okJson(data: unknown, summary?: string) {
   }
 }
 
-export const handler = createMcpHandler(({
-  // authInfo, requestInfo, era — stateless, no session
-}) => {
+export const handler = createMcpHandler(() => {
   const server = new McpServer({ name: 'needle-maps', version: '0.1.0' })
 
   // ---- MAPS ----
@@ -199,7 +197,7 @@ export const handler = createMcpHandler(({
     } else {
       const now = new Date().toISOString()
       doc = {
-        schemaVersion: 8 as const,
+        schemaVersion: SCHEMA_VERSION,
         id: newId,
         name: name ?? 'Untitled ontology',
         version: 'v0.1',
@@ -263,7 +261,7 @@ export const handler = createMcpHandler(({
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ document }) => {
     const migrated = migrateDocument(document)
-    if (!migrated) return badRequest('Document is not a valid OntologyDocument (schemaVersion must be 8, check structureType/floors/nodes)')
+    if (!migrated) return badRequest(`Document is not a valid OntologyDocument (schemaVersion must be ${SCHEMA_VERSION}, check structureType/floors/nodes)`)
     const diagnostics = validateDocument(migrated)
     return okJson({ valid: diagnostics.filter(d=>d.level==='error').length===0, diagnostics, document: migrated })
   })
@@ -444,10 +442,11 @@ export const handler = createMcpHandler(({
     const usedCodes = new Set(doc.nodes.map(n=>n.code))
     const finalCode = code ? code.toUpperCase().slice(0,3) : codeFromName(name, usedCodes)
     const propCount = properties?.length ?? 0
-    const { position: pos, corrected } = findFreePositionWithDistrictGap(doc, floorId, groupId, (size ?? 'm') as any, archetype, propCount, position)
-    const node = {
+    const requestedSize: BuildingSize = size ?? 'm'
+    const { position: pos, corrected } = findFreePositionWithDistrictGap(doc, floorId, groupId, requestedSize, archetype, propCount, position)
+    const node: OntologyDocument['nodes'][number] = {
       id, code: finalCode, name, groupId, floorId,
-      size: size ?? 'm' as const,
+      size: requestedSize,
       position: pos,
       whatItDoes: whatItDoes ?? 'Explain what this concept changes or makes possible.',
       howItsBuilt: howItsBuilt ?? 'Explain the decision that shapes it.',
@@ -482,6 +481,7 @@ export const handler = createMcpHandler(({
         howItsBuilt: z.string().optional(),
         archetype: z.enum(['cube','tower','low-slab','slab-stack','fin-row','podium-tower','twin-towers','courtyard','bridge','stepped-pyramid','server-rack','monitor','database']).nullable().optional().describe('null to clear override'),
         faceTexture: z.enum(['auto','plain','hatched']).optional(),
+        properties: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
       }).describe('Fields to patch'),
     }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -504,11 +504,12 @@ export const handler = createMcpHandler(({
         ...(patch.whatItDoes!==undefined?{whatItDoes: patch.whatItDoes}:{}),
         ...(patch.howItsBuilt!==undefined?{howItsBuilt: patch.howItsBuilt}:{}),
         ...(patch.faceTexture!==undefined?{faceTexture: patch.faceTexture}:{}),
+        ...(patch.properties!==undefined?{properties: patch.properties.map((property) => ({ id: makeId('property'), key: property.key, value: property.value }))}:{}),
         ...(patch.archetype!==undefined?{archetypeOverride: patch.archetype ?? undefined}:{}),
       }),
     }
     // If position/group/floor/size/archetype changed, ensure gap 3 between districts
-    const needsCheck = patch.position !== undefined || patch.groupId !== undefined || patch.floorId !== undefined || patch.size !== undefined || patch.archetype !== undefined
+    const needsCheck = patch.position !== undefined || patch.groupId !== undefined || patch.floorId !== undefined || patch.size !== undefined || patch.archetype !== undefined || patch.properties !== undefined
     if (needsCheck) {
       const updated = next.nodes.find(n=> n.id===nodeId)!
       const floorId = updated.floorId
@@ -524,7 +525,7 @@ export const handler = createMcpHandler(({
       const districtOverlap = updDistrict ? scene.districts.some(d=> d.id!==updated.groupId && footprintsOverlap(updDistrict.rect, d.rect, DISTRICT_GAP)) : false
       if (nodeOverlap || districtOverlap) {
         const propCount = updated.properties.length
-        const { position: correctedPos } = findFreePositionWithDistrictGap(next, floorId, updated.groupId, updated.size as any, updated.archetypeOverride, propCount)
+        const { position: correctedPos } = findFreePositionWithDistrictGap(next, floorId, updated.groupId, updated.size, updated.archetypeOverride, propCount)
         next = { ...next, nodes: next.nodes.map(n=> n.id===nodeId ? { ...n, position: correctedPos } : n) }
         const saved = await store.save(next)
         return okJson(saved, `Position auto-corrected to ${correctedPos.gx},${correctedPos.gy} to keep gap 3 between neighborhoods`)
@@ -650,7 +651,7 @@ export const handler = createMcpHandler(({
   }, async ({ mapId, flowId }) => {
     const doc = await store.read(mapId)
     if (!doc) return notFound(mapId)
-    const next = { ...doc, flows: doc.flows.filter(f=> f.id!==flowId)}
+    const next = { ...doc, flows: doc.flows.filter(f=> f.id!==flowId) }
     const saved = await store.save(next)
     return okJson(saved)
   })

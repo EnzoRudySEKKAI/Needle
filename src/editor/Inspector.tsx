@@ -14,8 +14,13 @@ import { FloorPreviewCard } from '../map/components/FloorPreviewCard'
 
 type Commit = ReturnType<typeof useDocumentStore>['commit']
 
-function Field({ label, value, onChange, multiline = false, type = 'text' }: { label: string; value: string | number; onChange: (value: string) => void; multiline?: boolean; type?: string }) {
-  return <label className="field"><span>{label}</span>{multiline ? <textarea value={value} rows={4} onChange={(event) => onChange(event.target.value)} /> : <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />}</label>
+function Field({ label, value, onChange, multiline = false, type = 'text', maxLength }: { label: string; value: string | number; onChange: (value: string) => void; multiline?: boolean; type?: string; maxLength?: number }) {
+  return <label className="field"><span>{label}</span>{multiline ? <textarea value={value} rows={4} onChange={(event) => onChange(event.target.value)} /> : <input type={type} value={value} maxLength={maxLength} onChange={(event) => onChange(event.target.value)} />}</label>
+}
+
+function DisplayNameField() {
+  const [name, setName] = useState(() => localStorage.getItem('needle:displayName') ?? '')
+  return <Field label="Your collaboration name" value={name} onChange={(value) => { setName(value); localStorage.setItem('needle:displayName', value); window.dispatchEvent(new CustomEvent('needle:display-name', { detail: value })) }} />
 }
 
 function FloorNeighborhoods({ floorId }: { floorId: string }) {
@@ -63,93 +68,98 @@ export function Inspector({ editable, activeFloorId, hoveredFloorId, isStructure
   const floor = selection?.kind === 'floor' ? document.floors.find((item) => item.id === selection.id) : null
   const [pendingGroupDelete, setPendingGroupDelete] = useState<OntologyGroup | null>(null)
   const [pendingFloorDelete, setPendingFloorDelete] = useState<OntologyFloor | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Selection | null>(null)
+
+  const targetExists = (target: Selection) => target.kind === 'node' ? document.nodes.some((item) => item.id === target.id)
+    : target.kind === 'relation' ? document.relations.some((item) => item.id === target.id)
+      : target.kind === 'group' ? document.groups.some((item) => item.id === target.id)
+        : target.kind === 'flow' ? document.flows.some((item) => item.id === target.id)
+          : document.floors.some((item) => item.id === target.id)
+  const navigateTo = (target: Selection) => {
+    if (!targetExists(target)) return
+    setSelection(target)
+    if (target.kind === 'flow') onActiveFlow(target.id)
+    const floorId = target.kind === 'floor' ? target.id
+      : target.kind === 'node' ? document.nodes.find((item) => item.id === target.id)?.floorId
+        : target.kind === 'relation' ? (() => {
+          const targetRelation = document.relations.find((item) => item.id === target.id)
+          return document.nodes.find((item) => item.id === targetRelation?.from)?.floorId ?? document.nodes.find((item) => item.id === targetRelation?.to)?.floorId
+        })()
+          : undefined
+    if (floorId && document.floors.some((item) => item.id === floorId)) onActiveFloor(floorId)
+  }
 
   const remove = (target: Selection) => {
-    commit((current) => {
-      if (target.kind === 'node') return deleteNodeCascade(current, target.id)
-      if (target.kind === 'relation') return deleteRelationsCascade(current, new Set([target.id]))
-      if (target.kind === 'flow') return { ...current, flows: current.flows.filter((item) => item.id !== target.id) }
-      if (target.kind === 'floor') return deleteFloorCascade(current, target.id)
-      return deleteGroupCascade(current, target.id)
-    })
+    commit((current) => target.kind === 'node' ? deleteNodeCascade(current, target.id)
+        : target.kind === 'relation' ? deleteRelationsCascade(current, new Set([target.id]))
+          : target.kind === 'flow' ? { ...current, flows: current.flows.filter((item) => item.id !== target.id) }
+            : target.kind === 'floor' ? deleteFloorCascade(current, target.id)
+              : deleteGroupCascade(current, target.id))
     setSelection(null)
     onActiveFlow(null)
   }
 
   if (connectionDraft) {
-    return <aside key="connection" className="inspector">{onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}<ConnectionInspector draft={connectionDraft} document={document} onUpdate={onUpdateConnection} onCancel={onCancelConnection} onCommit={onCommitConnection} /></aside>
+    return <aside key="connection" className="inspector">{onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}<ConnectionInspector draft={connectionDraft} document={document} onUpdate={onUpdateConnection} onCancel={onCancelConnection} onCommit={onCommitConnection} /></aside>
   }
 
   if (!selection) {
-    const hoveredFloor = hoveredFloorId ? document.floors.find((floor) => floor.id === hoveredFloorId) ?? null : null
+    const hoveredFloor = isStructureView && hoveredFloorId ? document.floors.find((floor) => floor.id === hoveredFloorId) ?? null : null
     if (hoveredFloor) {
       const index = document.floors.findIndex((candidate) => candidate.id === hoveredFloor.id)
       const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
       return (
         <aside className="inspector">
-          {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
+          {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
           <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
           <h2>{hoveredFloor.name}</h2>
           <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
-          {!isStructureView ? (
-            <div className="inspector-preview">
-              <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
-            </div>
-          ) : null}
           <FloorNeighborhoods floorId={hoveredFloor.id} />
         </aside>
       )
     }
     return (
       <aside className="inspector intro-panel">
-        {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
+        {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
         <span className="eyebrow">Ontology map</span>
         <h2>{document.name}</h2>
         <p className="lede">{document.description}</p>
-        {editable ? <div className="form-stack map-settings"><Field label="Map name" value={document.name} onChange={(value) => commit((current) => ({ ...current, name: value }))} /><Field label="Version" value={document.version} onChange={(value) => commit((current) => ({ ...current, version: value }))} /><StructureTypePicker value={document.structureType} onChange={(structureType) => commit((current) => ({ ...current, structureType }))} /><Field label="Purpose" value={document.description} multiline onChange={(value) => commit((current) => ({ ...current, description: value }))} /></div> : null}
+        {editable ? <div className="form-stack map-settings"><DisplayNameField /><Field label="Map name" value={document.name} onChange={(value) => commit((current) => ({ ...current, name: value }))} /><Field label="Version" value={document.version} onChange={(value) => commit((current) => ({ ...current, version: value }))} /><StructureTypePicker value={document.structureType} onChange={(structureType) => commit((current) => ({ ...current, structureType }))} /><Field label="Purpose" value={document.description} multiline onChange={(value) => commit((current) => ({ ...current, description: value }))} /></div> : null}
         <div className="divider" />
         <h3>Read the structure</h3>
         <p>Volumes are concepts. Their form and size make the ontology visible. Paths are declared relations; moving dots are payloads following complete scenarios.</p>
-        {diagnostics.length ? <section className="diagnostics"><h3>Diagnostics</h3>{diagnostics.map((item, index) => <p key={index} className={item.level}>{item.message}</p>)}</section> : null}
+        {diagnostics.length ? <section className="diagnostics"><h3>Diagnostics</h3>{diagnostics.map((item, index) => item.target && targetExists(item.target) ? <button key={index} type="button" className={item.level} onClick={() => navigateTo(item.target!)}>{item.message}</button> : <p key={index} className={item.level}>{item.message}</p>)}</section> : null}
       </aside>
     )
   }
 
-  if (floor) {
-    const hoveredFloor = hoveredFloorId ? document.floors.find((candidate) => candidate.id === hoveredFloorId) ?? null : null
-    if (hoveredFloor && hoveredFloor.id !== floor.id) {
-      const index = document.floors.findIndex((candidate) => candidate.id === hoveredFloor.id)
-      const count = document.nodes.filter((node) => node.floorId === hoveredFloor.id).length
-      return (
-        <aside className="inspector">
-          {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
-          <span className="eyebrow">Floor {String(index + 1).padStart(2, '0')}</span>
-          <h2>{hoveredFloor.name}</h2>
-          <p className="lede">{count} concept{count === 1 ? '' : 's'}</p>
-          {!isStructureView ? (
-            <div className="inspector-preview">
-              <FloorPreviewCard document={document} floorId={hoveredFloor.id} showHeader={false} />
-            </div>
-          ) : null}
-          <FloorNeighborhoods floorId={hoveredFloor.id} />
-        </aside>
-      )
-    }
-  }
-
   return <>
     <aside key={`${selection.kind}:${selection.id}`} className="inspector">
-      {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail ]" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
+      {onCollapse ? <button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Hide detail rail" title="Hide detail rail" onClick={onCollapse}><span aria-hidden="true">›</span></button> : null}
       {node ? <NodeInspector node={node} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} onMoveFloor={(floorId) => { commit((current) => updateNode(current, node.id, { floorId })); onActiveFloor(floorId); setSelection({ kind: 'node', id: node.id }) }} onStartConnection={onStartConnection} /> : null}
       {relation ? <RelationInspector relation={relation} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} onActiveFloor={onActiveFloor} /> : null}
-      {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} /> : null}
+      {group ? <GroupInspector group={group} editable={editable} commit={commit} document={document} setSelection={setSelection} onActiveFloor={onActiveFloor} /> : null}
       {flow ? <ScenarioInspector flow={flow} editable={editable} commit={commit} document={document} relationPickTarget={relationPickTarget} onRelationPickTarget={onRelationPickTarget} onRelationPreview={onRelationPreview} onStagePreview={onStagePreview} /> : null}
       {floor ? <FloorInspector floor={floor} editable={editable} commit={commit} document={document} activeFloorId={activeFloorId} isStructureView={isStructureView} onActiveFloor={onActiveFloor} /> : null}
-      {editable ? <button type="button" className="danger-button" disabled={selection.kind === 'floor' && document.floors.length <= 1} onClick={() => selection.kind === 'group' && group ? setPendingGroupDelete(group) : selection.kind === 'floor' && floor ? setPendingFloorDelete(floor) : remove(selection)}>Delete {selection.kind}</button> : null}
+      {editable ? <button type="button" className="danger-button" disabled={selection.kind === 'floor' && document.floors.length <= 1} onClick={() => selection.kind === 'group' && group ? setPendingGroupDelete(group) : selection.kind === 'floor' && floor ? setPendingFloorDelete(floor) : setPendingDelete(selection)}>Delete {selection.kind}</button> : null}
     </aside>
     {pendingGroupDelete ? <GroupDeleteDialog group={pendingGroupDelete} document={document} onCancel={() => setPendingGroupDelete(null)} onConfirm={() => { remove({ kind: 'group', id: pendingGroupDelete.id }); setPendingGroupDelete(null) }} /> : null}
     {pendingFloorDelete ? <FloorDeleteDialog floor={pendingFloorDelete} document={document} onCancel={() => setPendingFloorDelete(null)} onDelete={() => { const fallback = document.floors.find((candidate) => candidate.id !== pendingFloorDelete.id)!; remove({ kind: 'floor', id: pendingFloorDelete.id }); onActiveFloor(fallback.id); setPendingFloorDelete(null) }} onMove={(targetFloorId) => { commit((current) => moveFloorContents(current, pendingFloorDelete.id, targetFloorId)); onActiveFloor(targetFloorId); setSelection({ kind: 'floor', id: targetFloorId }); setPendingFloorDelete(null) }} /> : null}
+    {pendingDelete ? <SelectionDeleteDialog target={pendingDelete} document={document} onCancel={() => setPendingDelete(null)} onConfirm={() => { remove(pendingDelete); setPendingDelete(null) }} /> : null}
   </>
+}
+
+function SelectionDeleteDialog({ target, document, onCancel, onConfirm }: { target: Selection; document: OntologyDocument; onCancel: () => void; onConfirm: () => void }) {
+  const node = target.kind === 'node' ? document.nodes.find((item) => item.id === target.id) : null
+  const relation = target.kind === 'relation' ? document.relations.find((item) => item.id === target.id) : null
+  const flow = target.kind === 'flow' ? document.flows.find((item) => item.id === target.id) : null
+  const relationIds = new Set(node ? document.relations.filter((item) => item.from === node.id || item.to === node.id).map((item) => item.id) : relation ? [relation.id] : [])
+  const stepCount = document.flows.reduce((count, item) => count + flowRelationIds(item).filter((id) => relationIds.has(id)).length, 0)
+  const name = node?.name ?? relation?.label ?? flow?.name ?? target.id
+  const impact = node ? `${relationIds.size} relation${relationIds.size === 1 ? '' : 's'} and ${stepCount} scenario traversal${stepCount === 1 ? '' : 's'} will also be removed.`
+    : relation ? `${stepCount} scenario traversal${stepCount === 1 ? '' : 's'} will also be removed.`
+      : `${flow?.stages.length ?? 0} stage${flow?.stages.length === 1 ? '' : 's'} and ${flow ? flowRelationIds(flow).length : 0} traversal${flow && flowRelationIds(flow).length === 1 ? '' : 's'} will be removed.`
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={onCancel}><section className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-selection-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Destructive action</span><h2 id="delete-selection-title">Delete “{name}”?</h2><p>{impact} Undo can restore the complete selection during this session.</p><div><button type="button" onClick={onCancel}>Cancel</button><button type="button" className="confirm-delete" onClick={onConfirm}>Delete {target.kind === 'flow' ? 'scenario' : target.kind}</button></div></section></div>
 }
 
 function FloorDeleteDialog({ floor, document, onCancel, onDelete, onMove }: { floor: OntologyFloor; document: OntologyDocument; onCancel: () => void; onDelete: () => void; onMove: (targetFloorId: string) => void }) {
@@ -213,7 +223,7 @@ function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartC
   return <>
     {!editable ? <><span className="eyebrow">{node.code}</span><h2>{node.name}</h2><p className="lede">{node.size.toUpperCase()}</p></> : null}
     {editable ? <div className="form-stack">
-      <Field label="Code" value={node.code} onChange={(value) => patch({ code: value.toUpperCase().slice(0, 3) })} />
+      <Field label="Code" value={node.code} maxLength={3} onChange={(value) => patch({ code: value.toUpperCase() })} />
       <Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} />
       <label className="field"><span>Size</span><select value={node.size} onChange={(event) => patch({ size: event.target.value as BuildingSize })}>{(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label>
       <label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
@@ -261,10 +271,19 @@ function RelationInspector({ relation, editable, commit, document, activeFloorId
     const up = document.floors.indexOf(floor) > currentIndex
     return <button type="button" key={floor.id} onClick={() => onActiveFloor(floor.id)}>Go to {label} {up ? '↑' : '↓'}</button>
   }
-  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><div><strong>{from}</strong>{fromFloor ? <small>{fromFloor.name}</small> : null}</div><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><div><strong>{to}</strong>{toFloor ? <small>{toFloor.name}</small> : null}</div></div>{crossesFloors ? <div className="relation-floor-jump">{[jumpFor(fromFloor), jumpFor(toFloor)]}</div> : null}{editable ? <div className="form-stack"><Field label="Name" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{document.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
+  const nodeOptions = document.floors.map((floor) => {
+    const nodes = document.nodes.filter((node) => node.floorId === floor.id)
+    return nodes.length ? <optgroup key={floor.id} label={floor.name}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.code} · {node.name}</option>)}</optgroup> : null
+  })
+  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><div><strong>{from}</strong>{fromFloor ? <small>{fromFloor.name}</small> : null}</div><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><div><strong>{to}</strong>{toFloor ? <small>{toFloor.name}</small> : null}</div></div>{crossesFloors ? <div className="relation-floor-jump">{[jumpFor(fromFloor), jumpFor(toFloor)]}</div> : null}{editable ? <div className="form-stack"><Field label="Name" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{nodeOptions}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{nodeOptions}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
 }
 
-function GroupInspector({ group, editable, commit, document }: { group: OntologyGroup; editable: boolean; commit: Commit; document: OntologyDocument }) {
+function GroupInspector({ group, editable, commit, document, setSelection, onActiveFloor }: { group: OntologyGroup; editable: boolean; commit: Commit; document: OntologyDocument; setSelection: (selection: Selection) => void; onActiveFloor: (id: string) => void }) {
   const patch = (value: Partial<OntologyGroup>) => commit((current) => updateGroup(current, group.id, value))
-  return <><span className="eyebrow">Neighborhood</span><h2>{group.name}</h2><p className="lede">{document.nodes.filter((node) => node.groupId === group.id).length} concepts</p>{editable ? <div className="form-stack"><Field label="Name" value={group.name} onChange={(value) => patch({ name: value })} /><Field label="Purpose" value={group.description} multiline onChange={(value) => patch({ description: value })} /></div> : <p>{group.description}</p>}</>
+  const members = document.nodes.filter((node) => node.groupId === group.id)
+  return <><span className="eyebrow">Neighborhood</span><h2>{group.name}</h2><p className="lede">{members.length} concepts</p>{editable ? <div className="form-stack"><Field label="Name" value={group.name} onChange={(value) => patch({ name: value })} /><Field label="Purpose" value={group.description} multiline onChange={(value) => patch({ description: value })} /></div> : <p>{group.description}</p>}<div className="inspector-neighborhoods">{document.floors.map((floor) => {
+    const floorMembers = members.filter((node) => node.floorId === floor.id)
+    if (!floorMembers.length) return null
+    return <section className="rail-section" key={floor.id} style={{ paddingTop: 8 }}><span className="group-heading"><span>{floor.name}</span><span>{floorMembers.length}</span></span><div className="node-list">{floorMembers.map((node) => <button key={node.id} type="button" className="node-row" onClick={() => { onActiveFloor(floor.id); setSelection({ kind: 'node', id: node.id }) }}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>)}</div></section>
+  })}</div></>
 }

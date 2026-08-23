@@ -4,12 +4,22 @@ import { SCHEMA_VERSION, type BuildingSize, type OntologyDocument } from './type
 const MIGRATED_FLOOR_ID = 'floor-1'
 
 export function migrateDocument(value: unknown): OntologyDocument | null {
-  if (isOntologyDocument(value)) return value
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
   const legacyVersion = legacy.schemaVersion as number
+  if (legacyVersion === SCHEMA_VERSION) {
+    const current = { ...legacy }
+    delete current.comments
+    return isOntologyDocument(current) ? current : null
+  }
+  if (legacyVersion === 8) {
+    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION }
+    delete migrated.comments
+    return isOntologyDocument(migrated) ? migrated : null
+  }
   if (legacyVersion === 7) {
-    const migrated = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower' }
+    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower' }
+    delete migrated.comments
     return isOntologyDocument(migrated) ? migrated : null
   }
   if (![1, 2, 3, 4, 5, 6].includes(legacyVersion) || !Array.isArray(legacy.nodes) || !Array.isArray(legacy.groups) || !Array.isArray(legacy.relations) || !Array.isArray(legacy.flows)) return null
@@ -24,6 +34,7 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
   const documentFields = { ...legacy }
   delete documentFields.metricLabel
   delete documentFields.floors
+  delete documentFields.comments
   const groupFlagPositions: Record<string, { gx: number; gy: number }> = {}
   const groups = legacy.groups.map((group) => {
     const fields = { ...group as Record<string, unknown> }
