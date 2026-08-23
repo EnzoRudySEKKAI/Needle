@@ -11,6 +11,7 @@ import { ScenarioInspector, type RelationPickTarget, type StagePreviewTarget } f
 import type { RelationPreview } from './RelationCandidatePicker'
 import { StructureTypePicker } from './StructureTypePicker'
 import { FloorPreviewCard } from '../map/components/FloorPreviewCard'
+import { SelectField } from './AppSelect'
 
 type Commit = ReturnType<typeof useDocumentStore>['commit']
 
@@ -166,7 +167,7 @@ function FloorDeleteDialog({ floor, document, onCancel, onDelete, onMove }: { fl
   const targets = document.floors.filter((candidate) => candidate.id !== floor.id)
   const [targetFloorId, setTargetFloorId] = useState(targets[0]!.id)
   const count = document.nodes.filter((node) => node.floorId === floor.id).length
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={onCancel}><section className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-floor-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Floor removal</span><h2 id="delete-floor-title">Remove “{floor.name}”?</h2><p>{count} concept{count === 1 ? '' : 's'} currently belong to this floor. Move them together or delete the floor and every dependent path.</p><label className="field"><span>Move concepts to</span><select value={targetFloorId} onChange={(event) => setTargetFloorId(event.target.value)}>{targets.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}</select></label><div><button type="button" onClick={onCancel}>Cancel</button><button type="button" onClick={() => onMove(targetFloorId)}>Move and remove</button><button type="button" className="confirm-delete" onClick={onDelete}>Delete contents</button></div></section></div>
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={onCancel}><section className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-floor-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Floor removal</span><h2 id="delete-floor-title">Remove “{floor.name}”?</h2><p>{count} concept{count === 1 ? '' : 's'} currently belong to this floor. Move them together or delete the floor and every dependent path.</p><SelectField label="Move concepts to" ariaLabel="Move concepts to" value={targetFloorId} options={targets.map((target) => ({ value: target.id, label: target.name }))} onChange={setTargetFloorId} /><div><button type="button" onClick={onCancel}>Cancel</button><button type="button" onClick={() => onMove(targetFloorId)}>Move and remove</button><button type="button" className="confirm-delete" onClick={onDelete}>Delete contents</button></div></section></div>
 }
 
 function GroupDeleteDialog({ group, document, onCancel, onConfirm }: { group: OntologyGroup; document: OntologyDocument; onCancel: () => void; onConfirm: () => void }) {
@@ -211,8 +212,8 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
     </div>
     <div className="form-stack">
       <Field label="Relation label" value={draft.label} onChange={(label) => onUpdate({ ...draft, label })} />
-      <label className="field"><span>Relation kind</span><select value={draft.kind} onChange={(event) => onUpdate({ ...draft, kind: event.target.value as ConnectionDraft['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label>
-      <label className="field"><span>Add as one parallel step</span><select value={draft.flowId ?? ''} onChange={(event) => onUpdate({ ...draft, flowId: event.target.value || null })}><option value="">No scenario</option>{compatibleFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
+      <SelectField label="Relation kind" ariaLabel="Relation kind" value={draft.kind} options={['flow', 'data', 'support', 'retry'].map((kind) => ({ value: kind, label: `${kind[0]!.toUpperCase()}${kind.slice(1)}` }))} onChange={(kind) => onUpdate({ ...draft, kind: kind as ConnectionDraft['kind'] })} />
+      <SelectField label="Add as one parallel step" ariaLabel="Scenario for this connection" value={draft.flowId ?? ''} options={[{ value: '', label: 'No scenario' }, ...compatibleFlows.map((flow) => ({ value: flow.id, label: flow.name }))]} onChange={(flowId) => onUpdate({ ...draft, flowId: flowId || null })} />
     </div>
     <div className="connection-actions"><button type="button" onClick={onCancel}>Cancel</button><button type="button" className="primary-action" disabled={count === 0} onClick={onCommit}>Create {count} connection{count === 1 ? '' : 's'}</button></div>
   </>
@@ -225,9 +226,9 @@ function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartC
     {editable ? <div className="form-stack">
       <Field label="Code" value={node.code} maxLength={3} onChange={(value) => patch({ code: value.toUpperCase() })} />
       <Field label="Name" value={node.name} onChange={(value) => patch({ name: value })} />
-      <label className="field"><span>Size</span><select value={node.size} onChange={(event) => patch({ size: event.target.value as BuildingSize })}>{(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => <option key={size} value={size}>{size.toUpperCase()}</option>)}</select></label>
-      <label className="field"><span>Neighborhood</span><select value={node.groupId} onChange={(event) => patch({ groupId: event.target.value })}>{document.groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-      <label className="field"><span>Floor</span><select value={node.floorId} onChange={(event) => onMoveFloor(event.target.value)}>{document.floors.map((floor) => <option key={floor.id} value={floor.id}>{floor.name}</option>)}</select></label>
+      <SelectField label="Size" ariaLabel="Concept size" value={node.size} options={(['xs', 's', 'm', 'l', 'xl'] as const).map((size) => ({ value: size, label: size.toUpperCase() }))} onChange={(size) => patch({ size: size as BuildingSize })} />
+      <SelectField label="Neighborhood" ariaLabel="Concept neighborhood" value={node.groupId} options={document.groups.map((group) => ({ value: group.id, label: group.name }))} onChange={(groupId) => patch({ groupId })} />
+      <SelectField label="Floor" ariaLabel="Concept floor" value={node.floorId} options={document.floors.map((floor) => ({ value: floor.id, label: floor.name }))} onChange={onMoveFloor} />
       <Field label="What it does" value={node.whatItDoes} multiline onChange={(value) => patch({ whatItDoes: value })} />
       <Field label="Why it is shaped this way" value={node.howItsBuilt} multiline onChange={(value) => patch({ howItsBuilt: value })} />
       <button type="button" className="secondary-button connect-button" onClick={() => onStartConnection(node.id)}>Connect from {node.name}</button>
@@ -271,11 +272,8 @@ function RelationInspector({ relation, editable, commit, document, activeFloorId
     const up = document.floors.indexOf(floor) > currentIndex
     return <button type="button" key={floor.id} onClick={() => onActiveFloor(floor.id)}>Go to {label} {up ? '↑' : '↓'}</button>
   }
-  const nodeOptions = document.floors.map((floor) => {
-    const nodes = document.nodes.filter((node) => node.floorId === floor.id)
-    return nodes.length ? <optgroup key={floor.id} label={floor.name}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.code} · {node.name}</option>)}</optgroup> : null
-  })
-  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><div><strong>{from}</strong>{fromFloor ? <small>{fromFloor.name}</small> : null}</div><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><div><strong>{to}</strong>{toFloor ? <small>{toFloor.name}</small> : null}</div></div>{crossesFloors ? <div className="relation-floor-jump">{[jumpFor(fromFloor), jumpFor(toFloor)]}</div> : null}{editable ? <div className="form-stack"><Field label="Name" value={relation.label} onChange={(value) => patch({ label: value })} /><label className="field"><span>From</span><select value={relation.from} onChange={(event) => patch({ from: event.target.value })}>{nodeOptions}</select></label><label className="field"><span>To</span><select value={relation.to} onChange={(event) => patch({ to: event.target.value })}>{nodeOptions}</select></label><label className="field"><span>Relation kind</span><select value={relation.kind} onChange={(event) => patch({ kind: event.target.value as OntologyRelation['kind'] })}><option value="flow">Flow</option><option value="data">Data</option><option value="support">Support</option><option value="retry">Retry</option></select></label></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
+  const nodeOptions = document.floors.flatMap((floor) => document.nodes.filter((node) => node.floorId === floor.id).map((node) => ({ value: node.id, label: `${node.code} · ${node.name}`, group: floor.name })))
+  return <><span className="eyebrow">{relation.kind} relation</span><h2>{relation.label}</h2><div className="relation-direction"><div><strong>{from}</strong>{fromFloor ? <small>{fromFloor.name}</small> : null}</div><button type="button" title="Reverse relation globally" disabled={!editable} onClick={() => patch({ from: relation.to, to: relation.from })}>⇄</button><div><strong>{to}</strong>{toFloor ? <small>{toFloor.name}</small> : null}</div></div>{crossesFloors ? <div className="relation-floor-jump">{[jumpFor(fromFloor), jumpFor(toFloor)]}</div> : null}{editable ? <div className="form-stack"><Field label="Name" value={relation.label} onChange={(value) => patch({ label: value })} /><SelectField label="From" ariaLabel="Relation source" value={relation.from} options={nodeOptions} onChange={(from) => patch({ from })} /><SelectField label="To" ariaLabel="Relation target" value={relation.to} options={nodeOptions} onChange={(to) => patch({ to })} /><SelectField label="Relation kind" ariaLabel="Relation kind" value={relation.kind} options={['flow', 'data', 'support', 'retry'].map((kind) => ({ value: kind, label: `${kind[0]!.toUpperCase()}${kind.slice(1)}` }))} onChange={(kind) => patch({ kind: kind as OntologyRelation['kind'] })} /></div> : <p>This path carries {relation.label} from {from} to {to}.</p>}</>
 }
 
 function GroupInspector({ group, editable, commit, document, setSelection, onActiveFloor }: { group: OntologyGroup; editable: boolean; commit: Commit; document: OntologyDocument; setSelection: (selection: Selection) => void; onActiveFloor: (id: string) => void }) {

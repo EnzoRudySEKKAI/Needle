@@ -317,11 +317,21 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       floorTimer.current = window.setTimeout(() => setPreviousFloorId(null), 460)
     }
   }
-  const followCollaborator = useEffectEvent((followed: (typeof presences)[number]) => {
-    if (followed.activeFloorId && followed.activeFloorId !== activeFloorId) openFloor(followed.activeFloorId)
+  const applyCollaboratorPresence = (followed: (typeof presences)[number]) => {
+    if (followed.activeFloorId) {
+      openFloor(followed.activeFloorId, followed.selection)
+    } else {
+      window.clearTimeout(floorTimer.current)
+      window.clearTimeout(structureEnterTimer.current)
+      setPreviousFloorId(null)
+      setStructureEntering(false)
+      setEnteringFloorId(null)
+      setWorkspaceView('structure')
+      setSelection(followed.selection)
+    }
     if (followed.activeFlowId !== activeFlowId) setActiveFlowId(followed.activeFlowId)
-    if (followed.selection) setSelection(followed.selection)
-  })
+  }
+  const followCollaborator = useEffectEvent(applyCollaboratorPresence)
   useEffect(() => {
     if (!followingId) return
     const followed = presences.find((presence) => presence.clientId === followingId)
@@ -329,6 +339,11 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     const timer = window.setTimeout(() => followCollaborator(followed), 0)
     return () => window.clearTimeout(timer)
   }, [followingId, presences])
+  const changeFollowing = (presenceId: string | null) => {
+    setFollowingId(presenceId)
+    const followed = presences.find((presence) => presence.clientId === presenceId)
+    if (followed) window.setTimeout(() => applyCollaboratorPresence(followed), 0)
+  }
   const followScenarioFloor = useEffectEvent((floorId: string) => openFloor(floorId))
   const openScenarioStage = (stageId: string) => {
     const stage = flowProgram?.stages.find((candidate) => candidate.id === stageId)
@@ -374,7 +389,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     {conflict ? <div className="sync-error conflict-banner" role="alert"><span>A collaborator changed this map while you were editing.</span><button type="button" onClick={() => resolveConflict('remote')}>Load theirs</button><button type="button" onClick={() => resolveConflict('local')}>Keep mine</button></div> : null}
     <MapHeader editable={editable} fullscreen={fullscreen} fullscreenError={fullscreenError} historyOpen={historyOpen} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} onSearch={() => setCommandPaletteOpen(true)} onHistory={() => setHistoryOpen((current) => !current)} onShortcuts={() => setShortcutHelpOpen(true)} leftCollapsed={leftCollapsed} rightCollapsed={rightCollapsed} headerCollapsed={headerCollapsed} onToggleLeft={() => setLeftCollapsed((value) => !value)} onToggleRight={() => setRightCollapsed((value) => !value)} onToggleHeader={() => setHeaderCollapsed((value) => !value)} />
     <div className="presence-dock">
-      <PresenceBar entries={presences.map((presence, index) => ({ id: presence.clientId, name: presence.displayName, color: ['#3979d6', '#8267b8', '#3d8c70', '#a4683a'][index % 4]!, floorId: presence.activeFloorId ?? undefined, floorName: document.floors.find((floor) => floor.id === presence.activeFloorId)?.name, selection: presence.selection, presenting: presence.presenter }))} followingId={followingId} onFollow={setFollowingId} />
+      <PresenceBar entries={presences.map((presence, index) => ({ id: presence.clientId, name: presence.displayName, color: ['#3979d6', '#8267b8', '#3d8c70', '#a4683a'][index % 4]!, floorId: presence.activeFloorId ?? undefined, floorName: document.floors.find((floor) => floor.id === presence.activeFloorId)?.name, selection: presence.selection, presenting: presence.presenter }))} followingId={followingId} onFollow={changeFollowing} />
       <button type="button" className="header-restore" aria-label="Show header" onClick={() => setHeaderCollapsed(false)}><span aria-hidden="true">⌄</span></button>
     </div>
     {activeFlow ? <ScenarioControls flow={activeFlow} program={flowProgram} stepDisplayMode={stepDisplayMode} onStepDisplayMode={setStepDisplayMode} onOpenStage={openScenarioStage} /> : null}

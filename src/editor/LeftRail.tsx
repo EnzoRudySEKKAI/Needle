@@ -3,6 +3,7 @@ import { codeFromName, makeId } from '../domain/id'
 import { deleteRelationsCascade } from '../domain/commands'
 import type { RelationKind, Selection } from '../domain/types'
 import { nextFreePosition } from '../map/core/layout'
+import { AppSelect, SelectField } from './AppSelect'
 import { useDocumentStore } from './document-store'
 
 type RailTab = 'concepts' | 'relations' | 'scenarios'
@@ -158,12 +159,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         <div className="segmented" aria-label="Relation scope" style={{ marginTop: 10 }}>
           {(['floor', 'all', 'cross-floor'] as const).map((scope) => <button key={scope} type="button" className={relationScope === scope ? 'is-active' : ''} aria-pressed={relationScope === scope} onClick={() => setRelationScope(scope)}>{scope === 'cross-floor' ? 'Cross-floor' : scope}</button>)}
         </div>
-        <label className="field" style={{ marginTop: 10 }}>
-          <span>Relation kind</span>
-          <select value={relationKind} onChange={(event) => setRelationKind(event.target.value as 'all' | RelationKind)}>
-            {relationKinds.map((kind) => <option key={kind} value={kind}>{kind === 'all' ? 'All kinds' : kind}</option>)}
-          </select>
-        </label>
+        <div style={{ marginTop: 10 }}><SelectField label="Relation kind" ariaLabel="Relation kind" value={relationKind} options={relationKinds.map((kind) => ({ value: kind, label: kind === 'all' ? 'All kinds' : kind }))} onChange={(value) => setRelationKind(value as 'all' | RelationKind)} /></div>
         {editable && document.nodes.length > 0 ? <button type="button" className="secondary-button" style={{ marginTop: 10 }} onClick={beginRelation}>+ Create relation</button> : null}
         <div className="relation-list" style={{ marginTop: 8 }}>
           {filteredRelations.map((relation) => {
@@ -181,7 +177,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         {isChoosingRelationSource ? <section className="rail-section" aria-live="polite">
           <div className="rail-heading"><span>Choose relation source</span><button type="button" aria-label="Cancel relation creation" title="Cancel" onClick={() => setIsChoosingRelationSource(false)}>×</button></div>
           {sourceNodes.length > 0 ? <div style={{ marginTop: 8 }}>
-            <label className="field"><span>Source concept on this floor</span><select value={selectedSourceId} onChange={(event) => { setRelationSourceId(event.target.value); select({ kind: 'node', id: event.target.value }) }}>{sourceNodes.map((node) => <option key={node.id} value={node.id}>{node.code} · {node.name}</option>)}</select></label>
+            <SelectField label="Source concept on this floor" ariaLabel="Source concept on this floor" value={selectedSourceId} options={sourceNodes.map((node) => ({ value: node.id, label: `${node.code} · ${node.name}` }))} onChange={(value) => { setRelationSourceId(value); select({ kind: 'node', id: value }) }} />
             {onStartConnection ? <button type="button" className="secondary-button" style={{ marginTop: 8 }} onClick={() => { onStartConnection(selectedSourceId); setIsChoosingRelationSource(false) }}>Start from selected concept</button> : <><p className="rail-empty">Select the source here, then use “Connect from” in its inspector.</p><button type="button" className="add-row" onClick={() => select({ kind: 'node', id: selectedSourceId })}>Select source concept</button></>}
           </div> : <p className="rail-empty">Add a concept on this floor before creating a relation.</p>}
         </section> : null}
@@ -219,9 +215,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
                 <section className="rail-section" style={{ marginTop: 12, paddingTop: 12 }}>
                   <p className="rail-empty" style={{ fontSize: 10, marginBottom: 6 }}>Add concept to another neighborhood</p>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <select aria-label="Neighborhood for new concept" value={selectedHiddenGroupId} onChange={(event) => setHiddenGroupId(event.target.value)} style={{ flex: 1, minWidth: 0, padding: '6px 8px', background: 'var(--surface-soft)', fontSize: 11 }}>
-                      {hiddenGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                    </select>
+                    <AppSelect compact className="rail-inline-select" ariaLabel="Neighborhood for new concept" value={selectedHiddenGroupId} options={hiddenGroups.map((group) => ({ value: group.id, label: group.name }))} onChange={setHiddenGroupId} />
                     <button type="button" className="add-row" style={{ flex: '0 0 auto', padding: '6px 10px', background: 'var(--surface-soft)' }} onClick={() => addNode(selectedHiddenGroupId)}>+ Add</button>
                   </div>
                 </section>

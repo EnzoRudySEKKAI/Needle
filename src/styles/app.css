@@ -179,9 +179,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .settings-menu > button > i.is-on b { transform: translateX(14px); }
 .step-display-control { height: 30px; display: flex; align-items: center; border: 0; border-radius: 8px; background: var(--surface-soft); overflow: hidden; }
 .step-display-control > span { padding-left: 8px; color: var(--ink-3); font: 500 8px var(--mono); text-transform: uppercase; }
-.step-display-control select { height: 100%; min-width: 70px; border: 0; background: transparent; padding: 0 6px; font: 500 9px var(--mono); text-transform: uppercase; outline: none; }
+.step-display-control .app-select { min-width: 70px; }
 .step-display-control:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
-.step-display-control:has(select:disabled) { opacity: .35; }
+.step-display-control:has(.app-select-trigger:disabled) { opacity: .35; }
 .segmented, .speed-control { display: flex; gap: 4px; }
 .segmented button, .speed-control button { border-radius: 8px; margin-left: 0; }
 .segmented .is-active, .speed-control .is-active { color: var(--accent); background: var(--accent-wash); border-color: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent); }
@@ -475,6 +475,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .field input:focus, .field textarea:focus, .field select:focus { background: color-mix(in srgb, var(--surface-soft) 70%, var(--accent-wash)); }
 .field textarea { line-height: 1.5; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.app-select { width: 100%; min-width: 0; }
+.app-select-trigger { width: 100%; height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--surface-soft); color: var(--ink); text-align: left; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--structure) 7%, transparent); transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.app-select-trigger > span { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.app-select-trigger > i { width: 8px; height: 8px; flex: 0 0 auto; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
+.app-select-trigger:hover:not(:disabled) { background: color-mix(in srgb, var(--surface-soft) 76%, var(--accent-wash)); }
+.app-select-trigger:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent); }
+.app-select.is-open .app-select-trigger { background: color-mix(in srgb, var(--surface-soft) 68%, var(--accent-wash)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 72%, transparent), 0 7px 18px color-mix(in srgb, var(--accent) 9%, transparent); }
+.app-select.is-open .app-select-trigger > i { transform: translateY(2px) rotate(225deg); }
+.app-select-trigger:disabled { opacity: .42; cursor: default; }
+.app-select.is-compact .app-select-trigger { height: 30px; padding: 0 10px; border-radius: 10px; box-shadow: none; }
+.app-select.is-compact .app-select-trigger > span { font: 500 8px var(--mono); text-transform: uppercase; }
+.app-select-menu { position: fixed; z-index: 1000; overflow-x: hidden; overflow-y: auto; padding: 5px; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--surface-raised) 96%, transparent); box-shadow: 0 16px 42px color-mix(in srgb, var(--ink) 17%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 32%, transparent); backdrop-filter: blur(18px); transform-origin: center top; animation: app-select-in 150ms cubic-bezier(.22,1,.36,1) both; scrollbar-width: thin; }
+.app-select-menu.opens-up { transform: translateY(-100%); transform-origin: center bottom; animation-name: app-select-up-in; }
+.app-select-group { display: block; padding: 7px 9px 4px; color: var(--ink-3); font: 500 8px var(--mono); letter-spacing: .55px; text-transform: uppercase; }
+.app-select-option { width: 100%; min-height: 32px; display: grid; grid-template-columns: minmax(0, 1fr) 16px; align-items: center; gap: 7px; padding: 6px 9px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); text-align: left; transition: background 120ms ease, color 120ms ease, transform 120ms ease; }
+.app-select-option > span { overflow: hidden; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.app-select-option > b { color: var(--accent); font-size: 11px; font-weight: 600; text-align: center; }
+.app-select-option:hover:not(:disabled), .app-select-option.is-active { background: color-mix(in srgb, var(--accent-wash) 72%, transparent); color: var(--ink); }
+.app-select-option.is-selected { color: var(--accent); background: var(--accent-wash); }
+.app-select-option:focus, .app-select-option:focus-visible { outline: none; }
+.app-select-option:disabled { opacity: .35; cursor: default; }
+@keyframes app-select-in { from { opacity: 0; transform: translateY(-5px) scale(.985); } }
+@keyframes app-select-up-in { from { opacity: 0; transform: translateY(calc(-100% + 5px)) scale(.985); } to { transform: translateY(-100%) scale(1); } }
 .secondary-button, .danger-button { width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--surface-soft); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease, color 140ms ease; }
 .secondary-button:hover { background: color-mix(in srgb, var(--surface-soft) 70%, var(--accent-wash)); color: var(--ink); }
 .connect-button { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
@@ -535,39 +558,69 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .relation-floor-jump button { flex: 1; min-width: 0; padding: 9px 10px; border: 0; border-radius: 8px; background: var(--surface-soft); color: var(--accent); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease; }
 .relation-floor-jump button:hover { background: var(--accent-wash); }
 .relation-direction button { height: 30px; border: 0; border-radius: 8px; background: var(--accent-wash); color: var(--accent); }
-.scenario-stages { display: flex; flex-direction: column; gap: 10px; }
-.scenario-stage { position: relative; border: 0; border-radius: 12px; background: var(--surface-soft); cursor: grab; touch-action: none; user-select: none; transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease, background 120ms ease; overflow: hidden; box-shadow: 0 2px 12px color-mix(in srgb, var(--ink) 6%, transparent); }
-.scenario-stage:hover:not(.is-dragging) { background: color-mix(in srgb, var(--accent-wash) 38%, var(--surface-soft)); box-shadow: 0 7px 18px color-mix(in srgb, var(--ink) 8%, transparent); }
-.scenario-stage.is-dragging { opacity: .42; transform: scale(.985); cursor: grabbing; }
+.scenario-editor { gap: 14px; }
+.scenario-steps-heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.scenario-steps-heading > span { color: var(--ink); font: 600 10px var(--mono); letter-spacing: .45px; text-transform: uppercase; }
+.scenario-steps-heading > small { color: var(--ink-3); font: 7px var(--mono); text-transform: uppercase; }
+.scenario-stages { display: flex; flex-direction: column; gap: 14px; }
+.scenario-stage { position: relative; overflow: hidden; border: 0; border-radius: 14px; background: var(--surface-soft); box-shadow: 0 5px 18px color-mix(in srgb, var(--ink) 7%, transparent); transition: opacity 120ms ease, transform 120ms ease, box-shadow 160ms ease; }
+.scenario-stage.is-editable { overflow: visible; cursor: default; touch-action: auto; user-select: auto; }
+.scenario-stage.is-editable:hover:not(.is-dragging) { box-shadow: 0 10px 26px color-mix(in srgb, var(--ink) 10%, transparent); }
+.scenario-stage.is-dragging { opacity: .42; transform: scale(.985); }
 .scenario-stage.is-drop-before { box-shadow: 0 -4px 0 -1px var(--accent); }
 .scenario-stage-drop-end { height: 3px; margin-top: -4px; border-radius: 2px; background: var(--accent); }
-.scenario-stage > header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 0; background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.scenario-stage > header { padding: 9px 11px; border: 0; background: color-mix(in srgb, var(--surface-raised) 82%, transparent); }
 .scenario-stage > header strong { font: 500 9px var(--mono); text-transform: uppercase; }
-.scenario-stage > header div { display: flex; gap: 3px; }
-.scenario-stage > header button { width: 23px; height: 22px; padding: 0; border: 0; border-radius: 8px; background: var(--surface); font: 9px var(--mono); }
-.scenario-stage > header button:disabled { opacity: .25; }
-.scenario-drag-indicator { width: 23px; height: 22px; display: grid; place-items: center; color: var(--ink-3); font: 9px var(--mono); }
-.scenario-branch { display: grid; grid-template-columns: 25px minmax(0, 1fr) 27px 25px minmax(0, 1fr) 22px; align-items: center; gap: 4px; padding: 8px; border: 0; }
+.scenario-stage-header { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: center; gap: 10px; cursor: grab; touch-action: none; user-select: none; }
+.scenario-stage-header:active { cursor: grabbing; }
+.scenario-stage-title { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 8px; }
+.scenario-stage-title > span { color: var(--accent); font: 600 8px var(--mono); letter-spacing: .4px; text-transform: uppercase; }
+.scenario-stage-title > strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+.scenario-stage-actions { display: flex; justify-content: flex-end; }
+.scenario-stage-actions button { width: 28px; min-width: 0; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 9px; background: var(--surface-soft); color: var(--ink-3); font: 9px var(--mono); }
+.scenario-stage-actions button:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
+.scenario-stage-actions button:disabled { opacity: .25; cursor: default; }
+.scenario-stage-actions .scenario-stage-remove:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.scenario-stage-body { display: grid; gap: 12px; padding: 12px; }
+.scenario-stage-fields, .scenario-branch-list { display: grid; gap: 10px; }
+.scenario-branch-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: -5px; padding: 0 2px; }
+.scenario-branch-heading > span { color: var(--ink-2); font: 600 8px var(--mono); letter-spacing: .4px; text-transform: uppercase; }
+.scenario-branch-heading > small { color: var(--ink-3); font: 7px var(--mono); text-transform: uppercase; }
+.scenario-stage.is-editable :is(.field input, .field textarea) { background: var(--surface-raised); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--structure) 6%, transparent); }
+.scenario-branch { display: grid; grid-template-columns: 25px minmax(0, 1fr) 27px 25px minmax(0, 1fr); align-items: center; gap: 4px; padding: 8px; border: 0; }
 .scenario-branch .branch-code { color: var(--ink-3); font: 8px var(--mono); }
 .scenario-branch .branch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .scenario-branch button { height: 22px; padding: 0; border: 0; border-radius: 8px; background: var(--surface); }
 .scenario-branch .branch-direction { color: var(--accent); background: var(--accent-wash); }
-.scenario-branch small { grid-column: 2 / -1; color: var(--ink-3); font: 8px var(--mono); }
+.scenario-stage.is-editable .scenario-branch { grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 24px; gap: 8px; padding: 10px; border-radius: 12px; background: var(--surface-raised); box-shadow: 0 3px 12px color-mix(in srgb, var(--ink) 5%, transparent); }
+.branch-endpoint { min-width: 0; display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center; gap: 4px; }
+.scenario-stage.is-editable .scenario-branch .branch-direction { width: 28px; height: 28px; border-radius: 10px; font-size: 16px; }
+.branch-actions { grid-column: 4; display: flex; justify-content: flex-end; gap: 4px; }
+.branch-actions button { width: 24px; height: 24px; background: var(--surface-soft); color: var(--ink-3); }
+.branch-actions button:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
+.branch-actions button:disabled { opacity: .25; cursor: default; }
+.branch-actions .branch-remove:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 .scenario-branch.is-missing { color: var(--danger); font-size: 10px; }
 .relation-candidate-picker { position: relative; }
-.relation-candidate-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; border: 0; background: var(--surface); color: var(--ink-3); padding: 8px; font: 8px var(--mono); text-align: left; text-transform: uppercase; }
-.form-stack > .relation-candidate-picker > .relation-candidate-trigger { border: 1px solid var(--border); }
+.relation-candidate-trigger { width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: space-between; border: 0; border-radius: 13px; background: var(--surface-soft); color: var(--ink-2); padding: 9px 12px; font: 500 8px var(--mono); text-align: left; text-transform: uppercase; transition: background 150ms ease, box-shadow 150ms ease; }
+.relation-candidate-trigger:hover:not(:disabled), .relation-candidate-trigger[aria-expanded='true'] { background: color-mix(in srgb, var(--surface-soft) 70%, var(--accent-wash)); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+.relation-candidate-trigger > span { width: 8px; height: 8px; overflow: hidden; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; font-size: 0; transform: translateY(-2px) rotate(45deg); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
+.relation-candidate-trigger[aria-expanded='true'] > span { transform: translateY(2px) rotate(225deg); }
 .relation-candidate-trigger:disabled { opacity: .45; cursor: default; }
-.relation-candidate-list { position: absolute; left: 0; right: 0; z-index: 12; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); background: var(--surface-raised); box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 14%, transparent); outline: none; }
-.relation-candidate-map-hint { position: sticky; top: 0; z-index: 1; margin: 0; padding: 8px 10px; background: color-mix(in srgb, var(--accent-wash) 72%, var(--surface-raised)); color: var(--accent); font: 8px/1.45 var(--mono); text-transform: uppercase; }
-.relation-candidate-row { display: grid; grid-template-columns: minmax(0, 1fr) 34px; color: var(--ink-2); }
+.relation-candidate-list { position: static; max-height: 220px; margin-top: 7px; padding: 6px; overflow-y: auto; border: 0; border-radius: 14px; background: color-mix(in srgb, var(--surface-raised) 96%, transparent); box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 13%, transparent); backdrop-filter: blur(18px); outline: none; animation: app-select-in 150ms cubic-bezier(.22,1,.36,1) both; }
+.relation-candidate-row { display: grid; grid-template-columns: minmax(0, 1fr) 38px; border-radius: 11px; color: var(--ink-2); }
 .relation-candidate-row.is-active { background: var(--accent-wash); color: var(--accent); }
 .relation-candidate-choice { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; border: 0; background: transparent; color: inherit; text-align: left; }
 .relation-candidate-choice span { overflow: hidden; font-size: 10px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .relation-candidate-choice b { color: var(--accent); font-weight: 500; }
 .relation-candidate-choice small { overflow: hidden; color: var(--ink-3); font: 8px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
-.relation-candidate-direction { margin: 6px; border: 0; border-radius: 3px; background: color-mix(in srgb, var(--surface) 72%, transparent); color: var(--accent); font: 14px var(--mono); }
+.relation-candidate-direction { margin: 6px; border: 0; border-radius: 9px; background: color-mix(in srgb, var(--surface) 72%, transparent); color: var(--accent); font: 14px var(--mono); }
 .relation-candidate-direction:hover { background: var(--surface); }
+.scenario-stage .is-parallel-branch .relation-candidate-trigger { min-height: 36px; border-radius: 11px; background: var(--surface-raised); color: var(--ink-3); }
+.scenario-stage .is-parallel-branch .relation-candidate-trigger:hover:not(:disabled), .scenario-stage .is-parallel-branch .relation-candidate-trigger[aria-expanded='true'] { background: var(--accent-wash); color: var(--accent); }
+.relation-candidate-picker.is-next-step { margin-top: 2px; }
+.is-next-step .relation-candidate-trigger { min-height: 44px; border-radius: 14px; background: color-mix(in srgb, var(--accent-wash) 42%, var(--surface-soft)); color: var(--ink-2); padding: 10px 14px; }
+.is-next-step .relation-candidate-trigger:hover:not(:disabled), .is-next-step .relation-candidate-trigger[aria-expanded='true'] { background: var(--accent-wash); color: var(--accent); }
 
 /* SVG scene */
 .floor-grid line { stroke: var(--grid); stroke-width: 1; }
@@ -705,9 +758,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .export-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 20px; padding: 3px; border-radius: 10px; background: var(--surface-soft); }
 .export-scope button { min-height: 34px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 500 9px var(--mono); text-transform: uppercase; transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease; }
 .export-scope button.is-active { background: var(--surface-raised); color: var(--accent); box-shadow: 0 2px 10px color-mix(in srgb, var(--ink) 8%, transparent); }
-.export-scope:has(label) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; }
-.export-scope label { min-width: 0; display: flex; flex-direction: column; gap: 6px; color: var(--ink-3); font: 500 9px var(--mono); text-transform: uppercase; }
-.export-scope select { width: 100%; min-width: 0; height: 32px; padding: 0 28px 0 9px; border: 0; border-radius: 7px; background-color: var(--surface-raised); font-size: 11px; text-transform: none; }
+.export-selects { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+.export-selects > div { min-width: 0; display: flex; flex-direction: column; gap: 6px; color: var(--ink-3); font: 500 9px var(--mono); text-transform: uppercase; }
+.export-selects .app-select-trigger { background: var(--surface-raised); text-transform: none; }
 .export-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 20px; }
 .export-options button { min-width: 0; min-height: 76px; display: flex; flex-direction: column; gap: 7px; padding: 13px 12px; border: 0; border-radius: 10px; background: var(--surface-soft); color: var(--ink); text-align: left; transition: background 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease; }
 .export-options button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-wash) 70%, var(--surface-soft)); color: var(--accent); transform: translateY(-1px); box-shadow: 0 7px 18px color-mix(in srgb, var(--ink) 7%, transparent); }
@@ -873,12 +926,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .history-preview dt { color: var(--ink-3); font: 7px var(--mono); text-transform: uppercase; }
 .history-preview dd { margin: 3px 0 0; font-size: 11px; }
 .history-preview > button { width: 100%; margin-top: 8px; background: var(--ink); color: var(--surface); }
-.presence-bar { min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px; border-radius: 10px; background: var(--surface-soft); }
+.presence-bar { min-width: 72px; max-width: calc(100vw - 24px); height: 42px; display: flex; align-items: center; overflow: hidden; padding: 5px; border-radius: 21px; background: color-mix(in srgb, var(--surface-raised) 94%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 10%, transparent); backdrop-filter: blur(14px); transition: width 340ms cubic-bezier(.22,1,.36,1), box-shadow 220ms ease; }
 .presence-dock { position: absolute; top: 68px; left: 50%; z-index: 13; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); transition: top 360ms cubic-bezier(.22,1,.36,1); }
 .map-app.header-collapsed > .presence-dock { top: 12px; }
-.presence-dock > .presence-bar { position: relative; z-index: 2; max-width: 420px; background: color-mix(in srgb, var(--surface-raised) 94%, transparent); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 10%, transparent); backdrop-filter: blur(14px); }
+.presence-dock > .presence-bar { position: relative; z-index: 2; }
 .scenario-controls { --scenario-left: 256px; --scenario-right: 364px; position: absolute; right: var(--scenario-right); bottom: 18px; left: var(--scenario-left); z-index: 8; width: var(--scenario-player-width, 500px); max-width: calc(100% - var(--scenario-left) - var(--scenario-right)); min-height: 46px; margin: 0 auto; display: flex; align-items: center; gap: 5px; padding: 6px; border-radius: 12px; background: color-mix(in srgb, var(--surface-raised) 95%, transparent); box-shadow: 0 12px 32px color-mix(in srgb, var(--ink) 12%, transparent); backdrop-filter: blur(16px); transition: right 360ms cubic-bezier(.22,1,.36,1), left 360ms cubic-bezier(.22,1,.36,1), width 220ms cubic-bezier(.22,1,.36,1); animation: scenario-controls-in 180ms cubic-bezier(.22,1,.36,1) both; }
 .scenario-controls button:focus, .scenario-controls button:focus-visible, .scenario-controls input:focus, .scenario-controls input:focus-visible, .scenario-controls select:focus, .scenario-controls select:focus-visible, .scenario-controls .step-display-control:focus-within { outline: none; }
+.scenario-controls .app-select-trigger:focus-visible { box-shadow: none; }
 .map-app.left-collapsed .scenario-controls, .map-app.is-structure-view .scenario-controls { --scenario-left: 18px; }
 .map-app.right-collapsed .scenario-controls { --scenario-right: 18px; }
 @keyframes scenario-controls-in { from { opacity: 0; transform: translateY(8px) scale(.985); } }
@@ -896,7 +950,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .scenario-controls .step-navigator-track button { width: 24px; height: 24px; }
 .scenario-controls .step-display-control { flex: 0 0 auto; }
 .scenario-controls .step-display-control > span { display: none; }
-.scenario-controls .step-display-control select { min-width: 62px; font-size: 8px; }
+.scenario-controls .step-display-control .app-select { min-width: 62px; }
 .scenario-speed-control { min-width: 116px; display: grid; grid-template-columns: minmax(64px, 1fr) 32px; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 8px; background: var(--surface-soft); }
 .scenario-speed-control > span { grid-column: 1 / -1; color: var(--ink-3); font: 500 7px var(--mono); line-height: 1; text-transform: uppercase; }
 .scenario-speed-control input { width: 100%; height: 10px; margin: 0; accent-color: var(--accent); cursor: pointer; }
@@ -907,21 +961,27 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .conflict-banner { display: flex; align-items: center; gap: 8px; }
 .conflict-banner span { flex: 1; }
 .conflict-banner button { border: 0; border-radius: 6px; background: color-mix(in srgb, #fff 18%, transparent); color: #fff; padding: 6px 9px; }
-.presence-avatars { min-width: 0; display: flex; align-items: center; }
-.presence-avatars > div { margin-left: -6px; }
-.presence-avatars > div:first-child { margin-left: 0; }
-.presence-avatars button { min-width: 28px; height: 28px; display: flex; align-items: center; gap: 6px; padding: 2px; border: 0; border-radius: 14px; background: var(--surface-raised); box-shadow: 0 0 0 2px var(--surface-raised); overflow: hidden; transition: max-width 180ms ease, background 140ms ease; max-width: 28px; }
-.presence-avatars button:hover, .presence-avatars .is-following button { max-width: 180px; padding-right: 8px; background: var(--accent-wash); }
-.presence-avatars img, .presence-initials { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; object-fit: cover; }
+.presence-trigger { width: 62px; height: 32px; flex: 0 0 62px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 3px 5px; border: 0; border-radius: 16px; background: transparent; transition: background 160ms ease; }
+.presence-trigger:hover, .presence-trigger[aria-expanded='true'] { background: var(--surface-soft); }
+.presence-avatars { min-width: 24px; display: flex; align-items: center; }
+.presence-avatars > * { margin-left: -9px; box-shadow: 0 0 0 2px var(--surface-raised); }
+.presence-avatars > :first-child { margin-left: 0; }
+.presence-avatars > .is-following { position: relative; z-index: 1; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--accent); }
+.presence-avatars img, .presence-initials, .presence-person img { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; object-fit: cover; }
 .presence-initials { display: grid; place-items: center; color: #fff; font: 600 8px var(--body); }
-.presence-name { overflow: hidden; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.presence-status { color: var(--ink-3); font: 7px var(--mono); white-space: nowrap; }
-.presence-empty { padding: 0 7px; color: var(--ink-3); font: 8px var(--mono); text-transform: uppercase; }
-.presence-stop-following { padding: 6px 8px; border: 0; border-radius: 7px; background: var(--accent-wash); color: var(--accent); font: 8px var(--mono); text-transform: uppercase; white-space: nowrap; }
+.presence-count { color: var(--ink-3); font: 600 8px var(--mono); }
+.presence-members { min-width: 0; height: 32px; flex: 1; display: flex; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; padding-left: 4px; opacity: 0; pointer-events: none; transform: translateX(-10px); scrollbar-width: none; transition: opacity 120ms ease, transform 240ms cubic-bezier(.22,1,.36,1); }
+.presence-members::-webkit-scrollbar { display: none; }
+.presence-bar.is-open .presence-members { opacity: 1; pointer-events: auto; transform: translateX(0); transition-delay: 90ms; }
+.presence-person { min-width: 144px; height: 32px; flex: 0 0 144px; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 7px; padding: 4px 9px 4px 4px; border: 0; border-radius: 16px; background: transparent; color: var(--ink); text-align: left; transition: background 150ms ease, color 150ms ease; }
+.presence-person:hover { background: var(--surface-soft); }
+.presence-person.is-following { background: var(--accent-wash); color: var(--accent); }
+.presence-person > span:nth-child(2) { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.presence-person strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.presence-person small { overflow: hidden; color: var(--ink-3); font: 7px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.presence-person.is-following small { color: var(--accent); font-weight: 600; text-transform: uppercase; }
 
 /* Desktop integration controls */
-.branch-order { display: inline-flex; gap: 2px; }
-.branch-order button { width: 20px; height: 20px; border: 0; border-radius: 5px; background: var(--surface-soft); color: var(--ink-3); }
 .bulk-actions, .bulk-action-group { display: flex; align-items: center; gap: 4px; }
 .bulk-actions button, .bulk-action-group button { min-height: 30px; padding: 7px 9px; border: 0; border-radius: 8px; background: var(--surface-soft); color: var(--ink-2); font: 500 8px var(--mono); text-transform: uppercase; }
 .bulk-actions button:hover:not(:disabled), .bulk-action-group button:hover:not(:disabled) { background: var(--accent-wash); color: var(--accent); }
@@ -1009,12 +1069,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .scenario-speed-control { min-width: 92px; flex: 1 1 92px; }
   .step-navigator { min-width: 74px; flex: 1 1 86px; padding: 0 5px; border-left: 0; }
   .step-navigator-title, .step-navigator-track, .step-navigator.is-empty span { display: none; }
-  .step-navigator-select { display: block; width: 100%; height: 32px; border: 0; border-radius: 4px; background: var(--surface-soft); padding: 0 6px; font: 500 9px var(--mono); outline: none; }
-  .step-navigator-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .step-navigator-select { display: block; width: 100%; }
   .step-navigator.is-empty strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .header-actions { margin-left: 0; padding-right: 8px; }
   .step-display-control > span { display: none; }
-  .step-display-control select { min-width: 64px; }
+  .step-display-control .app-select { min-width: 64px; }
   .map-workspace { position: relative; display: block; }
   .stage-column { height: 100%; }
   .left-rail { position: absolute; left: 8px; right: 8px; bottom: 40px; height: 190px; z-index: 8; overflow-y: auto; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); backdrop-filter: blur(16px); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
@@ -1023,6 +1082,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .inspector { display: none; }
   .map-app.has-inspector .left-rail { display: none; }
   .map-app.has-inspector .inspector { position: absolute; right: 8px; bottom: 40px; left: 8px; z-index: 9; display: block; width: auto; max-height: min(46vh, 390px); border: 0; border-radius: 12px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); backdrop-filter: blur(16px); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
+  .inspector:has(.scenario-editor) { padding-right: 16px; padding-left: 16px; }
+  .scenario-stage-body { gap: 10px; padding: 10px; }
+  .scenario-stage-actions button { width: 32px; height: 32px; }
+  .branch-actions button { width: 28px; height: 28px; }
   .map-app.left-collapsed .left-rail { display: none !important; }
   .map-app.right-collapsed.has-inspector .inspector { display: none !important; }
   .map-app.right-collapsed.has-inspector .left-rail { display: block; }

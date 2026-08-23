@@ -94,8 +94,7 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
 
   const startStageDrag = (event: ReactPointerEvent<HTMLElement>, stageId: string) => {
     if (event.button !== 0 || dragSession.current) return
-    const target = event.target as Element
-    if (target.closest('button, input, textarea, select, a, [contenteditable="true"], [role="dialog"]')) return
+    if ((event.target as Element).closest('button')) return
     event.preventDefault()
     event.stopPropagation()
     dragSession.current = { pointerId: event.pointerId, stageId, beforeStageId: stageId, startY: event.clientY, clientX: event.clientX, clientY: event.clientY, moved: false, frame: 0, owner: event.currentTarget }
@@ -114,41 +113,53 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
     autoScroll()
   }
 
-  if (!editable) return <><span className="eyebrow">Animated scenario</span><h2>{flow.name}</h2><p className="lede">{flow.stages.length} steps · {flow.payload}</p><p>{flow.summary}</p><div className="scenario-stages is-readonly">{flow.stages.map((stage, index) => <section className="scenario-stage" key={stage.id}><header><strong>{stage.name || `Step ${String(index + 1).padStart(2, '0')}`}</strong></header>{stage.note ? <p>{stage.note}</p> : null}{stage.traversals.map((traversal) => { const relation = relationById.get(traversal.relationId); if (!relation) return null; const resolved = resolveTraversal(traversal, relation); return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><span aria-hidden="true">→</span><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span><small>{relation.label}</small></div> })}</section>)}</div></>
+  if (!editable) return <><span className="eyebrow">Animated scenario</span><h2>{flow.name}</h2><p className="lede">{flow.stages.length} steps</p><div className="scenario-stages is-readonly">{flow.stages.map((stage, index) => <section className="scenario-stage" key={stage.id}><header><strong>{stage.name || `Step ${String(index + 1).padStart(2, '0')}`}</strong></header>{stage.traversals.map((traversal) => { const relation = relationById.get(traversal.relationId); if (!relation) return null; const resolved = resolveTraversal(traversal, relation); return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><span aria-hidden="true">→</span><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span></div> })}</section>)}</div></>
 
   const nextStageCandidates = document.relations
 
   return <>
     <span className="eyebrow">Animated scenario</span>
     <h2>{flow.name}</h2>
-    <p className="lede">{flow.stages.length} steps · {flow.payload}</p>
-    <div className="form-stack">
+    <p className="lede">{flow.stages.length} steps</p>
+    <div className="form-stack scenario-editor">
       <label className="field"><span>Name</span><input value={flow.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-      <label className="field"><span>Payload</span><input value={flow.payload} onChange={(event) => patch({ payload: event.target.value })} /></label>
-      <label className="field"><span>Outcome</span><textarea rows={3} value={flow.summary} onChange={(event) => patch({ summary: event.target.value })} /></label>
+      <div className="scenario-steps-heading"><span>Steps</span><small>Drag a step header to reorder</small></div>
       <div className="scenario-stages">
         {flow.stages.map((stage, stageIndex) => {
           const usedRelationIds = new Set(stage.traversals.map((traversal) => traversal.relationId))
           const candidates = document.relations.filter((relation) => !usedRelationIds.has(relation.id))
           const withoutStage = flow.stages.filter((_, index) => index !== stageIndex)
-          return <section ref={(element) => { if (element) stageElements.current.set(stage.id, element); else stageElements.current.delete(stage.id) }} data-stage-id={stage.id} className={`scenario-stage ${draggingStageId === stage.id ? 'is-dragging' : ''} ${draggingStageId && dropBeforeStageId === stage.id ? 'is-drop-before' : ''}`} key={stage.id} onPointerEnter={() => onStagePreview({ flowId: flow.id, stageId: stage.id })} onPointerLeave={() => { if (!dragSession.current) onStagePreview(null) }} onPointerDown={(event) => startStageDrag(event, stage.id)} onPointerMove={moveStageDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }}>
-            <header><strong>{stage.name || `Step ${String(stageIndex + 1).padStart(2, '0')}`}</strong><div><span className="scenario-drag-indicator" aria-hidden="true">::</span><button type="button" title="Duplicate step" onClick={() => patch({ stages: [...flow.stages.slice(0, stageIndex + 1), { ...stage, id: crypto.randomUUID(), traversals: stage.traversals.map((traversal) => ({ ...traversal, id: crypto.randomUUID() })) }, ...flow.stages.slice(stageIndex + 1)] })}>Duplicate</button><button type="button" disabled={stageIndex === 0} onClick={() => commit((current) => moveFlowStage(current, flow.id, stage.id, flow.stages[stageIndex - 1]?.id ?? null))}>↑</button><button type="button" disabled={stageIndex === flow.stages.length - 1} onClick={() => commit((current) => moveFlowStage(current, flow.id, stage.id, flow.stages[stageIndex + 2]?.id ?? null))}>↓</button><button type="button" onClick={() => patch({ stages: withoutStage })}>×</button></div></header>
-            <label className="field"><span>Step name</span><input value={stage.name ?? ''} placeholder={`Step ${stageIndex + 1}`} onChange={(event) => patch({ stages: flow.stages.map((item) => item.id === stage.id ? { ...item, name: event.target.value } : item) })} /></label>
-            <label className="field"><span>Speaker note</span><textarea rows={2} value={stage.note ?? ''} placeholder="Explain what happens at this step." onChange={(event) => patch({ stages: flow.stages.map((item) => item.id === stage.id ? { ...item, note: event.target.value } : item) })} /></label>
-            {stage.traversals.map((traversal, traversalIndex) => {
+          return <section ref={(element) => { if (element) stageElements.current.set(stage.id, element); else stageElements.current.delete(stage.id) }} data-stage-id={stage.id} className={`scenario-stage is-editable ${draggingStageId === stage.id ? 'is-dragging' : ''} ${draggingStageId && dropBeforeStageId === stage.id ? 'is-drop-before' : ''}`} key={stage.id} onPointerEnter={() => onStagePreview({ flowId: flow.id, stageId: stage.id })} onPointerLeave={() => { if (!dragSession.current) onStagePreview(null) }}>
+            <header className="scenario-stage-header" onPointerDown={(event) => startStageDrag(event, stage.id)} onPointerMove={moveStageDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishStageDrag(false) }}>
+              <div className="scenario-stage-title"><span>Step {String(stageIndex + 1).padStart(2, '0')}</span><strong>{stage.name || 'Untitled step'}</strong></div>
+              <div className="scenario-stage-actions">
+                <button type="button" className="scenario-stage-remove" aria-label={`Delete step ${stageIndex + 1}`} title="Delete step" onClick={() => patch({ stages: withoutStage })}>×</button>
+              </div>
+            </header>
+            <div className="scenario-stage-body">
+              <div className="scenario-stage-fields">
+                <label className="field"><span>Step name</span><input value={stage.name ?? ''} placeholder={`Step ${stageIndex + 1}`} onChange={(event) => patch({ stages: flow.stages.map((item) => item.id === stage.id ? { ...item, name: event.target.value } : item) })} /></label>
+              </div>
+              <div className="scenario-branch-heading"><span>Paths</span><small>{stage.traversals.length} branch{stage.traversals.length === 1 ? '' : 'es'}</small></div>
+              <div className="scenario-branch-list">{stage.traversals.map((traversal) => {
               const relation = relationById.get(traversal.relationId)
               if (!relation) return <div className="scenario-branch is-missing" key={traversal.id}>Missing relation</div>
               const resolved = resolveTraversal(traversal, relation)
               const removed = flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.filter((candidate) => candidate.id !== traversal.id) } : item).filter((item) => item.traversals.length > 0)
-              const moveBranch = (offset: -1 | 1) => patch({ stages: flow.stages.map((item) => { if (item.id !== stage.id) return item; const traversals = [...item.traversals]; const destination = traversalIndex + offset; if (destination < 0 || destination >= traversals.length) return item; const [moved] = traversals.splice(traversalIndex, 1); traversals.splice(destination, 0, moved!); return { ...item, traversals } }) })
-              return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><button type="button" className="branch-direction" title="Reverse in this scenario" onClick={() => patch({ stages: flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.map((candidate) => candidate.id === traversal.id ? { ...candidate, direction: candidate.direction === 'forward' ? 'reverse' : 'forward' } : candidate) } : item) })}>→</button><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span><span className="branch-order"><button type="button" aria-label="Move branch up" disabled={traversalIndex === 0} onClick={() => moveBranch(-1)}>↑</button><button type="button" aria-label="Move branch down" disabled={traversalIndex === stage.traversals.length - 1} onClick={() => moveBranch(1)}>↓</button></span><button type="button" className="branch-remove" onClick={() => patch({ stages: removed })}>×</button><small>{relation.label}</small></div>
-            })}
-            <RelationCandidatePicker label="+ Add parallel branch" options={candidates.map(optionFor)} open={pickerOpen(stage.id)} onOpenChange={(open) => setPickerOpen(stage.id, open)} onSelect={(selection) => addTraversal(stage.id, selection)} onPreview={onRelationPreview} />
+              return <div className="scenario-branch" key={traversal.id}>
+                <div className="branch-endpoint"><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span></div>
+                <button type="button" className="branch-direction" aria-label={`Reverse ${relation.label} in this scenario`} title="Reverse in this scenario" onClick={() => patch({ stages: flow.stages.map((item, index) => index === stageIndex ? { ...item, traversals: item.traversals.map((candidate) => candidate.id === traversal.id ? { ...candidate, direction: candidate.direction === 'forward' ? 'reverse' : 'forward' } : candidate) } : item) })}>→</button>
+                <div className="branch-endpoint"><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span></div>
+                <div className="branch-actions"><button type="button" className="branch-remove" aria-label={`Remove ${relation.label} from this step`} onClick={() => patch({ stages: removed })}>×</button></div>
+              </div>
+            })}</div>
+              <RelationCandidatePicker className="is-parallel-branch" label="+ Add parallel branch" options={candidates.map(optionFor)} open={pickerOpen(stage.id)} onOpenChange={(open) => setPickerOpen(stage.id, open)} onSelect={(selection) => addTraversal(stage.id, selection)} onPreview={onRelationPreview} />
+            </div>
           </section>
         })}
         {draggingStageId && dropBeforeStageId === null ? <div className="scenario-stage-drop-end" aria-hidden="true" /> : null}
       </div>
-      <RelationCandidatePicker label="+ Add next step" options={nextStageCandidates.map(optionFor)} open={pickerOpen(null)} onOpenChange={(open) => setPickerOpen(null, open)} onSelect={(selection) => addTraversal(null, selection)} onPreview={onRelationPreview} />
+      <RelationCandidatePicker className="is-next-step" label="+ Add next step" options={nextStageCandidates.map(optionFor)} open={pickerOpen(null)} onOpenChange={(open) => setPickerOpen(null, open)} onSelect={(selection) => addTraversal(null, selection)} onPreview={onRelationPreview} />
     </div>
   </>
 }

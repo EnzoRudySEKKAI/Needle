@@ -10,7 +10,7 @@ export type RelationCandidateOption = {
   label: string
 }
 
-export function RelationCandidatePicker({ label, options, open, onOpenChange, onSelect, onPreview }: { label: string; options: RelationCandidateOption[]; open: boolean; onOpenChange: (open: boolean) => void; onSelect: (selection: RelationPreview) => void; onPreview: (preview: RelationPreview | null) => void }) {
+export function RelationCandidatePicker({ label, options, open, onOpenChange, onSelect, onPreview, className = '' }: { label: string; options: RelationCandidateOption[]; open: boolean; onOpenChange: (open: boolean) => void; onSelect: (selection: RelationPreview) => void; onPreview: (preview: RelationPreview | null) => void; className?: string }) {
   const panelId = useId()
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const choiceRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -60,7 +60,7 @@ export function RelationCandidatePicker({ label, options, open, onOpenChange, on
 
   useEffect(() => () => onPreview(null), [onPreview])
 
-  return <div className="relation-candidate-picker">
+  return <div className={`relation-candidate-picker ${open ? 'is-open' : ''} ${className}`}>
     <button ref={triggerRef} type="button" className="relation-candidate-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={panelId} disabled={options.length === 0} onClick={() => {
       if (open) close()
       else {
@@ -71,7 +71,6 @@ export function RelationCandidatePicker({ label, options, open, onOpenChange, on
       }
     }}>{label}<span aria-hidden="true">⌄</span></button>
     {open ? <div id={panelId} role="dialog" aria-label={label} className="relation-candidate-list">
-      <p className="relation-candidate-map-hint">Click a link on the map, or choose below.</p>
       {options.map((option, index) => {
         const direction = directionAt(index)
         const source = direction === 'forward' ? option.fromLabel : option.toLabel

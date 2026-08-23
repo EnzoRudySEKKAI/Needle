@@ -80,7 +80,9 @@ export function DocumentProvider({ initial, children }: { initial: OntologyDocum
 
   useEffect(() => {
     const subscription = subscribeToMap(initial.id, replaceRemote, setSyncReady, setPersistenceError, {
-      onPresence: (presence) => setPresences((current) => [...current.filter((item) => item.clientId !== presence.clientId), presence]),
+      onPresence: (presence) => setPresences((current) => current.some((item) => item.clientId === presence.clientId)
+        ? current.map((item) => item.clientId === presence.clientId ? presence : item)
+        : [...current, presence]),
       onPresenceRemoved: (clientId) => setPresences((current) => current.filter((item) => item.clientId !== clientId)),
     })
     subscriptionRef.current = subscription
