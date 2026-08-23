@@ -78,21 +78,61 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
         </div>
       </section> : null}
       {activeTab === 'concepts' ? <div className="rail-neighborhoods" role="tabpanel">
-        {document.groups.length === 0 ? <section className="rail-section"><p className="rail-empty">No neighborhoods yet. Create one to add your first concept.</p></section> : document.groups.map((group) => {
-          const nodesOnFloor = document.nodes.filter((node) => node.groupId === group.id && node.floorId === activeFloorId)
+        {(() => {
+          const nodesOnFloor = document.nodes.filter((n) => n.floorId === activeFloorId)
+          const groupsWithNodes = document.groups.filter((g) => nodesOnFloor.some((n) => n.groupId === g.id))
+          const totalOnFloor = nodesOnFloor.length
+          const displayGroups = totalOnFloor === 0 ? document.groups : groupsWithNodes
+          if (document.groups.length === 0) return <section className="rail-section"><p className="rail-empty">No neighborhoods yet. Create one to add your first concept.</p></section>
+          if (displayGroups.length === 0) return <section className="rail-section"><p className="rail-empty">No concepts on this floor.</p></section>
           return (
-          <section className="rail-section" key={group.id}>
-            <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{nodesOnFloor.length}</span></button>
-            <div className="node-list">
-              {nodesOnFloor.map((node) => (
-                <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>
-              ))}
-              {nodesOnFloor.length === 0 ? <p className="rail-empty" style={{ padding: '4px 0', fontSize: '11px', opacity: 0.6 }}>No concepts in this neighborhood on this floor.</p> : null}
-              {editable ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
-            </div>
-          </section>
-        )})}
-        {document.groups.length > 0 && document.nodes.filter((node) => node.floorId === activeFloorId).length === 0 ? <p className="rail-empty" style={{ marginTop: 8, fontSize: '11px', opacity: 0.5 }}>This floor is empty — add a concept to any neighborhood above.</p> : null}
+            <>
+              {displayGroups.map((group) => {
+                const nodesOnFloorForGroup = nodesOnFloor.filter((n) => n.groupId === group.id)
+                return (
+                  <section className="rail-section" key={group.id}>
+                    <button type="button" className={`group-heading ${selection?.kind === 'group' && selection.id === group.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'group', id: group.id })}><span>{group.name}</span><span>{nodesOnFloorForGroup.length}</span></button>
+                    <div className="node-list">
+                      {nodesOnFloorForGroup.map((node) => (
+                        <button key={node.id} id={`rail-node-${node.id}`} type="button" className={`node-row ${selection?.kind === 'node' && selection.id === node.id ? 'is-active' : ''}`} onClick={() => select({ kind: 'node', id: node.id })}><span className="node-code">{node.code}</span><span>{node.name}</span><span className="node-size">{node.size.toUpperCase()}</span></button>
+                      ))}
+                      {editable ? <button type="button" className="add-row" onClick={() => addNode(group.id)}>+ Add concept</button> : null}
+                    </div>
+                  </section>
+                )
+              })}
+              {editable && totalOnFloor > 0 && document.groups.length > displayGroups.length ? (
+                <section className="rail-section" style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <p className="rail-empty" style={{ fontSize: '10px', marginBottom: 6 }}>Add to another neighborhood</p>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <select
+                      aria-label="Neighborhood for new concept"
+                      defaultValue={document.groups.find((g) => !groupsWithNodes.some((h) => h.id === g.id))?.id ?? document.groups[0]?.id}
+                      id="add-concept-group-select"
+                      style={{ flex: 1, minWidth: 0, padding: '6px 8px', border: 0, borderRadius: 8, background: 'var(--surface-soft)', fontSize: 11 }}
+                    >
+                      {document.groups.filter((g) => !groupsWithNodes.some((h) => h.id === g.id)).map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="add-row"
+                      style={{ flex: '0 0 auto', padding: '6px 10px', background: 'var(--surface-soft)', borderRadius: 8 }}
+                      onClick={() => {
+                        const sel = (typeof window !== 'undefined' ? window.document.getElementById('add-concept-group-select') : null) as HTMLSelectElement | null
+                        const groupId = sel?.value ?? document.groups.find((g) => !groupsWithNodes.some((h) => h.id === g.id))?.id ?? document.groups[0]?.id
+                        if (groupId) addNode(groupId)
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+            </>
+          )
+        })()}
         {editable ? <button type="button" className="add-group" onClick={addGroup}>+ New neighborhood</button> : null}
       </div> : null}
     </aside>
