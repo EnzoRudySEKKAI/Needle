@@ -38,7 +38,6 @@ type Props = {
   connectionDraft: ConnectionDraft | null
   onToggleConnectionTarget: (id: string) => void
   highlightedFloorId?: string | null
-  onHoverFloor?: (floorId: string | null) => void
   viewportInsets?: { left: number; right: number; top: number; bottom: number }
   dezoom?: number
   onAddConcept?: () => void
@@ -113,7 +112,7 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, onHoverFloor, viewportInsets, dezoom, onAddConcept }: Props) {
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, onAddConcept }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -125,6 +124,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const [alignmentGuides, setAlignmentGuides] = useState<{ gx?: number; gy?: number } | null>(null)
   const [draggingFlagId, setDraggingFlagId] = useState<string | null>(null)
   const [hoveredDistrictId, setHoveredDistrictId] = useState<string | null>(null)
+  const [hoveredExitId, setHoveredExitId] = useState<string | null>(null)
   const interaction = useRef<InteractionSession | null>(null)
   const activePointers = useRef(new Map<number, PointerPoint>())
   const pinch = useRef<PinchSession | null>(null)
@@ -401,6 +401,10 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const orderedShapes = draggingNodeId
     ? [...scene.shapes.filter((node) => node.id !== draggingNodeId), ...scene.shapes.filter((node) => node.id === draggingNodeId)]
     : scene.shapes
+  const exitFloorHoverClass = (remoteFloorId: string) => {
+    const highlightedRemoteFloorId = highlightedFloorId === floorId ? null : highlightedFloorId
+    return highlightedRemoteFloorId ? highlightedRemoteFloorId === remoteFloorId ? 'is-floor-hovered' : 'is-floor-hover-dimmed' : ''
+  }
   const guideExtent = useMemo(() => {
     if (!nodes.length) return null
     return {
@@ -564,47 +568,76 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
                 return <g key={preview.key} className="candidate-relation-preview"><polyline points={pointsAttribute(preview.points)} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -8 4 L -8 -4 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} /></g>
               })}
-            </g>
-            {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} previewed={previewNodeIds.has(node.id)} editable={editable && !connectionDraft && !relationPicking} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
-              if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
-              if (connectionDraft) onToggleConnectionTarget(node.id)
-              else if (!relationPicking) selectNode(node.id)
-            }} onDragStart={(event) => startNodeDrag(event, node)} />)}
-            <g className="floor-exits" onPointerDown={(event) => event.stopPropagation()}>{groupedExits.map((group) => {
-              return <g key={group.floorId} className="floor-exit-group" onPointerEnter={() => onHoverFloor?.(group.floorId)} onPointerLeave={() => onHoverFloor?.(null)}>
+             </g>
+             <g className="floor-exit-ground-routes">{groupedExits.flatMap((group) => group.exits.map((exit) => {
+               const relation = relationById.get(exit.relationId)
+               if (!relation) return null
+               const selected = selection?.kind === 'relation' && selection.id === exit.relationId
+               const pickable = relationPickIds?.has(exit.relationId) ?? false
+               const dimmed = program !== null && !relationPicking
+               const isOutgoing = relation.from === exit.localNodeId
+               const arrowAngle = isOutgoing ? (exit.direction === 'down' ? 90 : -90) : (exit.direction === 'down' ? -90 : 90)
+               const gradientId = `${svgId}-exit-fade-${exit.relationId}`
+               const handleSelect = () => {
+                 if (relationPicking) { if (pickable) onPickRelation(exit.relationId) }
+                 else onSelect({ kind: 'relation', id: exit.relationId })
+               }
+               return <g key={exit.relationId} className={`floor-exit-ground floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} ${hoveredExitId === exit.relationId ? 'is-hovered' : ''} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${exitFloorHoverClass(group.floorId)} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} onPointerEnter={() => setHoveredExitId(exit.relationId)} onPointerLeave={() => setHoveredExitId(null)} onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }}>
+                 <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={exit.dropStart.x} y1={exit.dropStart.y} x2={exit.dropEnd.x} y2={exit.dropEnd.y}><stop offset="0" className="exit-fade-from" /><stop offset="1" className="exit-fade-to" /></linearGradient>
+                 <polyline points={pointsAttribute([exit.points[0]!, exit.points[1]!])} className="relation-line" vectorEffect="non-scaling-stroke" />
+                 <polyline points={pointsAttribute([exit.dropStart, exit.dropEnd])} className={`relation-line exit-drop ${isOutgoing ? '' : 'is-incoming'}`} style={{ '--exit-stroke': `url(#${gradientId})` } as CSSProperties} vectorEffect="non-scaling-stroke" />
+                 <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${exit.dropEnd.x} ${exit.dropEnd.y}) rotate(${arrowAngle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" />
+                 <polyline points={pointsAttribute(exit.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label} {isOutgoing ? '→' : '←'} {group.floorName}</title></polyline>
+               </g>
+             }))}</g>
+             {orderedShapes.map((node) => <Building key={node.id} node={node} selected={selection?.kind === 'node' && selection.id === node.id} dimmed={flowNodeIds !== null && !flowNodeIds.has(node.id)} active={activeNodeSet.has(node.id)} previewed={previewNodeIds.has(node.id)} editable={editable && !connectionDraft && !relationPicking} connectionMode={connectionDraft !== null} connectionSource={connectionDraft?.sourceId === node.id} connectionTarget={connectionDraft?.targets.some((target) => target.nodeId === node.id)} onSelect={() => {
+               if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }
+               if (connectionDraft) onToggleConnectionTarget(node.id)
+               else if (!relationPicking) selectNode(node.id)
+             }} onDragStart={(event) => startNodeDrag(event, node)} />)}
+             {selection?.kind === 'relation' ? <g className="selected-relation-overlay" pointerEvents="none">
+               {visibleRelations.filter((relation) => relation.id === selection.id).map((relation) => {
+                 const route = geometry.get(relation.id)
+                 if (!route) return null
+                 const end = route.points[route.points.length - 1]!
+                 const before = route.points[route.points.length - 2] ?? end
+                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
+                 const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
+                 return <g key={relation.id} className={`relation relation-${relation.kind} is-selected`}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" />{relation.kind !== 'support' ? <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /> : null}<g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g></g>
+               })}
+               {groupedExits.flatMap((group) => group.exits.filter((exit) => exit.relationId === selection.id).map((exit) => {
+                 const relation = relationById.get(exit.relationId)
+                 if (!relation) return null
+                 const isOutgoing = relation.from === exit.localNodeId
+                 const arrowAngle = isOutgoing ? (exit.direction === 'down' ? 90 : -90) : (exit.direction === 'down' ? -90 : 90)
+                 const gradientId = `${svgId}-exit-fade-${exit.relationId}`
+                 return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} is-selected`}><polyline points={pointsAttribute([exit.points[0]!, exit.points[1]!])} className="relation-line" vectorEffect="non-scaling-stroke" /><polyline points={pointsAttribute([exit.dropStart, exit.dropEnd])} className={`relation-line exit-drop ${isOutgoing ? '' : 'is-incoming'}`} style={{ '--exit-stroke': `url(#${gradientId})` } as CSSProperties} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${exit.dropEnd.x} ${exit.dropEnd.y}) rotate(${arrowAngle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /></g>
+               }))}
+             </g> : null}
+             <g className="floor-exits" onPointerDown={(event) => event.stopPropagation()}>{groupedExits.map((group) => {
+              return <g key={group.floorId} className="floor-exit-group">
                 {group.exits.map((exit) => {
                   const relation = relationById.get(exit.relationId)
                   if (!relation) return null
                   const selected = selection?.kind === 'relation' && selection.id === exit.relationId
                    const pickable = relationPickIds?.has(exit.relationId) ?? false
                    const dimmed = program !== null && !relationPicking
-                   const matchesHoveredFloor = highlightedFloorId === floorId || highlightedFloorId === group.floorId
-                   const floorHoverClass = highlightedFloorId ? matchesHoveredFloor ? 'is-floor-hovered' : 'is-floor-hover-dimmed' : ''
-                  const gradientId = `${svgId}-exit-fade-${exit.relationId}`
-                  const isOutgoing = relation.from === exit.localNodeId
-                  const arrowAngle = isOutgoing
-                    ? (exit.direction === 'down' ? 90 : -90)
-                    : (exit.direction === 'down' ? -90 : 90)
-                  const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
+                   const floorHoverClass = exitFloorHoverClass(group.floorId)
+                   const isOutgoing = relation.from === exit.localNodeId
+                   const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
                   const handleSelect = () => {
                     if (relationPicking) { if (pickable) onPickRelation(exit.relationId) }
                     else onSelect({ kind: 'relation', id: exit.relationId })
                   }
-                   return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${floorHoverClass} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`}>
-                    <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={exit.dropStart.x} y1={exit.dropStart.y} x2={exit.dropEnd.x} y2={exit.dropEnd.y}>
-                      <stop offset="0" className="exit-fade-from" />
-                      <stop offset="1" className="exit-fade-to" />
-                    </linearGradient>
-                     <g role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${conceptLabel(relation.from)} to ${conceptLabel(relation.to)}, ${group.floorName}`} aria-disabled={relationPicking && !pickable ? true : undefined} className="floor-exit-line" onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleSelect() } }}>
-                      <polyline points={pointsAttribute([exit.points[0]!, exit.points[1]!])} className="relation-line" vectorEffect="non-scaling-stroke" />
-                      <polyline points={pointsAttribute([exit.dropStart, exit.dropEnd])} className={`relation-line exit-drop ${isOutgoing ? '' : 'is-incoming'}`} style={{ '--exit-stroke': `url(#${gradientId})` } as CSSProperties} vectorEffect="non-scaling-stroke" />
-                      <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${exit.dropEnd.x} ${exit.dropEnd.y}) rotate(${arrowAngle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" />
-                      <g className="relation-label" transform={`translate(${exit.labelPoint.x} ${exit.labelPoint.y - 11})`}>
-                        <rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" />
-                        <text textAnchor="middle" dominantBaseline="central">{relation.label}</text>
+                   return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${floorHoverClass} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} onPointerEnter={() => setHoveredExitId(exit.relationId)} onPointerLeave={() => setHoveredExitId(null)} onFocusCapture={() => setHoveredExitId(exit.relationId)} onBlurCapture={() => setHoveredExitId(null)}>
+                      <g role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${conceptLabel(relation.from)} to ${conceptLabel(relation.to)}, ${group.floorName}`} aria-disabled={relationPicking && !pickable ? true : undefined} className="floor-exit-line" onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleSelect() } }}>
+                       <g className="relation-label" transform={`translate(${exit.labelPoint.x} ${exit.labelPoint.y - 11})`}>
+                         <rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" />
+                         <text textAnchor="middle" dominantBaseline="central">{relation.label}</text>
+                       </g>
+                       <polyline points={pointsAttribute(exit.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label} {isOutgoing ? '→' : '←'} {group.floorName}</title></polyline>
+                       <polyline points={pointsAttribute([exit.dropStart, exit.dropEnd])} className="relation-hit" vectorEffect="non-scaling-stroke" />
                       </g>
-                      <polyline points={pointsAttribute(exit.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label} {isOutgoing ? '→' : '←'} {group.floorName}</title></polyline>
-                    </g>
                   </g>
                 })}
               </g>

@@ -8,11 +8,20 @@ function StepNavigator({ flow, program, started, time, onOpenStage }: { flow: On
   const currentIndex = program && started ? activeStageState(program, time).index : -1
   const currentStageId = currentIndex >= 0 ? program?.stages[currentIndex]?.id ?? '' : ''
   const currentButton = useRef<HTMLButtonElement | null>(null)
-  useEffect(() => { currentButton.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }) }, [currentStageId])
+  const track = useRef<HTMLOListElement | null>(null)
+  useEffect(() => {
+    const button = currentButton.current
+    const container = track.current
+    if (!button || !container) return
+    const buttonBounds = button.getBoundingClientRect()
+    const containerBounds = container.getBoundingClientRect()
+    const left = container.scrollLeft + buttonBounds.left - containerBounds.left - (containerBounds.width - buttonBounds.width) / 2
+    container.scrollTo({ left: Math.max(0, left), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  }, [currentStageId])
   if (flow.stages.length === 0) return <div className="step-navigator is-empty"><span>Steps</span><strong>No steps</strong></div>
   return <nav className="step-navigator" aria-label={`Steps in ${flow.name}`}>
     <span className="step-navigator-title">Steps</span>
-    <ol className="step-navigator-track">{flow.stages.map((stage, index) => {
+    <ol ref={track} className="step-navigator-track">{flow.stages.map((stage, index) => {
       const current = stage.id === currentStageId
       const label = stage.name || `Step ${index + 1}`
       return <li key={stage.id}><button ref={current ? currentButton : undefined} type="button" disabled={!program} aria-current={current ? 'step' : undefined} aria-label={`${label}, ${index + 1} of ${flow.stages.length}`} title={stage.note || label} onClick={() => { if (program) { seekFlowStage(program.id, stage.id); onOpenStage(stage.id) } }}>{String(index + 1).padStart(2, '0')}</button></li>

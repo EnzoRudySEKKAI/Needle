@@ -20,6 +20,7 @@ export type PresenceBarProps = {
 
 export function PresenceBar({ entries, followingId = null, onFollow }: PresenceBarProps) {
   const collaborators = entries.filter((entry) => !entry.isCurrentUser)
+  if (collaborators.length === 0) return null
   return <section className="presence-bar" aria-label="People in this map">
     <div className="presence-avatars" role="list">
       {collaborators.map((entry) => {
@@ -35,7 +36,6 @@ export function PresenceBar({ entries, followingId = null, onFollow }: PresenceB
         </div>
       })}
     </div>
-    {collaborators.length === 0 ? <span className="presence-empty">Only you</span> : null}
     {followingId ? <button type="button" className="presence-stop-following" onClick={() => onFollow(null)}>Stop following</button> : null}
   </section>
 }
