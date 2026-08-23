@@ -142,7 +142,9 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     const screenBottom = standH
     const screenH = height - screenBottom - 0.08
     const screenTh = 0.095
-    const screenW = footprint.w * 0.88
+    const scale = footprint.w / 2.55
+    const screenFactor = 0.62 + 0.17 * scale
+    const screenW = footprint.w * screenFactor
     const screenX = footprint.gx + (footprint.w - screenW) / 2
     const screenY = footprint.gy + (footprint.d - screenTh) / 2
     const footW = footprint.w * 0.56

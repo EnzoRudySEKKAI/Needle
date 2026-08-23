@@ -31,7 +31,10 @@ const HEIGHT_FACTOR: Record<Archetype, number> = {
 }
 
 export function deriveHeight(size: BuildingSize, archetype: Archetype): number {
-  if (archetype === 'monitor') return SIZE_PROFILES[size].footprint * 1.52
+  if (archetype === 'monitor') {
+    const heights: Record<BuildingSize, number> = { xs: 1.02, s: 1.32, m: 1.68, l: 2.35, xl: 3.27 }
+    return heights[size]
+  }
   return SIZE_PROFILES[size].height * HEIGHT_FACTOR[archetype]
 }
 
