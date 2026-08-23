@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { cloneSample } from '../src/domain/sample'
+import { EXAMPLE_MAPS } from '../src/domain/examples'
 import { migrateDocument } from '../src/domain/migration'
 import type { OntologyDocument } from '../src/domain/types'
 
@@ -19,6 +20,14 @@ export class MapStore {
   async initialize(): Promise<void> {
     await mkdir(this.#directory, { recursive: true })
     if ((await this.list()).length === 0) await this.save(cloneSample())
+    for (const example of EXAMPLE_MAPS) {
+      const existing = await this.read(example.id)
+      if (!existing || existing.updatedAt < (example as OntologyDocument).updatedAt) await this.save(example as OntologyDocument)
+    }
+    const signalGarden = await this.read('signal-garden')
+    if (signalGarden && signalGarden.nodes.some((node) => node.id === 'intake' && node.position.gy === 2)) {
+      await this.save({ ...cloneSample('signal-garden'), updatedAt: new Date().toISOString() })
+    }
   }
 
   async list(): Promise<SharedMapSummary[]> {

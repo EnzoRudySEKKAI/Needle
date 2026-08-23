@@ -208,24 +208,8 @@ function ConnectionInspector({ draft, document, onUpdate, onCancel, onCommit }: 
   </>
 }
 
-function NodeInspector({ node, editable, commit, document, activeFloorId, onActiveFloor, onMoveFloor, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void; onMoveFloor: (id: string) => void; onStartConnection: (sourceId: string) => void }) {
+function NodeInspector({ node, editable, commit, document, onMoveFloor, onStartConnection }: { node: OntologyNode; editable: boolean; commit: Commit; document: OntologyDocument; activeFloorId: string; onActiveFloor: (id: string) => void; onMoveFloor: (id: string) => void; onStartConnection: (sourceId: string) => void }) {
   const patch = (value: Partial<OntologyNode>) => commit((current) => updateNode(current, node.id, value))
-  const connectedFloors = (() => {
-    const map = new Map<string, { floor: OntologyFloor; relations: OntologyRelation[] }>()
-    for (const relation of document.relations) {
-      if (relation.from !== node.id && relation.to !== node.id) continue
-      const otherId = relation.from === node.id ? relation.to : relation.from
-      const other = document.nodes.find((candidate) => candidate.id === otherId)
-      if (!other || other.floorId === node.floorId) continue
-      const floor = document.floors.find((candidate) => candidate.id === other.floorId)
-      if (!floor || floor.id === activeFloorId) continue
-      const entry = map.get(floor.id)
-      if (entry) entry.relations.push(relation)
-      else map.set(floor.id, { floor, relations: [relation] })
-    }
-    return [...map.values()].sort((a, b) => document.floors.indexOf(a.floor) - document.floors.indexOf(b.floor))
-  })()
-  const currentIndex = document.floors.findIndex((floor) => floor.id === activeFloorId)
   return <>
     {!editable ? <><span className="eyebrow">{node.code}</span><h2>{node.name}</h2><p className="lede">{node.size.toUpperCase()}</p></> : null}
     {editable ? <div className="form-stack">

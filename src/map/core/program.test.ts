@@ -13,7 +13,7 @@ describe('branched flow programs', () => {
       id: 'fan-out', name: 'Fan out', payload: 'evidence', summary: '',
       stages: [{ id: 'stage-1', traversals: [
         { id: 'a', relationId: 'ob-intake', direction: 'forward' },
-        { id: 'b', relationId: 'habitat-observer', direction: 'reverse' },
+        { id: 'b', relationId: 'habitat-observer', direction: 'forward' },
       ] }],
     }
     const program = buildFlowProgram(flow, nodes, document.relations, buildRelationGeometry(nodes, document.relations))!
