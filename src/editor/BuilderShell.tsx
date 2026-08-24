@@ -9,7 +9,8 @@ import { nextFreePosition, visualiseNodes } from '../map/core/layout'
 import { buildFlowProgram } from '../map/core/program'
 import { buildRelationGeometry } from '../map/core/routes'
 import type { StepDisplayMode } from '../map/core/step-display'
-import { configureFlow, pauseFlow, seekFlowStage, toggleFlow, useClockActiveKey } from '../map/stores/flow-clock'
+import { configureFlow, pauseFlow, seekFlowStage, syncFlowPlayback, toggleFlow, useClockActiveKey, useClockPresenceState } from '../map/stores/flow-clock'
+import { useI18n } from '../i18n/useI18n'
 import { Inspector } from './Inspector'
 import { FloorNavigator } from './FloorNavigator'
 import { LeftRail } from './LeftRail'
@@ -25,6 +26,7 @@ import type { RelationPreview } from './RelationCandidatePicker'
 import type { RelationPickTarget, StagePreviewTarget } from './ScenarioInspector'
 
 export function BuilderShell({ presentation = false }: { presentation?: boolean }) {
+  const { t } = useI18n()
   const { document, selection, setSelection, commit, undo, redo, canUndo, canRedo, persistenceError, syncReady, presences, sendPresence, conflict, resolveConflict, restoreDocument } = useDocumentStore()
   const appRef = useRef<HTMLDivElement | null>(null)
   const [editable, setEditable] = useState(!presentation)
@@ -81,8 +83,10 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [followingId, setFollowingId] = useState<string | null>(null)
-  const [displayName, setDisplayName] = useState(() => localStorage.getItem('needle:displayName')?.trim() || 'Anonymous')
+  const [savedDisplayName, setSavedDisplayName] = useState(() => localStorage.getItem('needle:displayName')?.trim() || '')
+  const displayName = savedDisplayName || t('common.anonymous')
   const floorTimer = useRef(0)
+  const clockPresence = useClockPresenceState()
 
   useEffect(() => { try { localStorage.setItem('needle:leftCollapsed', leftCollapsed ? '1' : '0') } catch { /* Storage can be disabled by the browser. */ } }, [leftCollapsed])
   useEffect(() => { try { localStorage.setItem('needle:rightCollapsed', rightCollapsed ? '1' : '0') } catch { /* Storage can be disabled by the browser. */ } }, [rightCollapsed])
@@ -101,13 +105,14 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     window.history.replaceState(null, '', `${window.location.pathname}?${query}`)
   }, [activeFloorId, activeFlowId, selection, workspaceView])
   useEffect(() => {
-    const updateName = (event: Event) => setDisplayName((event as CustomEvent<string>).detail.trim() || 'Anonymous')
+    const updateName = (event: Event) => setSavedDisplayName((event as CustomEvent<string>).detail.trim())
     window.addEventListener('needle:display-name', updateName)
     return () => window.removeEventListener('needle:display-name', updateName)
   }, [])
   useEffect(() => {
-    sendPresence({ selection, activeFloorId: workspaceView === 'floor' ? activeFloorId : null, activeFlowId, presenter: !editable, displayName })
-  }, [activeFloorId, activeFlowId, displayName, editable, selection, sendPresence, workspaceView])
+    const currentPlayback = clockPresence.programId === activeFlowId ? clockPresence : null
+    sendPresence({ selection, activeFloorId: workspaceView === 'floor' ? activeFloorId : null, activeFlowId, activeFlowStageId: currentPlayback?.stageId ?? null, flowPlaying: currentPlayback?.playing ?? false, flowSpeed: currentPlayback?.speed ?? 1, presenter: !editable, displayName })
+  }, [activeFloorId, activeFlowId, clockPresence, displayName, editable, selection, sendPresence, workspaceView])
   const stepDisplayContext = editable ? 'build' : 'present'
   const stepDisplayMode = stepDisplayModes[stepDisplayContext]
   const setStepDisplayMode = (mode: StepDisplayMode) => setStepDisplayModes((current) => ({ ...current, [stepDisplayContext]: mode }))
@@ -147,6 +152,8 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target?.closest('.presence-dock')) setFollowingId(null)
       if (event.key === 'Escape') {
         if (window.document.fullscreenElement) return
         if (relationPickTarget) { setRelationPickTarget(null); setRelationPreview(null) }
@@ -154,14 +161,13 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
         else if (connectionDraft) setConnectionDraft(null)
         else { setSelection(null); setActiveFlowId(null) }
       }
-      const target = event.target as HTMLElement | null
       const typing = target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')
       if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setCommandPaletteOpen(true) }
       if (!typing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo() }
       if (!typing && event.ctrlKey && event.key.toLowerCase() === 'y') { event.preventDefault(); redo() }
       if (!typing && event.key === '?') { event.preventDefault(); setShortcutHelpOpen(true) }
       if (!typing && editable && (event.key === 'Delete' || event.key === 'Backspace')) {
-        if (selection?.kind === 'node' && window.confirm('Delete this concept and its dependent relations?')) {
+        if (selection?.kind === 'node' && window.confirm(t('shell.deleteConcept.confirm'))) {
           event.preventDefault()
           commit((current) => deleteNodeCascade(current, selection.id))
           setSelection(null)
@@ -194,15 +200,15 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeClockKey, activeFloorId, activeFlowId, commit, connectionDraft, document.floors, editable, flowProgram, redo, relationPickTarget, relationPreview, selection, setSelection, undo])
+  }, [activeClockKey, activeFloorId, activeFlowId, commit, connectionDraft, document.floors, editable, flowProgram, redo, relationPickTarget, relationPreview, selection, setSelection, t, undo])
 
   const toggleFullscreen = async () => {
     setFullscreenError(null)
     try {
       if (window.document.fullscreenElement) await window.document.exitFullscreen()
       else await appRef.current?.requestFullscreen()
-    } catch (error) {
-      setFullscreenError(error instanceof Error ? error.message : 'Fullscreen is unavailable.')
+    } catch {
+      setFullscreenError(t('shell.fullscreen.unavailable'))
     }
   }
 
@@ -339,6 +345,13 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     const timer = window.setTimeout(() => followCollaborator(followed), 0)
     return () => window.clearTimeout(timer)
   }, [followingId, presences])
+  useEffect(() => {
+    if (!followingId || !flowProgram) return
+    const followed = presences.find((presence) => presence.clientId === followingId)
+    if (!followed || followed.activeFlowId !== flowProgram.id) return
+    const timer = window.setTimeout(() => syncFlowPlayback(flowProgram.id, followed.activeFlowStageId, followed.flowPlaying, followed.flowSpeed), 0)
+    return () => window.clearTimeout(timer)
+  }, [followingId, flowProgram, presences])
   const changeFollowing = (presenceId: string | null) => {
     setFollowingId(presenceId)
     const followed = presences.find((presence) => presence.clientId === presenceId)
@@ -382,33 +395,33 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     setSelection({ kind: 'node', id })
   }
 
-  if (!syncReady) return <main className="map-load-state"><span>Connecting to the shared workspace…</span></main>
+  if (!syncReady) return <main className="map-load-state"><span>{t('shell.sync.connecting')}</span></main>
 
-  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''} ${headerCollapsed ? 'header-collapsed' : ''}`}>
-    {persistenceError ? <div className="sync-error" role="alert">{persistenceError}</div> : null}
-    {conflict ? <div className="sync-error conflict-banner" role="alert"><span>A collaborator changed this map while you were editing.</span><button type="button" onClick={() => resolveConflict('remote')}>Load theirs</button><button type="button" onClick={() => resolveConflict('local')}>Keep mine</button></div> : null}
+  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || hoveredFloorId || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''} ${headerCollapsed ? 'header-collapsed' : ''}`} onPointerDownCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }} onClickCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }} onWheelCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }}>
+    {persistenceError ? <div className="sync-error" role="alert">{t('shell.sync.error', { error: persistenceError })}</div> : null}
+    {conflict ? <div className="sync-error conflict-banner" role="alert"><span>{t('shell.conflict.message')}</span><button type="button" onClick={() => resolveConflict('remote')}>{t('shell.conflict.loadTheirs')}</button><button type="button" onClick={() => resolveConflict('local')}>{t('shell.conflict.keepMine')}</button></div> : null}
     <MapHeader editable={editable} fullscreen={fullscreen} fullscreenError={fullscreenError} historyOpen={historyOpen} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} onSearch={() => setCommandPaletteOpen(true)} onHistory={() => setHistoryOpen((current) => !current)} onShortcuts={() => setShortcutHelpOpen(true)} leftCollapsed={leftCollapsed} rightCollapsed={rightCollapsed} headerCollapsed={headerCollapsed} onToggleLeft={() => setLeftCollapsed((value) => !value)} onToggleRight={() => setRightCollapsed((value) => !value)} onToggleHeader={() => setHeaderCollapsed((value) => !value)} />
     <div className="presence-dock">
       <PresenceBar entries={presences.map((presence, index) => ({ id: presence.clientId, name: presence.displayName, color: ['#3979d6', '#8267b8', '#3d8c70', '#a4683a'][index % 4]!, floorId: presence.activeFloorId ?? undefined, floorName: document.floors.find((floor) => floor.id === presence.activeFloorId)?.name, selection: presence.selection, presenting: presence.presenter }))} followingId={followingId} onFollow={changeFollowing} />
-      <button type="button" className="header-restore" aria-label="Show header" onClick={() => setHeaderCollapsed(false)}><span aria-hidden="true">⌄</span></button>
+      <button type="button" className="header-restore" aria-label={t('shell.header.showHeader')} onClick={() => setHeaderCollapsed(false)}><span aria-hidden="true">⌄</span></button>
     </div>
     {activeFlow ? <ScenarioControls flow={activeFlow} program={flowProgram} stepDisplayMode={stepDisplayMode} onStepDisplayMode={setStepDisplayMode} onOpenStage={openScenarioStage} /> : null}
-    <Link to="/" className="brand brand-floating" aria-label="Needle home"><strong>Needle</strong><span>ONTOLOGY</span></Link>
+    <Link to="/" className="brand brand-floating" aria-label={t('shell.home')}><strong>Needle</strong><span>{t('shell.brand.ontology')}</span></Link>
     <main className="map-workspace">
       <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} onStartConnection={startConnection} onCollapse={() => setLeftCollapsed(true)} />
       <section className="stage-column">
         <div className="floor-viewport">
-          {structureEntering ? <div className="floor-layer is-outgoing is-structure-exit"><div style={{ position: 'absolute', inset: 0, paddingTop: structureInsets.top, paddingRight: structureInsets.right, paddingBottom: structureInsets.bottom, paddingLeft: structureInsets.left, boxSizing: 'border-box' }}><div style={{ width: '100%', height: '100%', transform: 'scale(1.04)', transformOrigin: '50% 50%' }}><StructureView key={`${document.structureType}-exit`} document={document} activeFloorId={enteringFloorId ?? activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div></div></div> : previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroupFlag={() => {}} viewportInsets={viewportInsets} /></div> : null}
-          {workspaceView === 'structure' ? <div className="floor-layer is-structure"><div style={{ position: 'absolute', inset: 0, paddingTop: structureInsets.top, paddingRight: structureInsets.right, paddingBottom: structureInsets.bottom, paddingLeft: structureInsets.left, boxSizing: 'border-box' }}><div style={{ width: '100%', height: '100%', transform: 'scale(1.04)', transformOrigin: '50% 50%' }}><StructureView key={document.structureType} document={document} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div></div></div> : <div className={`floor-layer ${structureEntering ? 'is-incoming is-floor-enter' : previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={structureEntering && enteringFloorId ? enteringFloorId : activeFloorId} document={document} floorId={structureEntering && enteringFloorId ? enteringFloorId : activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId && !structureEntering} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} highlightedFloorId={hoveredFloorId} viewportInsets={viewportInsets} onAddConcept={editable ? addConceptToFloor : undefined} /></div>}
+          {structureEntering ? <div className="floor-layer is-outgoing is-structure-exit"><div style={{ position: 'absolute', inset: 0, paddingTop: structureInsets.top, paddingRight: structureInsets.right, paddingBottom: structureInsets.bottom, paddingLeft: structureInsets.left, boxSizing: 'border-box' }}><div style={{ width: '100%', height: '100%', transform: 'scale(1.04)', transformOrigin: '50% 50%' }}><StructureView key={`${document.structureType}-exit`} document={document} activeFloorId={enteringFloorId ?? activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div></div></div> : previousFloorId ? <div className={`floor-layer is-outgoing direction-${floorDirection}`}><IsoCanvas key={previousFloorId} document={document} floorId={previousFloorId} svgId="ontology-map-svg-outgoing" selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode={stepDisplayMode} relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={() => {}} connectionDraft={null} onToggleConnectionTarget={() => {}} onSelect={() => {}} onMoveNode={() => {}} onMoveGroup={() => {}} onMoveGroupFlag={() => {}} viewportInsets={viewportInsets} /></div> : null}
+          {workspaceView === 'structure' ? <div className="floor-layer is-structure"><div style={{ position: 'absolute', inset: 0, paddingTop: structureInsets.top, paddingRight: structureInsets.right, paddingBottom: structureInsets.bottom, paddingLeft: structureInsets.left, boxSizing: 'border-box' }}><div style={{ width: '100%', height: '100%', transform: 'scale(1.04)', transformOrigin: '50% 50%' }}><StructureView key={document.structureType} document={document} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} onOpenFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} /></div></div></div> : <div className={`floor-layer ${structureEntering ? 'is-incoming is-floor-enter' : previousFloorId ? `is-incoming direction-${floorDirection}` : ''}`}><IsoCanvas key={structureEntering && enteringFloorId ? enteringFloorId : activeFloorId} document={document} floorId={structureEntering && enteringFloorId ? enteringFloorId : activeFloorId} selection={selection} activeFlowId={activeFlowId} flowProgram={flowProgram} editable={editable && !previousFloorId && !structureEntering} stepDisplayMode={stepDisplayMode} relationPreview={relationPreview} stagePreviewTarget={stagePreviewTarget} relationPickIds={relationPickIds} onPickRelation={pickRelation} connectionDraft={connectionDraft} onToggleConnectionTarget={toggleConnectionTarget} onSelect={setSelection} onOpenFloor={openFloor} onMoveNode={(id, gx, gy) => commit((current) => ({ ...current, nodes: current.nodes.map((node) => node.id === id ? { ...node, position: { gx, gy } } : node) }))} onMoveGroup={(id, floorId, delta, flagPosition) => commit((current) => { const moved = flagPosition ? setFloorFlagPosition(current, floorId, id, flagPosition) : current; return { ...moved, nodes: moved.nodes.map((node) => node.floorId === floorId && node.groupId === id ? { ...node, position: { gx: node.position.gx + delta.gx, gy: node.position.gy + delta.gy } } : node) } })} onMoveGroupFlag={(id, gx, gy) => commit((current) => setFloorFlagPosition(current, activeFloorId, id, { gx, gy }))} highlightedFloorId={hoveredFloorId} viewportInsets={viewportInsets} onAddConcept={editable ? addConceptToFloor : undefined} /></div>}
           <FloorNavigator floors={document.floors} activeFloorId={activeFloorId} view={workspaceView} onFloor={(floorId) => { openFloor(floorId); setSelection({ kind: 'floor', id: floorId }) }} onStructure={() => { pauseFlow(); setPreviousFloorId(null); setStructureEntering(false); setEnteringFloorId(null); window.clearTimeout(structureEnterTimer.current); setWorkspaceView('structure'); setSelection(null); setConnectionDraft(null); setRelationPickTarget(null); setRelationPreview(null); setStagePreviewTarget(null) }} editable={editable} onAddFloor={handleAddFloor} onMoveFloor={handleMoveFloor} highlightedFloorId={hoveredFloorId} onHoverFloor={setHoveredFloorId} />
-          <button type="button" className="rail-restore rail-restore-left" aria-label="Show left rail" onClick={() => setLeftCollapsed(false)}><span aria-hidden="true">›</span></button>
-          <button type="button" className="rail-restore rail-restore-right" aria-label="Show detail rail" onClick={() => setRightCollapsed(false)}><span aria-hidden="true">‹</span></button>
+          <button type="button" className="rail-restore rail-restore-left" aria-label={t('shell.header.showConcepts')} onClick={() => setLeftCollapsed(false)}><span aria-hidden="true">›</span></button>
+          <button type="button" className="rail-restore rail-restore-right" aria-label={t('shell.header.showDetails')} onClick={() => setRightCollapsed(false)}><span aria-hidden="true">‹</span></button>
         </div>
       </section>
       <Inspector editable={editable} activeFloorId={activeFloorId} hoveredFloorId={hoveredFloorId} isStructureView={workspaceView === 'structure'} onActiveFloor={openFloor} onActiveFlow={changeActiveFlow} relationPickTarget={relationPickTarget} onRelationPickTarget={setRelationPickTarget} onRelationPreview={setRelationPreview} onStagePreview={setStagePreviewTarget} connectionDraft={connectionDraft} onStartConnection={startConnection} onUpdateConnection={setConnectionDraft} onCancelConnection={() => setConnectionDraft(null)} onCommitConnection={commitConnection} onCollapse={() => setRightCollapsed(true)} />
-      {historyOpen ? <aside className="utility-panel"><button type="button" className="rail-collapse-button rail-collapse-right" aria-label="Close history" onClick={() => setHistoryOpen(false)}>×</button><HistoryPanel documentId={document.id} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} onRestored={restoreDocument} /></aside> : null}
+      {historyOpen ? <aside className="utility-panel"><button type="button" className="rail-collapse-button rail-collapse-right" aria-label={t('shell.history.close')} onClick={() => setHistoryOpen(false)}>×</button><HistoryPanel documentId={document.id} onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo} onRestored={restoreDocument} /></aside> : null}
     </main>
-    {exporting ? <ExportDialog document={document} activeFloorId={activeFloorId} filename={document.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')} scope={exportScope} onScope={(scope) => { setExportScope(scope); setPreviousFloorId(null); setWorkspaceView(scope) }} onClose={() => setExporting(false)} /> : null}
+    {exporting ? <ExportDialog document={document} activeFloorId={activeFloorId} filename={document.name} scope={exportScope} onScope={(scope) => { setExportScope(scope); setPreviousFloorId(null); setWorkspaceView(scope) }} onClose={() => setExporting(false)} /> : null}
     <CommandPalette open={commandPaletteOpen} document={document} activeFloorId={activeFloorId} onClose={() => setCommandPaletteOpen(false)} onSelect={(next, floorId) => { if (floorId) openFloor(floorId, next); else setSelection(next) }} onOpenFlow={(flowId) => { changeActiveFlow(flowId); setSelection({ kind: 'flow', id: flowId }) }} />
     <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
   </div>

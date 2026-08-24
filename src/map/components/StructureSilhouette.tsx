@@ -1,4 +1,5 @@
 import type { StructureGeometry } from '../core/structure-geometry'
+import { useI18n } from '../../i18n/useI18n'
 
 type StructureSilhouetteProps = {
   geometry: StructureGeometry
@@ -10,6 +11,7 @@ type StructureSilhouetteProps = {
 }
 
 export function StructureSilhouette({ geometry, previewIndex = null, currentIndex = -1, floorNames = [], onPreview, onEnter }: StructureSilhouetteProps) {
+  const { t } = useI18n()
   const interactive = Boolean(onPreview && onEnter)
   return <g className={`structure-silhouette structure-${geometry.type} ${previewIndex !== null ? 'has-preview' : ''}`}>
     <g className="structure-paint" aria-hidden="true">{geometry.layers.map((paintLayer) => {
@@ -26,7 +28,7 @@ export function StructureSilhouette({ geometry, previewIndex = null, currentInde
         className={`structure-floor-slot ${previewed ? 'is-previewed' : ''} ${currentIndex === floor.index ? 'is-current' : ''}`}
         role="button"
         tabIndex={0}
-        aria-label={`Open floor ${floor.index + 1}, ${floorNames[floor.index] ?? ''}`}
+        aria-label={t('shell.structure.openFloor', { number: floor.index + 1, name: floorNames[floor.index] ?? '' })}
         onPointerEnter={() => onPreview?.(floor.index)}
         onPointerLeave={() => onPreview?.(null)}
         onFocus={() => onPreview?.(floor.index)}

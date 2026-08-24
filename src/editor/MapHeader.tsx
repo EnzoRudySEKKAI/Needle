@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { McpSetupDialog } from '../app/McpSetupDialog'
+import { LanguageSwitch } from '../i18n/LanguageSwitch'
+import { useI18n } from '../i18n/useI18n'
 import { useDocumentStore } from './document-store'
 
 type IconName = 'undo' | 'redo' | 'search' | 'left-panel' | 'right-panel' | 'header' | 'fullscreen' | 'fullscreen-exit' | 'settings'
@@ -12,7 +14,7 @@ function HeaderIcon({ name }: { name: IconName }) {
   if (name === 'header') return <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="15" height="14" rx="2" /><path d="M2.5 7.5h15" /></svg>
   if (name === 'fullscreen') return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3H3v4M3 3l5 5m5-5h4v4m0-4-5 5M7 17H3v-4m0 4 5-5m5 5h4v-4m0 4-5-5" /></svg>
   if (name === 'fullscreen-exit') return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 8H4V4m0 4 4-4m4 4h4V4m0 4-4-4M8 12H4v4m0-4 4 4m4-4h4v4m0-4-4 4" /></svg>
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.3 1.8h3.4l.5 2.1c.5.2 1 .4 1.4.8l1.9-1.1 1.7 3-1.7 1.4c.1.5.1 1.1 0 1.6l1.7 1.4-1.7 3-1.9-1.1c-.4.3-.9.6-1.4.8l-.5 2.1H8.3l-.5-2.1c-.5-.2-1-.4-1.4-.8L4.5 16l-1.7-3 1.7-1.4a6 6 0 0 1 0-1.6L2.8 6.6l1.7-3 1.9 1.1c.4-.3.9-.6 1.4-.8z" /><circle cx="10" cy="9.8" r="2.6" /></svg>
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" /><circle cx="12" cy="12" r="3" /></svg>
 }
 
 function setTheme(dark: boolean) {
@@ -22,6 +24,7 @@ function setTheme(dark: boolean) {
 }
 
 export function MapHeader({ editable, fullscreen, fullscreenError, historyOpen = false, onFullscreen, onEditable, onExport, onSearch, onHistory, onShortcuts, leftCollapsed = false, rightCollapsed = false, headerCollapsed = false, onToggleLeft, onToggleRight, onToggleHeader }: { editable: boolean; fullscreen: boolean; fullscreenError: string | null; historyOpen?: boolean; onFullscreen: () => void; onEditable?: (editable: boolean) => void; onExport?: () => void; onSearch?: () => void; onHistory?: () => void; onShortcuts?: () => void; leftCollapsed?: boolean; rightCollapsed?: boolean; headerCollapsed?: boolean; onToggleLeft?: () => void; onToggleRight?: () => void; onToggleHeader?: () => void }) {
+  const { t } = useI18n()
   const { document: map, undo, redo, canUndo, canRedo } = useDocumentStore()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mcpOpen, setMcpOpen] = useState(false)
@@ -38,25 +41,26 @@ export function MapHeader({ editable, fullscreen, fullscreenError, historyOpen =
   }, [settingsOpen])
 
   return <><header className="map-header">
-    <Link to="/" className="brand"><strong>Needle</strong><span>ONTOLOGY</span></Link>
-    <div className="header-cell repository-cell"><span>Map</span><strong>{map.name} · {map.version}</strong></div>
+    <Link to="/" className="brand"><strong>Needle</strong><span>{t('shell.brand.ontology')}</span></Link>
+    <div className="header-cell repository-cell"><span>{t('common.map')}</span><strong>{map.name} · {map.version}</strong></div>
     <div className="header-spacer" />
-    {onEditable ? <div className="segmented header-mode-control"><button type="button" className={editable ? 'is-active' : ''} onClick={() => onEditable(true)}>Build</button><button type="button" className={!editable ? 'is-active' : ''} onClick={() => onEditable(false)}>Play</button></div> : <Link className="header-mode-link" to={`/builder/${map.id}`}>Build</Link>}
+    {onEditable ? <div className="segmented header-mode-control"><button type="button" className={editable ? 'is-active' : ''} onClick={() => onEditable(true)}>{t('shell.header.build')}</button><button type="button" className={!editable ? 'is-active' : ''} onClick={() => onEditable(false)}>{t('shell.header.play')}</button></div> : <Link className="header-mode-link" to={`/builder/${map.id}`}>{t('shell.header.build')}</Link>}
     <div className="header-actions">
-      {editable ? <><button type="button" className="header-icon-button" disabled={!canUndo} onClick={undo} aria-label="Undo" title="Undo"><HeaderIcon name="undo" /></button><button type="button" className="header-icon-button" disabled={!canRedo} onClick={redo} aria-label="Redo" title="Redo"><HeaderIcon name="redo" /></button></> : null}
-      {onSearch ? <button type="button" className="header-icon-button" onClick={onSearch} aria-label="Find" title="Find (Command K)"><HeaderIcon name="search" /></button> : null}
-      {onShortcuts ? <button type="button" className="header-icon-button header-help-button" onClick={onShortcuts} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button> : null}
-      {onToggleLeft ? <button type="button" className={`header-icon-button rail-toggle-button ${leftCollapsed ? 'is-collapsed' : ''}`} aria-label={leftCollapsed ? 'Show concepts rail' : 'Hide concepts rail'} aria-pressed={!leftCollapsed} title={leftCollapsed ? 'Show left rail [' : 'Hide left rail ['} onClick={onToggleLeft}><HeaderIcon name="left-panel" /></button> : null}
-      {onToggleRight ? <button type="button" className={`header-icon-button rail-toggle-button ${rightCollapsed ? 'is-collapsed' : ''}`} aria-label={rightCollapsed ? 'Show detail rail' : 'Hide detail rail'} aria-pressed={!rightCollapsed} title={rightCollapsed ? 'Show detail rail ]' : 'Hide detail rail ]'} onClick={onToggleRight}><HeaderIcon name="right-panel" /></button> : null}
-      {onToggleHeader ? <button type="button" className={`header-icon-button rail-toggle-button ${headerCollapsed ? 'is-collapsed' : ''}`} aria-label={headerCollapsed ? 'Show header' : 'Hide header'} aria-pressed={!headerCollapsed} title={headerCollapsed ? 'Show header (H)' : 'Hide header (H)'} onClick={onToggleHeader}><HeaderIcon name="header" /></button> : null}
-      <button type="button" className="header-icon-button" onClick={onFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreenError ?? (fullscreen ? 'Exit fullscreen' : 'Enter fullscreen')}><HeaderIcon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} /></button>
+      {editable ? <><button type="button" className="header-icon-button" disabled={!canUndo} onClick={undo} aria-label={t('shell.header.undo')} title={t('shell.header.undo')}><HeaderIcon name="undo" /></button><button type="button" className="header-icon-button" disabled={!canRedo} onClick={redo} aria-label={t('shell.header.redo')} title={t('shell.header.redo')}><HeaderIcon name="redo" /></button></> : null}
+      {onSearch ? <button type="button" className="header-icon-button" onClick={onSearch} aria-label={t('shell.header.find')} title={t('shell.header.findTitle')}><HeaderIcon name="search" /></button> : null}
+      {onShortcuts ? <button type="button" className="header-icon-button header-help-button" onClick={onShortcuts} aria-label={t('shell.header.shortcuts')} title={t('shell.header.shortcutsTitle')}>?</button> : null}
+      {onToggleLeft ? <button type="button" className={`header-icon-button rail-toggle-button ${leftCollapsed ? 'is-collapsed' : ''}`} aria-label={t(leftCollapsed ? 'shell.header.showConcepts' : 'shell.header.hideConcepts')} aria-pressed={!leftCollapsed} title={t(leftCollapsed ? 'shell.header.showLeft' : 'shell.header.hideLeft')} onClick={onToggleLeft}><HeaderIcon name="left-panel" /></button> : null}
+      {onToggleRight ? <button type="button" className={`header-icon-button rail-toggle-button ${rightCollapsed ? 'is-collapsed' : ''}`} aria-label={t(rightCollapsed ? 'shell.header.showDetails' : 'shell.header.hideDetails')} aria-pressed={!rightCollapsed} title={t(rightCollapsed ? 'shell.header.showRight' : 'shell.header.hideRight')} onClick={onToggleRight}><HeaderIcon name="right-panel" /></button> : null}
+      {onToggleHeader ? <button type="button" className={`header-icon-button rail-toggle-button ${headerCollapsed ? 'is-collapsed' : ''}`} aria-label={t(headerCollapsed ? 'shell.header.showHeader' : 'shell.header.hideHeader')} aria-pressed={!headerCollapsed} title={t(headerCollapsed ? 'shell.header.showHeaderTitle' : 'shell.header.hideHeaderTitle')} onClick={onToggleHeader}><HeaderIcon name="header" /></button> : null}
+      <button type="button" className="header-icon-button" onClick={onFullscreen} aria-label={t(fullscreen ? 'shell.header.exitFullscreen' : 'shell.header.enterFullscreen')} title={fullscreenError ?? t(fullscreen ? 'shell.header.exitFullscreen' : 'shell.header.enterFullscreen')}><HeaderIcon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} /></button>
       <div className="settings-menu-wrap" ref={settingsRef}>
-        <button type="button" className={`header-icon-button ${settingsOpen ? 'is-active' : ''}`} aria-label="Settings" aria-haspopup="menu" aria-expanded={settingsOpen} title="Settings" onClick={() => setSettingsOpen((open) => !open)}><HeaderIcon name="settings" /></button>
-        {settingsOpen ? <div className="settings-menu" role="menu">
-          {onExport ? <button type="button" role="menuitem" onClick={() => { setSettingsOpen(false); onExport() }}><span>Export</span><small>Files and images</small></button> : null}
-          <button type="button" role="menuitemcheckbox" aria-checked={dark} onClick={() => { const next = !dark; setDark(next); setTheme(next) }}><span>{dark ? 'Dark appearance' : 'Light appearance'}</span><i className={dark ? 'is-on' : ''} aria-hidden="true"><b /></i></button>
-          {onHistory ? <button type="button" role="menuitem" className={historyOpen ? 'is-active' : ''} onClick={() => { setSettingsOpen(false); onHistory() }}><span>History</span><small>{historyOpen ? 'Close versions' : 'Saved versions'}</small></button> : null}
-          <button type="button" role="menuitem" onClick={() => { setSettingsOpen(false); setMcpOpen(true) }}><span>Connect MCP</span><small>Copy client JSON</small></button>
+        <button type="button" className={`header-icon-button ${settingsOpen ? 'is-active' : ''}`} aria-label={t('shell.header.settings')} aria-haspopup="menu" aria-expanded={settingsOpen} title={t('shell.header.settings')} onClick={() => setSettingsOpen((open) => !open)}><HeaderIcon name="settings" /></button>
+        {settingsOpen ? <div className="settings-menu" aria-label={t('shell.header.settings')}>
+          {onExport ? <button type="button" onClick={() => { setSettingsOpen(false); onExport() }}><span>{t('shell.settings.export')}</span><small>{t('shell.settings.exportHint')}</small></button> : null}
+          <button type="button" role="switch" aria-checked={dark} onClick={() => { const next = !dark; setDark(next); setTheme(next) }}><span>{t(dark ? 'shell.settings.dark' : 'shell.settings.light')}</span><i className={dark ? 'is-on' : ''} aria-hidden="true"><b /></i></button>
+          <div className="settings-language-row"><span>{t('language.label')}</span><LanguageSwitch /></div>
+          {onHistory ? <button type="button" className={historyOpen ? 'is-active' : ''} onClick={() => { setSettingsOpen(false); onHistory() }}><span>{t('shell.settings.history')}</span><small>{t(historyOpen ? 'shell.settings.closeVersions' : 'shell.settings.savedVersions')}</small></button> : null}
+          <button type="button" onClick={() => { setSettingsOpen(false); setMcpOpen(true) }}><span>{t('shell.settings.connectMcp')}</span><small>{t('shell.settings.copyClientJson')}</small></button>
         </div> : null}
       </div>
     </div>

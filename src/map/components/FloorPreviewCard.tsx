@@ -1,4 +1,5 @@
 import type { OntologyDocument } from '../../domain/types'
+import { useI18n } from '../../i18n/useI18n'
 import { FloorMiniPlan } from './FloorMiniPlan'
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export function FloorPreviewCard({ document, floorId, width = 320, height = 190, showHeader = true, actionLabel, onAction }: Props) {
+  const { t, formatNumber } = useI18n()
   const floor = document.floors.find((candidate) => candidate.id === floorId)
   if (!floor) return null
   const index = document.floors.findIndex((candidate) => candidate.id === floorId)
@@ -20,9 +22,9 @@ export function FloorPreviewCard({ document, floorId, width = 320, height = 190,
     <div className="floor-preview-card" aria-live="polite">
       {showHeader ? (
         <div className="floor-preview-card-header">
-          <span className="floor-preview-card-index">Floor {String(index + 1).padStart(2, '0')}</span>
+          <span className="floor-preview-card-index">{t('shell.structure.floorIndex', { number: String(index + 1).padStart(2, '0') })}</span>
           <strong className="floor-preview-card-name">{floor.name}</strong>
-          <span className="floor-preview-card-count">{count} concept{count === 1 ? '' : 's'}</span>
+          <span className="floor-preview-card-count">{t(count === 1 ? 'shell.structure.oneConcept' : 'shell.structure.manyConcepts', { count: formatNumber(count) })}</span>
         </div>
       ) : null}
       <div className="floor-preview-card-map">

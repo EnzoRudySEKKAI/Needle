@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { FlowDirection } from '../domain/types'
+import { useI18n } from '../i18n/useI18n'
 
 export type RelationPreview = { relationId: string; direction: FlowDirection }
 
@@ -11,6 +12,7 @@ export type RelationCandidateOption = {
 }
 
 export function RelationCandidatePicker({ label, options, open, onOpenChange, onSelect, onPreview, className = '' }: { label: string; options: RelationCandidateOption[]; open: boolean; onOpenChange: (open: boolean) => void; onSelect: (selection: RelationPreview) => void; onPreview: (preview: RelationPreview | null) => void; className?: string }) {
+  const { t } = useI18n()
   const panelId = useId()
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const choiceRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -77,7 +79,7 @@ export function RelationCandidatePicker({ label, options, open, onOpenChange, on
         const target = direction === 'forward' ? option.toLabel : option.fromLabel
         return <div key={option.relationId} className={`relation-candidate-row ${activeIndex === index ? 'is-active' : ''}`} onPointerEnter={() => previewAt(index)} onPointerLeave={() => onPreview(null)}>
           <button ref={(element) => { choiceRefs.current[index] = element }} type="button" className="relation-candidate-choice" onFocus={() => previewAt(index)} onKeyDown={(event) => onRowKeyDown(event, index)} onClick={() => { onSelect({ relationId: option.relationId, direction }); close(true) }}><span>{source} <b aria-hidden="true">→</b> {target}</span><small>{option.label}</small></button>
-          <button type="button" className="relation-candidate-direction" aria-label={`Reverse ${option.label}; currently ${source} to ${target}`} title="Reverse direction" onFocus={() => previewAt(index)} onKeyDown={(event) => onRowKeyDown(event, index)} onClick={() => toggleDirection(index)}>⇄</button>
+          <button type="button" className="relation-candidate-direction" aria-label={t('content.reverseCandidate', { label: option.label, source, target })} title={t('content.reverseDirection')} onFocus={() => previewAt(index)} onKeyDown={(event) => onRowKeyDown(event, index)} onClick={() => toggleDirection(index)}>⇄</button>
         </div>
       })}
     </div> : null}

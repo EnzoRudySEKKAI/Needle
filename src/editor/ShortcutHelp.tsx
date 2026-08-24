@@ -1,23 +1,10 @@
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
+import { useI18n } from '../i18n/useI18n'
 
 export type ShortcutHelpProps = { open: boolean; onClose: () => void }
 
-const SHORTCUTS: { keys: ReactNode; label: string }[] = [
-  { keys: <><kbd>Cmd</kbd><span>+</span><kbd>K</kbd></>, label: 'Open command palette' },
-  { keys: <><kbd>Cmd</kbd><span>+</span><kbd>Z</kbd></>, label: 'Undo' },
-  { keys: <><kbd>Shift</kbd><span>+</span><kbd>Cmd</kbd><span>+</span><kbd>Z</kbd></>, label: 'Redo' },
-  { keys: <kbd>Delete</kbd>, label: 'Delete selection' },
-  { keys: <kbd>Space</kbd>, label: 'Play or pause the active scenario' },
-  { keys: <><kbd>Left</kbd><span>/</span><kbd>Right</kbd></>, label: 'Previous or next step in presentation' },
-  { keys: <kbd>[</kbd>, label: 'Toggle left rail' },
-  { keys: <kbd>]</kbd>, label: 'Toggle inspector' },
-  { keys: <kbd>H</kbd>, label: 'Toggle header' },
-  { keys: <kbd>?</kbd>, label: 'Open keyboard shortcut help' },
-  { keys: <><kbd>Alt</kbd><span>+</span><kbd>Up</kbd><span>/</span><kbd>Down</kbd></>, label: 'Move between floors' },
-  { keys: <><kbd>Alt</kbd><span>+</span><kbd>Home</kbd><span>/</span><kbd>End</kbd></>, label: 'Go to first or last floor' },
-]
-
 export function ShortcutHelp({ open, onClose }: ShortcutHelpProps) {
+  const { t } = useI18n()
   const titleId = useId()
   const dialogRef = useRef<HTMLElement | null>(null)
   const closeRef = useRef<HTMLButtonElement | null>(null)
@@ -30,6 +17,21 @@ export function ShortcutHelp({ open, onClose }: ShortcutHelpProps) {
   }, [open])
 
   if (!open) return null
+
+  const shortcuts = [
+    { keys: <><kbd>{t('tools.shortcuts.key.command')}</kbd><span>+</span><kbd>K</kbd></>, label: t('tools.shortcuts.openPalette') },
+    { keys: <><kbd>{t('tools.shortcuts.key.command')}</kbd><span>+</span><kbd>Z</kbd></>, label: t('tools.shortcuts.undo') },
+    { keys: <><kbd>{t('tools.shortcuts.key.shift')}</kbd><span>+</span><kbd>{t('tools.shortcuts.key.command')}</kbd><span>+</span><kbd>Z</kbd></>, label: t('tools.shortcuts.redo') },
+    { keys: <kbd>{t('tools.shortcuts.key.delete')}</kbd>, label: t('tools.shortcuts.deleteSelection') },
+    { keys: <kbd>{t('tools.shortcuts.key.space')}</kbd>, label: t('tools.shortcuts.playPause') },
+    { keys: <><kbd>{t('tools.shortcuts.key.left')}</kbd><span>/</span><kbd>{t('tools.shortcuts.key.right')}</kbd></>, label: t('tools.shortcuts.previousNext') },
+    { keys: <kbd>[</kbd>, label: t('tools.shortcuts.toggleLeftRail') },
+    { keys: <kbd>]</kbd>, label: t('tools.shortcuts.toggleInspector') },
+    { keys: <kbd>H</kbd>, label: t('tools.shortcuts.toggleHeader') },
+    { keys: <kbd>?</kbd>, label: t('tools.shortcuts.openHelp') },
+    { keys: <><kbd>{t('tools.shortcuts.key.alt')}</kbd><span>+</span><kbd>{t('tools.shortcuts.key.up')}</kbd><span>/</span><kbd>{t('tools.shortcuts.key.down')}</kbd></>, label: t('tools.shortcuts.moveFloors') },
+    { keys: <><kbd>{t('tools.shortcuts.key.alt')}</kbd><span>+</span><kbd>{t('tools.shortcuts.key.home')}</kbd><span>/</span><kbd>{t('tools.shortcuts.key.end')}</kbd></>, label: t('tools.shortcuts.firstLastFloor') },
+  ]
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') { event.preventDefault(); onClose(); return }
@@ -44,9 +46,9 @@ export function ShortcutHelp({ open, onClose }: ShortcutHelpProps) {
 
   return <div className="dialog-backdrop shortcut-help-backdrop" role="presentation" onMouseDown={onClose}>
     <section ref={dialogRef} className="shortcut-help" role="dialog" aria-modal="true" aria-labelledby={titleId} onMouseDown={(event) => event.stopPropagation()} onKeyDown={onKeyDown}>
-      <div className="dialog-heading"><h2 id={titleId}>Keyboard shortcuts</h2><button ref={closeRef} type="button" onClick={onClose} aria-label="Close keyboard shortcuts">x</button></div>
-      <dl>{SHORTCUTS.map((shortcut, index) => <div key={index}><dt>{shortcut.keys}</dt><dd>{shortcut.label}</dd></div>)}</dl>
-      <p>Floor navigation shortcuts are ignored while typing in a field.</p>
+      <div className="dialog-heading"><h2 id={titleId}>{t('tools.shortcuts.title')}</h2><button ref={closeRef} type="button" onClick={onClose} aria-label={t('tools.shortcuts.closeAria')}>x</button></div>
+      <dl>{shortcuts.map((shortcut, index) => <div key={index}><dt>{shortcut.keys}</dt><dd>{shortcut.label}</dd></div>)}</dl>
+      <p>{t('tools.shortcuts.typingNote')}</p>
     </section>
   </div>
 }

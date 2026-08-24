@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Selection } from '../domain/types'
+import { useI18n } from '../i18n/useI18n'
 
 export type PresenceEntry = {
   id: string
@@ -20,11 +21,12 @@ export type PresenceBarProps = {
 }
 
 export function PresenceBar({ entries, followingId = null, onFollow }: PresenceBarProps) {
+  const { t, formatNumber } = useI18n()
   const rootRef = useRef<HTMLElement | null>(null)
   const [open, setOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
   const collaborators = entries.filter((entry) => !entry.isCurrentUser)
-  const expandedWidth = Math.min(540, 72 + collaborators.length * 152)
+  const expandedWidth = Math.min(540, 10 + collaborators.length * 152)
   const expanded = open || hovered
 
   useEffect(() => {
@@ -44,22 +46,23 @@ export function PresenceBar({ entries, followingId = null, onFollow }: PresenceB
   }, [open])
 
   if (collaborators.length === 0) return null
-  return <section ref={rootRef} className={`presence-bar ${expanded ? 'is-open' : ''}`} style={{ width: expanded ? expandedWidth : 72 }} aria-label="People in this map" onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}>
-    <button type="button" className="presence-trigger" aria-expanded={expanded} aria-controls="presence-members" aria-label={`${expanded ? 'Hide' : 'Show'} ${collaborators.length} connected collaborator${collaborators.length === 1 ? '' : 's'}`} onClick={() => setOpen((current) => !current)}>
+  const count = formatNumber(collaborators.length)
+  return <section ref={rootRef} className={`presence-bar ${expanded ? 'is-open' : ''}`} style={{ width: expanded ? expandedWidth : 72 }} aria-label={t('shell.presence.people')} onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}>
+    {!expanded ? <button type="button" className="presence-trigger" aria-expanded="false" aria-controls="presence-members" aria-label={t(collaborators.length === 1 ? 'shell.presence.showOne' : 'shell.presence.showMany', { count })} onClick={() => setOpen(true)}>
       <span className="presence-avatars" aria-hidden="true">
         {collaborators.slice(0, 3).map((entry) => entry.avatarUrl ? <img key={entry.id} className={followingId === entry.id ? 'is-following' : ''} src={entry.avatarUrl} alt="" /> : <span key={entry.id} className={`presence-initials ${followingId === entry.id ? 'is-following' : ''}`} style={{ backgroundColor: entry.color }}>{initials(entry.name)}</span>)}
       </span>
-      {collaborators.length > 3 ? <span className="presence-count" aria-hidden="true">+{collaborators.length - 3}</span> : null}
-    </button>
-    <div id="presence-members" className="presence-members" role="group" aria-label="Connected collaborators" aria-hidden={!expanded}>
+      {collaborators.length > 3 ? <span className="presence-count" aria-hidden="true">+{formatNumber(collaborators.length - 3)}</span> : null}
+    </button> : null}
+    <div id="presence-members" className="presence-members" role="group" aria-label={t('shell.presence.connected')} aria-hidden={!expanded}>
       {collaborators.map((entry) => {
         const following = followingId === entry.id
-        const location = entry.floorName ?? entry.floorId ?? 'Structure view'
-        const activity = entry.presenting ? `Presenting · ${location}` : location
+        const location = entry.floorName ?? entry.floorId ?? t('shell.presence.structureView')
+        const activity = entry.presenting ? t('shell.presence.presenting', { location }) : location
         const toggleFollow = () => onFollow(following ? null : entry.id)
-        return <button key={entry.id} type="button" tabIndex={expanded ? 0 : -1} className={`presence-person ${following ? 'is-following' : ''}`} aria-pressed={following} aria-label={`${following ? 'Stop following' : 'Follow'} ${entry.name}. ${activity}.`} onPointerDown={(event) => { if (event.button !== 0) return; event.preventDefault(); event.stopPropagation(); toggleFollow() }} onClick={(event) => { if (event.detail === 0) toggleFollow() }}>
+        return <button key={entry.id} type="button" tabIndex={expanded ? 0 : -1} className={`presence-person ${following ? 'is-following' : ''}`} aria-pressed={following} aria-label={t(following ? 'shell.presence.stopFollowing' : 'shell.presence.follow', { name: entry.name, activity })} onPointerDown={(event) => { if (event.button !== 0) return; event.preventDefault(); event.stopPropagation(); toggleFollow() }} onClick={(event) => { if (event.detail === 0) toggleFollow() }}>
           {entry.avatarUrl ? <img src={entry.avatarUrl} alt="" /> : <span className="presence-initials" aria-hidden="true" style={{ backgroundColor: entry.color }}>{initials(entry.name)}</span>}
-          <span><strong>{entry.name}</strong><small>{following ? 'Following' : activity}</small></span>
+          <span><strong>{entry.name}</strong><small>{following ? t('shell.presence.following') : activity}</small></span>
         </button>
       })}
     </div>

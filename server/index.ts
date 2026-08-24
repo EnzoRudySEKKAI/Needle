@@ -142,7 +142,7 @@ sockets.on('connection', (socket) => {
       for (const presence of presenceByMap.get(message.mapId)?.values() ?? []) socket.send(JSON.stringify({ type: 'presence', presence }))
       return
     }
-    if (message.type !== 'presence' || typeof message.mapId !== 'string' || typeof message.clientId !== 'string' || (message.selection !== null && !isSelection(message.selection)) || (message.activeFloorId !== null && typeof message.activeFloorId !== 'string') || (message.activeFlowId !== null && typeof message.activeFlowId !== 'string') || typeof message.presenter !== 'boolean' || typeof message.displayName !== 'string') return
+    if (message.type !== 'presence' || typeof message.mapId !== 'string' || typeof message.clientId !== 'string' || (message.selection !== null && !isSelection(message.selection)) || (message.activeFloorId !== null && typeof message.activeFloorId !== 'string') || (message.activeFlowId !== null && typeof message.activeFlowId !== 'string') || (message.activeFlowStageId !== null && typeof message.activeFlowStageId !== 'string') || typeof message.flowPlaying !== 'boolean' || typeof message.flowSpeed !== 'number' || !Number.isFinite(message.flowSpeed) || message.flowSpeed <= 0 || typeof message.presenter !== 'boolean' || typeof message.displayName !== 'string') return
     state.mapId = message.mapId
     state.clientId = message.clientId
     const presence: MapPresence = {
@@ -151,6 +151,9 @@ sockets.on('connection', (socket) => {
       selection: message.selection,
       activeFloorId: message.activeFloorId,
       activeFlowId: message.activeFlowId,
+      activeFlowStageId: message.activeFlowStageId,
+      flowPlaying: message.flowPlaying,
+      flowSpeed: message.flowSpeed,
       presenter: message.presenter,
       displayName: message.displayName,
     }

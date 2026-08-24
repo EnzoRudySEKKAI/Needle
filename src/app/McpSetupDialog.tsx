@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useI18n } from '../i18n/useI18n'
 
 export function McpSetupDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n()
   const dialogRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
   const endpoint = `${window.location.origin}/mcp`
@@ -26,11 +28,11 @@ export function McpSetupDialog({ onClose }: { onClose: () => void }) {
 
   return <div className="dialog-backdrop" role="presentation" onMouseDown={onClose}>
     <section ref={dialogRef} className="export-dialog mcp-setup-dialog" role="dialog" aria-modal="true" aria-labelledby="mcp-setup-title" tabIndex={-1} onMouseDown={(event) => event.stopPropagation()}>
-      <div className="dialog-heading"><div><span className="eyebrow">Integration</span><h2 id="mcp-setup-title">Connect Needle MCP</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></div>
-      <p>Add this block to your client’s MCP JSON configuration. Needle exposes a Streamable HTTP server at the current workspace address.</p>
-      <div className="mcp-endpoint"><span>Endpoint</span><code>{endpoint}</code></div>
-      <pre aria-label="Needle MCP JSON configuration"><code>{config}</code></pre>
-      <button type="button" className="mcp-copy-button" onClick={() => void copyConfig()}>{copied ? 'Copied' : 'Copy JSON'}</button>
+      <div className="dialog-heading"><div><span className="eyebrow">{t('home.mcp.eyebrow')}</span><h2 id="mcp-setup-title">{t('home.mcp.title')}</h2></div><button type="button" onClick={onClose} aria-label={t('common.close')}>×</button></div>
+      <p>{t('home.mcp.description')}</p>
+      <div className="mcp-endpoint"><span>{t('home.mcp.endpoint')}</span><code>{endpoint}</code></div>
+      <pre aria-label={t('home.mcp.configAria')}><code>{config}</code></pre>
+      <button type="button" className="mcp-copy-button" onClick={() => void copyConfig()}>{t(copied ? 'home.mcp.copied' : 'home.mcp.copyJson')}</button>
     </section>
   </div>
 }

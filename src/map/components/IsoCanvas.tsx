@@ -4,6 +4,7 @@ import { projectFloor } from '../../domain/floors'
 import type { ConnectionDraft } from '../../editor/connection'
 import type { RelationPreview } from '../../editor/RelationCandidatePicker'
 import type { StagePreviewTarget } from '../../editor/ScenarioInspector'
+import { useI18n } from '../../i18n/useI18n'
 import { portAnchors } from '../core/archetypes'
 import { buildExitGeometries, buildExitRoute, exitExtent, exitRelationGeometry, type ExitGeometry } from '../core/exits'
 import { visualiseNodes } from '../core/layout'
@@ -34,6 +35,7 @@ type Props = {
   onSelect: (selection: Selection | null) => void
   onOpenFloor?: (id: string) => void
   onMoveNode: (id: string, gx: number, gy: number) => void
+  onMoveGroup: (id: string, floorId: string, delta: GridPoint, flagPosition: GridPoint | null) => void
   onMoveGroupFlag: (id: string, gx: number, gy: number) => void
   connectionDraft: ConnectionDraft | null
   onToggleConnectionTarget: (id: string) => void
@@ -44,6 +46,7 @@ type Props = {
 }
 
 function EmptyFloorPrompt({ onAddConcept }: { onAddConcept?: () => void }) {
+  const { t } = useI18n()
   return <div className="canvas-empty">
     <div className="empty-floor-scene">
       <svg viewBox="0 0 440 250" aria-hidden="true">
@@ -57,15 +60,16 @@ function EmptyFloorPrompt({ onAddConcept }: { onAddConcept?: () => void }) {
         <polygon className="empty-floor-edge" points="34,131 218,35 406,130 220,230" />
         <ellipse className="empty-floor-target" cx="220" cy="132" rx="34" ry="17" />
       </svg>
-      {onAddConcept ? <button type="button" className="empty-floor-action" onClick={onAddConcept}><i aria-hidden="true">+</i><span>Place first concept</span></button> : <span className="empty-floor-readonly">Add a concept from the left rail</span>}
+      {onAddConcept ? <button type="button" className="empty-floor-action" onClick={onAddConcept}><i aria-hidden="true">+</i><span>{t('shell.canvas.placeFirst')}</span></button> : <span className="empty-floor-readonly">{t('shell.canvas.addFromRail')}</span>}
     </div>
   </div>
 }
 
 type PanSession = { kind: 'pan'; pointerId: number; x: number; y: number; camera: Camera; moved: boolean; deferCapture: boolean }
 type NodeDragSession = { kind: 'node'; pointerId: number; nodeId: string; startX: number; startY: number; start: GridPoint; alignments: GridPoint[]; camera: Camera; pending: GridPoint; centerOffset: GridPoint; guides: { gx?: number; gy?: number } | null; moved: boolean; frame: number }
+type GroupDragSession = { kind: 'group'; pointerId: number; groupId: string; floorId: string; startX: number; startY: number; start: GridPoint; memberStarts: ReadonlyMap<string, GridPoint>; customFlag: boolean; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
 type FlagDragSession = { kind: 'flag'; pointerId: number; groupId: string; startX: number; startY: number; start: GridPoint; camera: Camera; pending: GridPoint; moved: boolean; frame: number }
-type InteractionSession = PanSession | NodeDragSession | FlagDragSession
+type InteractionSession = PanSession | NodeDragSession | GroupDragSession | FlagDragSession
 type PointerPoint = { x: number; y: number }
 type PinchSession = { pointerIds: [number, number]; distance: number; midpoint: PointerPoint; camera: Camera }
 
@@ -90,6 +94,7 @@ function snapToConnectedAxes(point: GridPoint, alignments: readonly GridPoint[])
 }
 
 function DistrictFlag({ district, selected, hovered, editable, dragging, onSelect, onHover, onMeasure, onDragStart }: { district: District; selected: boolean; hovered: boolean; editable: boolean; dragging: boolean; onSelect: () => void; onHover: (id: string | null) => void; onMeasure: (id: string, width: number) => void; onDragStart: (event: ReactPointerEvent<SVGGElement>) => void }) {
+  const { t } = useI18n()
   const textRef = useRef<SVGTextElement | null>(null)
   useLayoutEffect(() => {
     let cancelled = false
@@ -102,7 +107,7 @@ function DistrictFlag({ district, selected, hovered, editable, dragging, onSelec
     return () => { cancelled = true }
   }, [district.id, district.name, onMeasure])
   const flag = toScreen(district.flagAt.gx, district.flagAt.gy)
-  return <g className={`district-flag ${selected ? 'is-selected' : ''} ${hovered ? 'is-hovered' : ''} ${dragging ? 'is-dragging' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => onHover(district.id)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(district.id)} onBlur={() => onHover(null)} onPointerDown={(event) => { if (event.button !== 0 || !editable) return; event.stopPropagation(); onDragStart(event) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect() } }} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
+  return <g className={`district-flag ${selected ? 'is-selected' : ''} ${hovered ? 'is-hovered' : ''} ${dragging ? 'is-dragging' : ''}`} role="button" tabIndex={0} aria-label={t('shell.canvas.neighborhood', { name: district.name })} onPointerEnter={() => onHover(district.id)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(district.id)} onBlur={() => onHover(null)} onPointerDown={(event) => { if (event.button !== 0 || !editable) return; event.stopPropagation(); onDragStart(event) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onSelect() } }} onClick={(event) => { event.stopPropagation(); onSelect() }}><line x1={flag.x} y1={flag.y} x2={flag.x} y2={flag.y - 34} className="flag-pole" vectorEffect="non-scaling-stroke" /><g transform={`translate(${flag.x + 4} ${flag.y - 34})`}><rect width={district.labelWidth} height="18" className="flag-label" vectorEffect="non-scaling-stroke" /><text ref={textRef} x="6" y="12.5">{district.name}</text></g></g>
 }
 
 function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationGeometry {
@@ -112,7 +117,8 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, onAddConcept }: Props) {
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, onAddConcept }: Props) {
+  const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -232,7 +238,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const selectNode = (id: string) => onSelect({ kind: 'node', id })
   const conceptLabel = (id: string) => {
     const node = nodeById.get(id)
-    if (!node) return 'Unknown concept'
+    if (!node) return t('shell.canvas.unknownConcept')
     const code = node.code.trim()
     return code ? `${code} ${node.name}` : node.name
   }
@@ -285,6 +291,23 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     next.delete(id)
     return next
   })
+  const previewGroupPosition = (session: GroupDragSession) => {
+    const delta = { gx: session.pending.gx - session.start.gx, gy: session.pending.gy - session.start.gy }
+    setDragPositions((current) => {
+      const next = new Map(current)
+      for (const [id, start] of session.memberStarts) next.set(id, { gx: start.gx + delta.gx, gy: start.gy + delta.gy })
+      return next
+    })
+    if (session.customFlag) previewFlagPosition(session.groupId, session.pending)
+  }
+  const cancelGroupPosition = (session: GroupDragSession) => {
+    setDragPositions((current) => {
+      const next = new Map(current)
+      for (const id of session.memberStarts.keys()) next.delete(id)
+      return next
+    })
+    cancelFlagPosition(session.groupId)
+  }
   const previewFlagPosition = (id: string, position: GridPoint) => setDragFlagPositions((current) => {
     const existing = current.get(id)
     if (existing?.gx === position.gx && existing.gy === position.gy) return current
@@ -336,8 +359,21 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
       return
     }
     setDraggingFlagId(null)
-    if (!commit || !session.moved) {
+    if (session.kind === 'flag') {
       cancelFlagPosition(session.groupId)
+      if (!commit || !session.moved) {
+        if (commit && !session.moved) {
+          suppressNextClick()
+          onSelect({ kind: 'group', id: session.groupId })
+        }
+        return
+      }
+      suppressNextClick()
+      onMoveGroupFlag(session.groupId, session.pending.gx, session.pending.gy)
+      return
+    }
+    cancelGroupPosition(session)
+    if (!commit || !session.moved) {
       if (commit && !session.moved) {
         suppressNextClick()
         onSelect({ kind: 'group', id: session.groupId })
@@ -345,9 +381,10 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
       return
     }
     const position = session.pending
-    cancelFlagPosition(session.groupId)
+    const delta = { gx: position.gx - session.start.gx, gy: position.gy - session.start.gy }
     suppressNextClick()
-    onMoveGroupFlag(session.groupId, position.gx, position.gy)
+    onSelect({ kind: 'group', id: session.groupId })
+    if (delta.gx !== 0 || delta.gy !== 0) onMoveGroup(session.groupId, session.floorId, delta, session.customFlag ? position : null)
   }
   const cancelInteraction = useEffectEvent(() => {
     const pointerIds = pinch.current?.pointerIds
@@ -388,6 +425,17 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     setDraggingNodeId(node.id)
     svg.setPointerCapture(event.pointerId)
   }
+  const startGroupDrag = (event: ReactPointerEvent<SVGGElement>, district: District) => {
+    if (!camera || interaction.current) return
+    const svg = svgRef.current
+    if (!svg) return
+    const memberIds = new Set(district.nodeIds)
+    const memberStarts = new Map(positionedNodes.filter((node) => memberIds.has(node.id)).map((node) => [node.id, node.position]))
+    updateCamera(camera)
+    interaction.current = { kind: 'group', pointerId: event.pointerId, groupId: district.id, floorId, startX: event.clientX, startY: event.clientY, start: district.flagAt, memberStarts, customFlag: projection?.floor.groupFlagPositions[district.id] !== undefined, camera, pending: district.flagAt, moved: false, frame: 0 }
+    setDraggingFlagId(district.id)
+    svg.setPointerCapture(event.pointerId)
+  }
   const startFlagDrag = (event: ReactPointerEvent<SVGGElement>, district: District) => {
     if (!camera || interaction.current) return
     const svg = svgRef.current
@@ -425,7 +473,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
         id={svgId}
         className="iso-canvas"
         tabIndex={0}
-        aria-label="Interactive ontology map"
+        aria-label={t('shell.canvas.label')}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return
           if (event.key === '+' || event.key === '=') { event.preventDefault(); zoomAtCenter(1.25) }
@@ -498,7 +546,8 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
             if (session.kind === 'node') {
               previewNodePosition(session.nodeId, session.pending.gx, session.pending.gy)
               setAlignmentGuides(session.guides)
-            } else previewFlagPosition(session.groupId, session.pending)
+            } else if (session.kind === 'group') previewGroupPosition(session)
+            else previewFlagPosition(session.groupId, session.pending)
           })
         }}
         onPointerUp={(event) => {
@@ -540,8 +589,9 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
             </g> : null}
             <g className="districts">
               {scene.districts.map((district) => {
-                const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
-                 return <g key={district.id} className={`district ${selection?.kind === 'group' && selection.id === district.id ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''}`} role="button" tabIndex={0} aria-label={`${district.name} neighborhood`} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
+                 const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
+                   const selected = selection?.kind === 'group' && selection.id === district.id
+                   return <g key={district.id} className={`district ${selected ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''} ${draggingFlagId === district.id ? 'is-dragging' : ''}`} role="button" tabIndex={0} aria-label={t('shell.canvas.neighborhood', { name: district.name })} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onPointerDown={(event) => { if (event.button !== 0 || !editable || !selected || connectionDraft || relationPicking) return; event.stopPropagation(); startGroupDrag(event, district) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
               })}
             </g>
             <g className="relations" onPointerDown={(event) => event.stopPropagation()}>
@@ -554,7 +604,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                 const before = route.points[route.points.length - 2] ?? end
                 const angle = Math.atan2(end.y - before.y, end.x - before.x) * 180 / Math.PI
                 const labelWidth = Math.max(42, relation.label.length * 5.5 + 14)
-                 return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program && !relationPicking ? 'is-dimmed' : ''} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${conceptLabel(relation.from)} to ${conceptLabel(relation.to)}`} aria-disabled={relationPicking && !pickable ? true : undefined} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) } }} onClick={(event) => { event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /><g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
+                  return <g key={relation.id} className={`relation relation-${relation.kind} ${selected ? 'is-selected' : ''} ${program && !relationPicking ? 'is-dimmed' : ''} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={t('shell.canvas.relation', { label: relation.label, from: conceptLabel(relation.from), to: conceptLabel(relation.to) })} aria-disabled={relationPicking && !pickable ? true : undefined} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) } }} onClick={(event) => { event.stopPropagation(); if (relationPicking) { if (pickable) onPickRelation(relation.id) } else onSelect({ kind: 'relation', id: relation.id }) }}><polyline points={pointsAttribute(route.points)} className="relation-line" vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /><g className="relation-label" transform={`translate(${route.labelPoint.x} ${route.labelPoint.y - 11})`}><rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" /><text textAnchor="middle" dominantBaseline="central">{relation.label}</text></g><polyline points={pointsAttribute(route.points)} className="relation-hit" vectorEffect="non-scaling-stroke"><title>{relation.label}</title></polyline></g>
               })}
               {previewRelations.map((relation) => {
                 const route = previewGeometry.get(relation.id)
@@ -630,7 +680,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                     else onSelect({ kind: 'relation', id: exit.relationId })
                   }
                    return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} ${selected ? 'is-selected' : ''} ${dimmed ? 'is-dimmed' : ''} ${floorHoverClass} ${relationPicking ? pickable ? 'is-pickable' : 'is-pick-disabled' : ''}`} onPointerEnter={() => setHoveredExitId(exit.relationId)} onPointerLeave={() => setHoveredExitId(null)} onFocusCapture={() => setHoveredExitId(exit.relationId)} onBlurCapture={() => setHoveredExitId(null)}>
-                      <g role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={`${relation.label}: ${conceptLabel(relation.from)} to ${conceptLabel(relation.to)}, ${group.floorName}`} aria-disabled={relationPicking && !pickable ? true : undefined} className="floor-exit-line" onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleSelect() } }}>
+                       <g role="button" tabIndex={pickable || !relationPicking ? 0 : -1} aria-label={t('shell.canvas.relationToFloor', { label: relation.label, from: conceptLabel(relation.from), to: conceptLabel(relation.to), floor: group.floorName })} aria-disabled={relationPicking && !pickable ? true : undefined} className="floor-exit-line" onClick={(event) => { event.stopPropagation(); handleSelect() }} onDoubleClick={(event) => { event.stopPropagation(); onOpenFloor?.(group.floorId) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); handleSelect() } }}>
                        <g className="relation-label" transform={`translate(${exit.labelPoint.x} ${exit.labelPoint.y - 11})`}>
                          <rect x={-labelWidth / 2} y="-8" width={labelWidth} height="16" rx="3" vectorEffect="non-scaling-stroke" />
                          <text textAnchor="middle" dominantBaseline="central">{relation.label}</text>
@@ -650,7 +700,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
           </g>
         ) : null}
       </svg>
-      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} aria-label="Recenter map" title="Recenter">⌾</button><button type="button" onClick={() => zoomAtCenter(1.25)} aria-label="Zoom in">+</button><button type="button" onClick={() => zoomAtCenter(0.8)} aria-label="Zoom out">−</button></div>
+      <div className="camera-controls"><button type="button" onClick={() => updateCamera(null)} aria-label={t('shell.canvas.recenter')} title={t('shell.canvas.recenterTitle')}>⌾</button><button type="button" onClick={() => zoomAtCenter(1.25)} aria-label={t('shell.canvas.zoomIn')}>+</button><button type="button" onClick={() => zoomAtCenter(0.8)} aria-label={t('shell.canvas.zoomOut')}>−</button></div>
     </div>
   )
 }

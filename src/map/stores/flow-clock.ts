@@ -2,12 +2,18 @@ import { useSyncExternalStore } from 'react'
 import { activeStageState, type FlowProgram } from '../core/program'
 
 type ClockState = { program: FlowProgram | null; time: number; playing: boolean; started: boolean; speed: number }
+export type ClockPresenceState = { programId: string | null; stageId: string | null; playing: boolean; speed: number }
 let state: ClockState = { program: null, time: 0, playing: false, started: false, speed: 1 }
+const emptyPresenceState: ClockPresenceState = { programId: null, stageId: null, playing: false, speed: 1 }
+let presenceState = emptyPresenceState
 let frameId: number | null = null
 let lastFrame = 0
 const listeners = new Set<() => void>()
 
 function notify() {
+  const active = state.program && state.started ? activeStageState(state.program, state.time) : null
+  const nextPresence = { programId: state.program?.id ?? null, stageId: active && state.program ? state.program.stages[active.index]?.id ?? null : null, playing: state.playing, speed: state.speed }
+  if (nextPresence.programId !== presenceState.programId || nextPresence.stageId !== presenceState.stageId || nextPresence.playing !== presenceState.playing || nextPresence.speed !== presenceState.speed) presenceState = nextPresence
   for (const listener of listeners) listener()
 }
 
@@ -77,6 +83,21 @@ export function seekFlowStage(programId: string, stageId: string) {
   notify()
 }
 
+export function syncFlowPlayback(programId: string, stageId: string | null, playing: boolean, speed: number) {
+  const program = state.program
+  if (!program || program.id !== programId) return
+  const stage = stageId ? program.stages.find((candidate) => candidate.id === stageId) : null
+  const currentStageId = state.started ? program.stages[activeStageState(program, state.time).index]?.id ?? null : null
+  const nextStarted = Boolean(stage)
+  const nextPlaying = Boolean(stage && playing && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const nextTime = stage && currentStageId !== stage.id ? stage.start + 1 : stage ? state.time : 0
+  if (state.started === nextStarted && state.playing === nextPlaying && state.time === nextTime && state.speed === speed) return
+  stop()
+  state = { ...state, time: nextTime, playing: nextPlaying, started: nextStarted, speed }
+  if (nextPlaying) start()
+  notify()
+}
+
 export function getClockState(): ClockState {
   return state
 }
@@ -88,6 +109,10 @@ function subscribe(listener: () => void) {
 
 export function useClockState() {
   return useSyncExternalStore(subscribe, () => state, () => ({ program: null, time: 0, playing: false, started: false, speed: 1 }))
+}
+
+export function useClockPresenceState(): ClockPresenceState {
+  return useSyncExternalStore(subscribe, () => presenceState, () => emptyPresenceState)
 }
 
 export function useClockActiveKey(): string {

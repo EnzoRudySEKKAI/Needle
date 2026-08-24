@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useEffectEvent, useReducer, useRef, useState, type ReactNode } from 'react'
 import type { MapPresence, OntologyDocument, Selection } from '../domain/types'
+import { useI18n } from '../i18n/useI18n'
 import { saveMapWithConflict, subscribeToMap, type PresenceState } from '../persistence/map-repository'
 
 type History = { past: OntologyDocument[]; present: OntologyDocument; future: OntologyDocument[]; source: 'clean' | 'local' | 'remote' }
@@ -46,6 +47,7 @@ type DocumentContextValue = {
 const DocumentContext = createContext<DocumentContextValue | null>(null)
 
 export function DocumentProvider({ initial, children }: { initial: OntologyDocument; children: ReactNode }) {
+  const { t } = useI18n()
   const [history, dispatch] = useReducer(historyReducer, { past: [], present: initial, future: [], source: 'clean' })
   const [selection, setSelection] = useReducer((_previous: Selection | null, next: Selection | null) => next, null)
   const [persistenceError, setPersistenceError] = useReducer((_previous: string | null, next: string | null) => next, null)
@@ -63,7 +65,7 @@ export function DocumentProvider({ initial, children }: { initial: OntologyDocum
       setConflict(null)
       setPersistenceError(null)
     }
-    catch (error) { setPersistenceError(error instanceof Error ? error.message : 'Unable to save the shared map.') }
+    catch { setPersistenceError(t('shell.sync.saveError')) }
   })
   const replaceRemote = useEffectEvent((document: OntologyDocument, source: 'snapshot' | 'live') => {
     if (source === 'snapshot' && history.source === 'local') return
@@ -71,6 +73,7 @@ export function DocumentProvider({ initial, children }: { initial: OntologyDocum
     serverUpdatedAt.current = document.updatedAt
     dispatch({ type: 'replace', document })
   })
+  const reportSyncError = useEffectEvent(() => setPersistenceError(t('shell.sync.unavailable')))
 
   useEffect(() => {
     if (history.source !== 'local') return
@@ -79,7 +82,7 @@ export function DocumentProvider({ initial, children }: { initial: OntologyDocum
   }, [history.present, history.source])
 
   useEffect(() => {
-    const subscription = subscribeToMap(initial.id, replaceRemote, setSyncReady, setPersistenceError, {
+    const subscription = subscribeToMap(initial.id, replaceRemote, setSyncReady, reportSyncError, {
       onPresence: (presence) => setPresences((current) => current.some((item) => item.clientId === presence.clientId)
         ? current.map((item) => item.clientId === presence.clientId ? presence : item)
         : [...current, presence]),

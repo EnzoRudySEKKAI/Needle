@@ -3,6 +3,18 @@ import type { OntologyDocument } from '../domain/types'
 export type ExportBackground = 'current' | 'white' | 'transparent'
 export type ExportTheme = 'current' | 'light' | 'dark'
 
+type AllFloorsPdfLabels = {
+  locale: string
+  conceptCount: (count: number) => string
+  neighborhoods: string
+  noDescription: string
+  relations: string
+  noRelations: string
+  title: string
+  structureTypes: Record<OntologyDocument['structureType'], string>
+  relationKinds: Record<OntologyDocument['relations'][number]['kind'], string>
+}
+
 function currentSvg(): SVGSVGElement {
   const svg = document.getElementById('ontology-map-svg')
   if (!(svg instanceof SVGSVGElement)) throw new Error('Map canvas is not available.')
@@ -186,49 +198,63 @@ export function exportMermaid(source: OntologyDocument, filename: string, active
   download(new Blob([`${lines.join('\n')}\n`], { type: 'text/plain;charset=utf-8' }), `${filename}.mmd`)
 }
 
-export async function exportAllFloorsPdf(source: OntologyDocument, filename: string) {
-  const { jsPDF } = await import('jspdf')
+export async function exportAllFloorsPdf(source: OntologyDocument, filename: string, labels: AllFloorsPdfLabels) {
+  const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import('jspdf'), import('html2canvas')])
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true })
-  const margin = 44
-  const pageWidth = pdf.internal.pageSize.getWidth()
-  const pageHeight = pdf.internal.pageSize.getHeight()
   const nodeById = new Map(source.nodes.map((node) => [node.id, node]))
-  let pageStarted = false
-  let y = margin
-
-  const newPage = () => {
-    if (pageStarted) pdf.addPage()
-    pageStarted = true
-    y = margin
-  }
-  const write = (text: string, size = 10, indent = 0, gap = 5) => {
-    pdf.setFontSize(size)
-    const lines = pdf.splitTextToSize(text || '-', pageWidth - (margin * 2) - indent) as string[]
-    const lineHeight = size * 1.3
-    if (y + (lines.length * lineHeight) > pageHeight - margin) newPage()
-    pdf.text(lines, margin + indent, y)
-    y += (lines.length * lineHeight) + gap
-  }
-
-  source.floors.forEach((floor, floorIndex) => {
-    newPage()
-    write(source.name, 9, 0, 8)
-    write(`${floorIndex + 1}. ${floor.name}`, 22, 0, 7)
-    write(`${source.version} | ${source.structureType} | ${source.nodes.filter((node) => node.floorId === floor.id).length} concepts`, 9, 0, 18)
-    const floorNodes = source.nodes.filter((node) => node.floorId === floor.id)
-    const groupIds = new Set(floorNodes.map((node) => node.groupId))
-    write('NEIGHBORHOODS AND CONCEPTS', 10, 0, 10)
-    source.groups.filter((group) => groupIds.has(group.id)).forEach((group) => {
-      write(group.name, 13, 0, 3)
-      if (group.description) write(group.description, 9, 0, 6)
-      floorNodes.filter((node) => node.groupId === group.id).forEach((node) => write(`${node.code ? `${node.code} - ` : ''}${node.name}: ${node.whatItDoes || 'No description.'}`, 9, 12, 4))
-      y += 5
-    })
-    write('RELATIONS', 10, 0, 10)
-    const relations = source.relations.filter((relation) => nodeById.get(relation.from)?.floorId === floor.id || nodeById.get(relation.to)?.floorId === floor.id)
-    if (relations.length === 0) write('No relations touch this floor.', 9, 12, 4)
-    relations.forEach((relation) => write(`${nodeById.get(relation.from)?.name ?? relation.from} -> ${nodeById.get(relation.to)?.name ?? relation.to} [${relation.kind}]${relation.label ? `: ${relation.label}` : ''}`, 9, 12, 4))
+  const sections: HTMLElement[] = []
+  const report = document.createElement('article')
+  Object.assign(report.style, {
+    position: 'fixed', left: '-10000px', top: '0', width: '760px', boxSizing: 'border-box',
+    background: '#fff', color: '#172033', fontFamily: "Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif",
+    fontSize: '14px', lineHeight: '1.5', padding: '0',
   })
-  pdf.setProperties({ title: `${source.name} - all floors`, subject: source.description, creator: 'Needle' })
+  const append = (parent: HTMLElement, tag: 'h1' | 'h2' | 'h3' | 'p', text: string, style: Partial<CSSStyleDeclaration> = {}) => {
+    const element = document.createElement(tag)
+    element.textContent = text
+    Object.assign(element.style, { margin: '0 0 10px', breakInside: 'avoid', ...style })
+    parent.append(element)
+  }
+  source.floors.forEach((floor, floorIndex) => {
+    const section = document.createElement('section')
+    Object.assign(section.style, { padding: '0 0 28px', breakBefore: floorIndex === 0 ? 'auto' : 'page' })
+    append(section, 'p', source.name, { fontSize: '12px', color: '#667085', marginBottom: '8px' })
+    append(section, 'h1', `${floorIndex + 1}. ${floor.name}`, { fontSize: '28px', lineHeight: '1.2', marginBottom: '7px' })
+    const floorNodes = source.nodes.filter((node) => node.floorId === floor.id)
+    append(section, 'p', `${source.version} | ${labels.structureTypes[source.structureType]} | ${labels.conceptCount(floorNodes.length)}`, { fontSize: '12px', color: '#667085', marginBottom: '22px' })
+    const groupIds = new Set(floorNodes.map((node) => node.groupId))
+    append(section, 'h2', labels.neighborhoods, { fontSize: '13px', textTransform: labels.locale === 'en' ? 'uppercase' : 'none', marginBottom: '12px' })
+    source.groups.filter((group) => groupIds.has(group.id)).forEach((group) => {
+      const block = document.createElement('div')
+      Object.assign(block.style, { breakInside: 'avoid', marginBottom: '14px' })
+      append(block, 'h3', group.name, { fontSize: '17px', marginBottom: '3px' })
+      if (group.description) append(block, 'p', group.description, { color: '#475467', marginBottom: '7px' })
+      floorNodes.filter((node) => node.groupId === group.id).forEach((node) => append(block, 'p', `${node.code ? `${node.code} - ` : ''}${node.name}: ${node.whatItDoes || labels.noDescription}`, { marginLeft: '16px', marginBottom: '5px' }))
+      section.append(block)
+    })
+    append(section, 'h2', labels.relations, { fontSize: '13px', textTransform: labels.locale === 'en' ? 'uppercase' : 'none', marginTop: '18px', marginBottom: '12px' })
+    const relations = source.relations.filter((relation) => nodeById.get(relation.from)?.floorId === floor.id || nodeById.get(relation.to)?.floorId === floor.id)
+    if (relations.length === 0) append(section, 'p', labels.noRelations, { marginLeft: '16px' })
+    relations.forEach((relation) => append(section, 'p', `${nodeById.get(relation.from)?.name ?? relation.from} -> ${nodeById.get(relation.to)?.name ?? relation.to} [${labels.relationKinds[relation.kind]}]${relation.label ? `: ${relation.label}` : ''}`, { marginLeft: '16px', marginBottom: '5px' }))
+    report.append(section)
+    sections.push(section)
+  })
+  document.body.append(report)
+  try {
+    const margin = 44
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    for (const [index, section] of sections.entries()) {
+      const canvas = await html2canvas(section, { backgroundColor: '#ffffff', scale: 2, useCORS: true })
+      if (index > 0) pdf.addPage()
+      const ratio = Math.min((pageWidth - margin * 2) / canvas.width, (pageHeight - margin * 2) / canvas.height)
+      const width = canvas.width * ratio
+      const height = canvas.height * ratio
+      pdf.addImage(canvas, 'PNG', margin, margin, width, height, undefined, 'FAST')
+    }
+  } finally {
+    report.remove()
+  }
+  pdf.setProperties({ title: labels.title, subject: source.description, creator: 'Needle' })
   pdf.save(`${filename}.pdf`)
 }

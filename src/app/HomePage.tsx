@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EXAMPLE_MAPS } from '../domain/examples'
 import { makeId } from '../domain/id'
 import { STRUCTURE_TYPES, type OntologyDocument, type StructureType } from '../domain/types'
+import { LanguageSwitch } from '../i18n/LanguageSwitch'
+import { useI18n } from '../i18n/useI18n'
 import { StructureSilhouette } from '../map/components/StructureSilhouette'
 import { structureGeometry } from '../map/core/structure-geometry'
 import * as repository from '../persistence/map-repository'
@@ -11,7 +13,7 @@ import { HeroMiniMap } from './HeroMiniMap'
 import { McpSetupDialog } from './McpSetupDialog'
 
 type TrashSummary = MapSummary & { deletedAt?: string }
-type RepositoryCapabilities = Pick<typeof repository, 'createBlankMap' | 'deleteMap' | 'listLegacyMaps' | 'listMaps' | 'publishLegacyMaps' | 'subscribeToLibrary'> & {
+type RepositoryCapabilities = Pick<typeof repository, 'createBlankMap' | 'deleteMap' | 'listMaps' | 'subscribeToLibrary'> & {
   createMapFromTemplate?: (templateId: string) => Promise<OntologyDocument>
   cloneMap?: (id: string) => Promise<OntologyDocument>
   listTrash?: () => Promise<TrashSummary[]>
@@ -20,13 +22,12 @@ type RepositoryCapabilities = Pick<typeof repository, 'createBlankMap' | 'delete
 }
 
 const library = repository as RepositoryCapabilities
-const updatedAtFormatter = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-const structureNames: Record<StructureType, string> = { tower: 'Tower', campus: 'Campus', 'cruise-ship': 'Cruise ship' }
-
 function StructurePreview({ structureType, floorCount, className = '' }: { structureType: StructureType; floorCount: number; className?: string }) {
+  const { t } = useI18n()
   const geometry = structureGeometry(structureType, floorCount)
   const bounds = geometry.structureBounds
-  return <span className={`map-card-structure ${className}`}><svg viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`} preserveAspectRatio="xMidYMid meet" aria-label={`${structureNames[structureType]} structure`}><StructureSilhouette geometry={geometry} /></svg><span>{structureNames[structureType]} · {floorCount} floor{floorCount === 1 ? '' : 's'}</span></span>
+  const structure = t(structureType === 'tower' ? 'structure.tower' : structureType === 'campus' ? 'structure.campus' : 'structure.ship')
+  return <span className={`map-card-structure ${className}`}><svg viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`} preserveAspectRatio="xMidYMid meet" aria-label={t('home.structure.aria', { structure })}><StructureSilhouette geometry={geometry} /></svg><span>{t(floorCount === 1 ? 'home.structure.summaryOne' : 'home.structure.summaryMany', { structure, count: floorCount })}</span></span>
 }
 
 function EmptyNeighborhoodPreview() {
@@ -48,13 +49,13 @@ function MapStructurePreview({ map }: { map: MapSummary }) {
 
 export function HomePage() {
   const navigate = useNavigate()
+  const { t, formatDate } = useI18n()
   const dialogRef = useRef<HTMLElement>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const [maps, setMaps] = useState<MapSummary[]>([])
   const [trash, setTrash] = useState<TrashSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [legacyCount, setLegacyCount] = useState(() => library.listLegacyMaps().length)
   const [pendingDelete, setPendingDelete] = useState<MapSummary | null>(null)
   const [pendingPermanentId, setPendingPermanentId] = useState<string | null>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
@@ -66,10 +67,12 @@ export function HomePage() {
   const [working, setWorking] = useState<string | null>(null)
   const trashAvailable = Boolean(library.listTrash && library.restoreTrashedMap && library.permanentlyDeleteTrashedMap)
   const dialogOpen = templateOpen || trashOpen || pendingDelete !== null
+  const reportLoadError = useEffectEvent(() => setError(t('home.error.loadMaps')))
+  const reportLibraryError = useEffectEvent(() => setError(t('home.error.liveUpdates')))
 
   useEffect(() => {
-    void library.listMaps().then(setMaps).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Unable to load shared maps.')).finally(() => setLoading(false))
-    return library.subscribeToLibrary(() => { void library.listMaps().then(setMaps).catch(() => undefined) }, setError)
+    void library.listMaps().then(setMaps).catch(reportLoadError).finally(() => setLoading(false))
+    return library.subscribeToLibrary(() => { void library.listMaps().then(setMaps).catch(() => undefined) }, reportLibraryError)
   }, [])
 
   useEffect(() => {
@@ -95,7 +98,7 @@ export function HomePage() {
     return () => { window.removeEventListener('keydown', onKeyDown); previouslyFocused?.focus() }
   }, [dialogOpen])
 
-  const reportError = (reason: unknown, fallback: string) => setError(reason instanceof Error ? reason.message : fallback)
+  const reportError = (_reason: unknown, fallback: string) => setError(fallback)
 
   const confirmDelete = async () => {
     if (!pendingDelete) return
@@ -105,7 +108,7 @@ export function HomePage() {
       setMaps((current) => current.filter((map) => map.id !== pendingDelete.id))
       setPendingDelete(null)
     } catch (reason) {
-      reportError(reason, 'Unable to move the map to Trash.')
+      reportError(reason, t('home.error.moveToTrash'))
     } finally {
       setWorking(null)
     }
@@ -117,7 +120,7 @@ export function HomePage() {
     try {
       let created: OntologyDocument
       if (templateId) {
-        if (!library.createMapFromTemplate) throw new Error('Template creation is waiting for repository integration.')
+        if (!library.createMapFromTemplate) throw new Error(t('home.error.templateUnavailable'))
         created = await library.createMapFromTemplate(templateId)
       } else {
         created = await library.createBlankMap(mapName.trim() || undefined, blankStructureType)
@@ -125,7 +128,7 @@ export function HomePage() {
       setTemplateOpen(false)
       navigate(`/builder/${created.id}`)
     } catch (reason) {
-      reportError(reason, 'Unable to create a map.')
+      reportError(reason, t('home.error.createMap'))
     } finally {
       setWorking(null)
     }
@@ -135,11 +138,11 @@ export function HomePage() {
     setWorking(`clone:${map.id}`)
     setError(null)
     try {
-      if (!library.cloneMap) throw new Error('Duplication is waiting for repository integration.')
+      if (!library.cloneMap) throw new Error(t('home.error.duplicateUnavailable'))
       const clone = await library.cloneMap(map.id)
       navigate(`/builder/${clone.id}`)
     } catch (reason) {
-      reportError(reason, 'Unable to duplicate the map.')
+      reportError(reason, t('home.error.duplicateMap'))
     } finally {
       setWorking(null)
     }
@@ -151,12 +154,12 @@ export function HomePage() {
     setError(null)
     try {
       const migrated = repository.migrateDocument(JSON.parse(await file.text()) as unknown)
-      if (!migrated) throw new Error('This file is not a valid Needle ontology map.')
+      if (!migrated) throw new Error(t('home.error.invalidImport'))
       const now = new Date().toISOString()
       const imported = await repository.saveMap({ ...migrated, id: makeId('map'), name: `${migrated.name} import`, createdAt: now, updatedAt: now })
       navigate(`/builder/${imported.id}`)
     } catch (reason) {
-      reportError(reason, 'Unable to import this map.')
+      reportError(reason, t('home.error.importMap'))
     } finally {
       setWorking(null)
       if (importRef.current) importRef.current.value = ''
@@ -170,7 +173,7 @@ export function HomePage() {
     try {
       setTrash(await library.listTrash())
     } catch (reason) {
-      reportError(reason, 'Unable to load Trash.')
+      reportError(reason, t('home.error.loadTrash'))
     } finally {
       setWorking(null)
     }
@@ -184,7 +187,7 @@ export function HomePage() {
       setTrash((current) => current.filter((map) => map.id !== id))
       setMaps(await library.listMaps())
     } catch (reason) {
-      reportError(reason, 'Unable to restore the map.')
+      reportError(reason, t('home.error.restoreMap'))
     } finally {
       setWorking(null)
     }
@@ -199,91 +202,80 @@ export function HomePage() {
       setTrash((current) => current.filter((map) => map.id !== id))
       setPendingPermanentId(null)
     } catch (reason) {
-      reportError(reason, 'Unable to permanently delete the map.')
+      reportError(reason, t('home.error.deleteMap'))
     } finally {
       setWorking(null)
     }
   }
 
-  const publishLocal = async () => {
-    try {
-      await library.publishLegacyMaps()
-      setLegacyCount(0)
-      setMaps(await library.listMaps())
-    } catch (reason) {
-      reportError(reason, 'Unable to publish local maps.')
-    }
-  }
-
   return <main className="home-page">
-    <header className="home-header"><div className="brand"><strong>Needle</strong><span>ONTOLOGY</span></div><div className="home-header-actions"><button type="button" onClick={() => setMcpOpen(true)}>Connect MCP</button><span className="home-version">DMA STUDIO · V1.0</span></div></header>
-    <section className="home-hero"><div className="hero-copy"><h1>Build ideas<br />you can <i>walk through.</i></h1><p>Turn complex ideas into something people can understand and act on. Connect concepts, build scenarios, map decisions and actions, and present the whole picture clearly.</p><button type="button" className="primary-button" onClick={() => { setCreationMode(null); setTemplateOpen(true) }}>Create a map <span>→</span></button></div><div className="hero-diagram"><div className="diagram-grid" /><HeroMiniMap /></div></section>
+    <header className="home-header"><div className="brand"><strong>Needle</strong><span>{t('shell.brand.ontology')}</span></div><div className="home-header-actions"><button type="button" onClick={() => setMcpOpen(true)}>{t('home.header.connectMcp')}</button><LanguageSwitch /><span className="home-version">DMA STUDIO · V1.0</span></div></header>
+    <section className="home-hero"><div className="hero-copy"><h1>{t('home.hero.titleLineOne')}<br /><i>{t('home.hero.titleLineTwo')}</i></h1><p>{t('home.hero.description')}</p><button type="button" className="primary-button" onClick={() => { setCreationMode(null); setTemplateOpen(true) }}>{t('home.hero.createMap')} <span>→</span></button></div><div className="hero-diagram"><div className="diagram-grid" /><HeroMiniMap /></div></section>
     <section className="map-library">
       <div className="library-heading">
-        <div><span className="eyebrow">Shared workspace</span><h2>LAN atlas</h2></div>
-        <span><i aria-hidden="true" />{maps.length} {maps.length === 1 ? 'map' : 'maps'} · synchronized live</span>
+        <div><span className="eyebrow">{t('home.library.eyebrow')}</span><h2>{t('home.library.title')}</h2></div>
+        <span><i aria-hidden="true" />{t(maps.length === 1 ? 'home.library.statusOne' : 'home.library.statusMany', { count: maps.length })}</span>
       </div>
       <div className="library-toolbar">
-        <div><strong>Workspace</strong><span>Create, import, and recover ontology maps.</span></div>
+        <div><strong>{t('home.library.workspace')}</strong><span>{t('home.library.description')}</span></div>
         <div>
-          <button type="button" className="library-create-button" onClick={() => { setCreationMode(null); setTemplateOpen(true) }}>New map</button>
-          <button type="button" disabled={working !== null} onClick={() => importRef.current?.click()}>{working === 'import' ? 'Importing…' : 'Import JSON'}</button>
+          <button type="button" className="library-create-button" onClick={() => { setCreationMode(null); setTemplateOpen(true) }}>{t('home.library.newMap')}</button>
+          <button type="button" disabled={working !== null} onClick={() => importRef.current?.click()}>{t(working === 'import' ? 'home.library.importing' : 'home.library.importJson')}</button>
           <input ref={importRef} hidden type="file" accept="application/json,.json" onChange={(event) => void importMap(event.target.files?.[0])} />
-          {trashAvailable ? <button type="button" onClick={() => void openTrash()}>Trash</button> : null}
+          {trashAvailable ? <button type="button" onClick={() => void openTrash()}>{t('home.library.trash')}</button> : null}
         </div>
       </div>
       {error ? <p className="library-error" role="alert">{error}</p> : null}
-      {legacyCount > 0 ? <button type="button" className="publish-local-button" onClick={() => void publishLocal()}>Publish {legacyCount} local {legacyCount === 1 ? 'map' : 'maps'} to the LAN workspace</button> : null}
       <div className="map-cards">
         {maps.map((map, index) => <article className="map-card" key={map.id}>
-          <div className="map-card-heading"><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span className="map-card-live"><i aria-hidden="true" />Live</span></div>
+          <div className="map-card-heading"><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span className="map-card-live"><i aria-hidden="true" />{t('home.card.live')}</span></div>
           <MapStructurePreview map={map} />
           <div className="map-card-copy"><h3>{map.name}</h3><p>{map.description}</p></div>
-          <div className="map-card-meta"><span>Updated {updatedAtFormatter.format(new Date(map.updatedAt))}</span></div>
-          <div className="card-actions"><button type="button" onClick={() => navigate(`/builder/${map.id}`)}>Build</button><button type="button" onClick={() => navigate(`/map/${map.id}`)}>Present</button><button type="button" disabled={working === `clone:${map.id}`} onClick={() => void duplicateMap(map)}>Duplicate</button><button type="button" className="delete-map-button" onClick={() => setPendingDelete(map)}>Trash</button></div>
+          <div className="map-card-meta"><span>{t('home.card.updated', { date: formatDate(map.updatedAt, { day: 'numeric', month: 'short', year: 'numeric' }) })}</span></div>
+          <div className="card-actions"><button type="button" onClick={() => navigate(`/builder/${map.id}`)}>{t('home.card.build')}</button><button type="button" onClick={() => navigate(`/map/${map.id}`)}>{t('home.card.present')}</button><button type="button" disabled={working === `clone:${map.id}`} onClick={() => void duplicateMap(map)}>{t('home.card.duplicate')}</button><button type="button" className="delete-map-button" onClick={() => setPendingDelete(map)}>{t('home.card.trash')}</button></div>
         </article>)}
-        {loading ? <p className="library-empty">Loading shared maps…</p> : maps.length === 0 ? <p className="library-empty">No shared maps yet. Create one from blank ground or a template.</p> : null}
+        {loading ? <p className="library-empty">{t('home.library.loading')}</p> : maps.length === 0 ? <p className="library-empty">{t('home.library.empty')}</p> : null}
       </div>
     </section>
     {templateOpen ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => { setTemplateOpen(false); setCreationMode(null) }}><section ref={dialogRef} className={`export-dialog template-dialog${creationMode === null ? ' is-choice' : ''}`} role="dialog" aria-modal="true" aria-labelledby="template-title" onMouseDown={(event) => event.stopPropagation()}>
-      <div className="dialog-heading"><div><span className="eyebrow">New map</span><h2 id="template-title">{creationMode === 'blank' ? 'Start from blank ground' : creationMode === 'templates' ? 'Choose a template' : 'Choose how to begin'}</h2></div><button type="button" onClick={() => { setTemplateOpen(false); setCreationMode(null) }} aria-label="Close">×</button></div>
-      <p>{creationMode === 'blank' ? 'Name the map and choose the architecture that will hold it.' : creationMode === 'templates' ? 'Adapt a complete example with concepts, relations, and scenarios.' : 'Begin with a clean structure or adapt a complete example.'}</p>
+      <div className="dialog-heading"><div><span className="eyebrow">{t('home.creation.eyebrow')}</span><h2 id="template-title">{t(creationMode === 'blank' ? 'home.creation.titleBlank' : creationMode === 'templates' ? 'home.creation.titleTemplates' : 'home.creation.titleChoice')}</h2></div><button type="button" onClick={() => { setTemplateOpen(false); setCreationMode(null) }} aria-label={t('common.close')}>×</button></div>
+      <p>{t(creationMode === 'blank' ? 'home.creation.descriptionBlank' : creationMode === 'templates' ? 'home.creation.descriptionTemplates' : 'home.creation.descriptionChoice')}</p>
       {creationMode === null ? <div className="creation-split">
         <article className="creation-choice creation-choice-blank">
-          <button type="button" aria-label="Start with a blank map" onClick={() => setCreationMode('blank')} />
-          <div className="creation-choice-copy"><span>Blank</span><strong>Shape it yourself</strong><p>Name the map, choose a structure, and begin on open ground.</p></div>
+          <button type="button" aria-label={t('home.creation.blankAria')} onClick={() => setCreationMode('blank')} />
+          <div className="creation-choice-copy"><span>{t('home.creation.blankLabel')}</span><strong>{t('home.creation.blankTitle')}</strong><p>{t('home.creation.blankDescription')}</p></div>
           <EmptyNeighborhoodPreview />
         </article>
         <article className="creation-choice creation-choice-templates">
-          <button type="button" aria-label="Choose a map template" onClick={() => setCreationMode('templates')} />
-          <div className="creation-choice-copy"><span>Templates</span><strong>Begin with a template</strong><p>Explore complete examples and replace their content with your own.</p></div>
+          <button type="button" aria-label={t('home.creation.templatesAria')} onClick={() => setCreationMode('templates')} />
+          <div className="creation-choice-copy"><span>{t('home.creation.templatesLabel')}</span><strong>{t('home.creation.templatesTitle')}</strong><p>{t('home.creation.templatesDescription')}</p></div>
           <StructurePreview structureType="cruise-ship" floorCount={4} className="creation-choice-structure" />
         </article>
       </div> : null}
       {creationMode === 'blank' ? <div className="blank-setup">
-        <button type="button" className="creation-back" onClick={() => setCreationMode(null)}>← Back to choices</button>
+        <button type="button" className="creation-back" onClick={() => setCreationMode(null)}>{t('home.creation.back')}</button>
         <div className="blank-setup-body">
           <div className="blank-setup-preview"><StructurePreview structureType={blankStructureType} floorCount={1} className="template-card-structure" /></div>
           <div className="blank-setup-form">
-            <label><span>Map name</span><input autoFocus value={mapName} onChange={(event) => setMapName(event.target.value)} placeholder="Untitled ontology" /></label>
-            <fieldset><legend>Structure type</legend><div>{STRUCTURE_TYPES.map((structureType) => <button key={structureType} type="button" className={blankStructureType === structureType ? 'is-selected' : ''} aria-pressed={blankStructureType === structureType} onClick={() => setBlankStructureType(structureType)}><StructurePreview structureType={structureType} floorCount={1} className="blank-type-preview" /><span>{structureNames[structureType]}</span></button>)}</div></fieldset>
-            <button type="button" className="blank-create-button" disabled={working !== null || !mapName.trim()} onClick={() => void createMap()}>{working === 'blank' ? 'Creating…' : 'Create map'}</button>
+            <label><span>{t('home.creation.mapName')}</span><input autoFocus value={mapName} onChange={(event) => setMapName(event.target.value)} placeholder={t('home.creation.mapNamePlaceholder')} /></label>
+            <fieldset><legend>{t('home.creation.structureType')}</legend><div>{STRUCTURE_TYPES.map((structureType) => <button key={structureType} type="button" className={blankStructureType === structureType ? 'is-selected' : ''} aria-pressed={blankStructureType === structureType} onClick={() => setBlankStructureType(structureType)}><StructurePreview structureType={structureType} floorCount={1} className="blank-type-preview" /><span>{t(structureType === 'tower' ? 'structure.tower' : structureType === 'campus' ? 'structure.campus' : 'structure.ship')}</span></button>)}</div></fieldset>
+            <button type="button" className="blank-create-button" disabled={working !== null || !mapName.trim()} onClick={() => void createMap()}>{t(working === 'blank' ? 'home.creation.creating' : 'home.creation.create')}</button>
           </div>
         </div>
       </div> : null}
       {creationMode === 'templates' ? <div className="template-selection">
-        <button type="button" className="creation-back" onClick={() => setCreationMode(null)}>← Back to choices</button>
+        <button type="button" className="creation-back" onClick={() => setCreationMode(null)}>{t('home.creation.back')}</button>
         <div className="template-grid">{EXAMPLE_MAPS.map((template, index) => <article className="template-card" key={template.id}>
-          <div className="template-card-heading"><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span>{structureNames[template.structureType]}</span></div>
+          <div className="template-card-heading"><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span>{t(template.structureType === 'tower' ? 'structure.tower' : template.structureType === 'campus' ? 'structure.campus' : 'structure.ship')}</span></div>
           <StructurePreview structureType={template.structureType} floorCount={template.floors.length} className="template-card-structure" />
           <div className="template-card-copy"><h3>{template.name}</h3><p>{template.description}</p></div>
-          <div className="template-card-footer"><span>{template.floors.length} floors · {template.nodes.length} concepts</span><button type="button" disabled={working !== null} onClick={() => void createMap(template.id)}>Use template</button></div>
+          <div className="template-card-footer"><span>{t(template.floors.length === 1 ? template.nodes.length === 1 ? 'home.creation.metadataOneOne' : 'home.creation.metadataOneMany' : template.nodes.length === 1 ? 'home.creation.metadataManyOne' : 'home.creation.metadataManyMany', { floors: template.floors.length, concepts: template.nodes.length })}</span><button type="button" disabled={working !== null} onClick={() => void createMap(template.id)}>{t('home.creation.useTemplate')}</button></div>
         </article>)}</div>
       </div> : null}
       {error ? <p className="library-error" role="alert">{error}</p> : null}
     </section></div> : null}
-    {trashOpen ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => setTrashOpen(false)}><section ref={dialogRef} className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="trash-title" onMouseDown={(event) => event.stopPropagation()}><div className="dialog-heading"><div><span className="eyebrow">Library</span><h2 id="trash-title">Trash</h2></div><button type="button" onClick={() => setTrashOpen(false)} aria-label="Close">×</button></div><p>Restore maps to the atlas or permanently delete them.</p><div className="map-cards">{trash.map((map, index) => <article className="map-card" key={map.id}><div className="card-index">{String(index + 1).padStart(2, '0')}</div><div><h3>{map.name}</h3><p>{map.description}</p></div><div className="card-actions"><button type="button" disabled={working !== null} onClick={() => void restoreMap(map.id)}>Restore</button><button type="button" className="delete-map-button" disabled={working !== null} onClick={() => void permanentlyDelete(map.id)}>{pendingPermanentId === map.id ? 'Confirm delete' : 'Delete forever'}</button></div></article>)}{working === 'trash' ? <p className="library-empty">Loading Trash…</p> : trash.length === 0 ? <p className="library-empty">Trash is empty.</p> : null}</div></section></div> : null}
-    {pendingDelete ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => setPendingDelete(null)}><section ref={dialogRef} className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-map-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Move to Trash</span><h2 id="delete-map-title">Trash “{pendingDelete.name}”?</h2><p>The map will be moved to Trash. You can restore it later until it is permanently deleted from Trash.</p><div><button type="button" onClick={() => setPendingDelete(null)}>Cancel</button><button type="button" className="confirm-delete" disabled={working !== null} onClick={() => void confirmDelete()}>Move to Trash</button></div></section></div> : null}
+    {trashOpen ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => setTrashOpen(false)}><section ref={dialogRef} className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="trash-title" onMouseDown={(event) => event.stopPropagation()}><div className="dialog-heading"><div><span className="eyebrow">{t('home.trash.library')}</span><h2 id="trash-title">{t('home.trash.title')}</h2></div><button type="button" onClick={() => setTrashOpen(false)} aria-label={t('common.close')}>×</button></div><p>{t('home.trash.description')}</p><div className="map-cards">{trash.map((map, index) => <article className="map-card" key={map.id}><div className="card-index">{String(index + 1).padStart(2, '0')}</div><div><h3>{map.name}</h3><p>{map.description}</p></div><div className="card-actions"><button type="button" disabled={working !== null} onClick={() => void restoreMap(map.id)}>{t('home.trash.restore')}</button><button type="button" className="delete-map-button" disabled={working !== null} onClick={() => void permanentlyDelete(map.id)}>{t(pendingPermanentId === map.id ? 'home.trash.confirmDelete' : 'home.trash.deleteForever')}</button></div></article>)}{working === 'trash' ? <p className="library-empty">{t('home.trash.loading')}</p> : trash.length === 0 ? <p className="library-empty">{t('home.trash.empty')}</p> : null}</div></section></div> : null}
+    {pendingDelete ? <div className="dialog-backdrop" role="presentation" onMouseDown={() => setPendingDelete(null)}><section ref={dialogRef} className="delete-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-map-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">{t('home.delete.eyebrow')}</span><h2 id="delete-map-title">{t('home.delete.title', { name: pendingDelete.name })}</h2><p>{t('home.delete.description')}</p><div><button type="button" onClick={() => setPendingDelete(null)}>{t('common.cancel')}</button><button type="button" className="confirm-delete" disabled={working !== null} onClick={() => void confirmDelete()}>{t('home.delete.move')}</button></div></section></div> : null}
     {mcpOpen ? <McpSetupDialog onClose={() => setMcpOpen(false)} /> : null}
   </main>
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { useI18n } from '../i18n/useI18n'
 
 export type AppSelectOption = {
   value: string
@@ -19,6 +20,7 @@ type AppSelectProps = {
 }
 
 export function AppSelect({ value, options, onChange, ariaLabel, disabled = false, className = '', compact = false }: AppSelectProps) {
+  const { t } = useI18n()
   const listId = useId()
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -141,7 +143,7 @@ export function AppSelect({ value, options, onChange, ariaLabel, disabled = fals
   </div> : null
 
   return <div className={`app-select ${compact ? 'is-compact' : ''} ${open ? 'is-open' : ''} ${className}`}>
-    <button ref={triggerRef} type="button" className="app-select-trigger" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined} disabled={disabled || options.length === 0} onKeyDown={onTriggerKeyDown} onClick={() => open ? close() : openMenu()}><span>{selected?.label ?? 'Choose'}</span><i aria-hidden="true" /></button>
+    <button ref={triggerRef} type="button" className="app-select-trigger" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined} disabled={disabled || options.length === 0} onKeyDown={onTriggerKeyDown} onClick={() => open ? close() : openMenu()}><span>{selected?.label ?? t('common.choose')}</span><i aria-hidden="true" /></button>
     {panel ? createPortal(panel, document.body) : null}
   </div>
 }

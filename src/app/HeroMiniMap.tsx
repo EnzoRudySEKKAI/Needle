@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import type { Archetype, Footprint, GridPoint } from '../domain/types'
+import { useI18n } from '../i18n/useI18n'
 import { buildingFaces, chipAnchor } from '../map/core/archetypes'
 import { depthKey, gridRouteToScreen, pointAtLength, pointsAttribute, polylineLengths } from '../map/core/iso'
 
 type HeroBuilding = {
   id: string
   code: string
-  name: string
+  nameKey: 'home.hero.building.noise' | 'home.hero.building.filter' | 'home.hero.building.pattern' | 'home.hero.building.finding'
   archetype: Archetype
   footprint: Footprint
   height: number
@@ -15,10 +16,10 @@ type HeroBuilding = {
 }
 
 const BUILDINGS = ([
-  { id: 'noise', code: 'NS', name: 'Noise', archetype: 'fin-row', footprint: { gx: 0.6, gy: 7.4, w: 2.6, d: 1.8 }, height: 1.05, properties: 4 },
-  { id: 'filter', code: 'FL', name: 'Filter', archetype: 'tower', footprint: { gx: 5.6, gy: 6.6, w: 1.7, d: 1.7 }, height: 2.8, properties: 3 },
-  { id: 'pattern', code: 'PT', name: 'Pattern', archetype: 'slab-stack', footprint: { gx: 10.2, gy: 3.9, w: 2.35, d: 2 }, height: 2.4, properties: 3 },
-  { id: 'finding', code: 'FN', name: 'Finding', archetype: 'stepped-pyramid', footprint: { gx: 15.1, gy: 2.1, w: 2.1, d: 2.1 }, height: 2.2, properties: 3, finding: true },
+  { id: 'noise', code: 'NS', nameKey: 'home.hero.building.noise', archetype: 'fin-row', footprint: { gx: 0.6, gy: 7.4, w: 2.6, d: 1.8 }, height: 1.05, properties: 4 },
+  { id: 'filter', code: 'FL', nameKey: 'home.hero.building.filter', archetype: 'tower', footprint: { gx: 5.6, gy: 6.6, w: 1.7, d: 1.7 }, height: 2.8, properties: 3 },
+  { id: 'pattern', code: 'PT', nameKey: 'home.hero.building.pattern', archetype: 'slab-stack', footprint: { gx: 10.2, gy: 3.9, w: 2.35, d: 2 }, height: 2.4, properties: 3 },
+  { id: 'finding', code: 'FN', nameKey: 'home.hero.building.finding', archetype: 'stepped-pyramid', footprint: { gx: 15.1, gy: 2.1, w: 2.1, d: 2.1 }, height: 2.2, properties: 3, finding: true },
 ] satisfies HeroBuilding[]).sort((a, b) => depthKey(a.footprint) - depthKey(b.footprint))
 
 const ROUTES: GridPoint[][] = [
@@ -30,9 +31,10 @@ const ROUTE_POINTS = ROUTES.map(gridRouteToScreen)
 const ROUTE_METRICS = ROUTE_POINTS.map(polylineLengths)
 
 function BuildingGlyph({ building }: { building: HeroBuilding }) {
+  const { t } = useI18n()
   const faces = buildingFaces(building.archetype, building.footprint, building.height, building.properties)
   const chip = chipAnchor(building.footprint, building.height)
-  const label = `${building.code} · ${building.name}`
+  const label = `${building.code} · ${t(building.nameKey)}`
   const half = Math.max(18, label.length * 3.2 + 8)
   return <g className={`hero-map-building hero-building-${building.id} ${building.finding ? 'is-finding' : ''}`}>
     {faces.map((face, index) => <polygon key={index} points={pointsAttribute(face.points)} className={`building-face face-${face.shade}`} vectorEffect="non-scaling-stroke" />)}
@@ -44,6 +46,7 @@ function BuildingGlyph({ building }: { building: HeroBuilding }) {
 }
 
 export function HeroMiniMap() {
+  const { t } = useI18n()
   const exampleRef = useRef<HTMLDivElement | null>(null)
   const payloadRef = useRef<SVGGElement | null>(null)
 
@@ -54,6 +57,8 @@ export function HeroMiniMap() {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
     let frame = 0
     let startedAt = performance.now()
+    let renderedStage = -1
+    let payloadVisible = false
     const renderRestingPayload = () => {
       const points = ROUTE_POINTS[ROUTE_POINTS.length - 1]!
       const point = points[points.length - 1]!
@@ -64,21 +69,29 @@ export function HeroMiniMap() {
     const tick = (now: number) => {
       const elapsed = ((now - startedAt) % 7500 + 7500) % 7500
       const stageIndex = Math.floor(elapsed / 2500)
-      example.dataset.stage = String(stageIndex + 1)
+      if (stageIndex !== renderedStage) {
+        renderedStage = stageIndex
+        example.dataset.stage = String(stageIndex + 1)
+      }
       const stageTime = elapsed % 2500
-      const rawProgress = Math.min(stageTime / 1900, 1)
-      const progress = rawProgress * rawProgress * (3 - 2 * rawProgress)
+      const progress = Math.min(stageTime / 1900, 1)
       const points = ROUTE_POINTS[stageIndex]!
       const metrics = ROUTE_METRICS[stageIndex]!
       const point = pointAtLength(points, metrics.cumulative, metrics.total * progress)
       payload.setAttribute('transform', `translate(${point.x} ${point.y})`)
-      payload.style.opacity = stageTime < 2100 ? '1' : '0'
+      const visible = stageTime < 2100
+      if (visible !== payloadVisible) {
+        payloadVisible = visible
+        payload.style.opacity = visible ? '1' : '0'
+      }
       frame = requestAnimationFrame(tick)
     }
     const start = () => {
       cancelAnimationFrame(frame)
       if (reducedMotion.matches) { renderRestingPayload(); return }
       startedAt = performance.now()
+      renderedStage = -1
+      payloadVisible = false
       frame = requestAnimationFrame(tick)
     }
     start()
@@ -87,8 +100,8 @@ export function HeroMiniMap() {
   }, [])
 
   return <div ref={exampleRef} className="hero-example" data-stage="1">
-    <svg className="hero-mini-map" viewBox="-250 35 680 290" role="img" aria-label="Noise to finding scenario">
-      <desc>A signal travels through Noise, Filter, Pattern and Finding buildings in three automatic steps.</desc>
+    <svg className="hero-mini-map" viewBox="-250 35 680 290" role="img" aria-label={t('home.hero.mapAria')}>
+      <desc>{t('home.hero.mapDescription')}</desc>
       <defs><filter id="hero-finding-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="7" /></filter></defs>
       <ellipse className="hero-finding-halo" cx="320" cy="225" rx="58" ry="25" filter="url(#hero-finding-glow)" />
       <g className="hero-routes">
@@ -109,6 +122,6 @@ export function HeroMiniMap() {
         })}
       </g>
     </svg>
-    <div className="hero-note">FINDING A NEEDLE<br />IN A HAYSTACK</div>
+    <div className="hero-note">{t('home.hero.note')}</div>
   </div>
 }

@@ -1,10 +1,12 @@
 import { useEffect, useEffectEvent, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { OntologyFloor } from '../domain/types'
+import { useI18n } from '../i18n/useI18n'
 import { useDocumentStore } from './document-store'
 
 type DragSession = { pointerId: number; floorId: string; beforeFloorId: string | null; startY: number; clientY: number; moved: boolean; frame: number; owner: HTMLElement }
 
 export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructure, editable = false, onAddFloor, onMoveFloor, highlightedFloorId, onHoverFloor }: { floors: readonly OntologyFloor[]; activeFloorId: string; view: 'floor' | 'structure'; onFloor: (id: string) => void; onStructure: () => void; editable?: boolean; onAddFloor?: () => void; onMoveFloor?: (floorId: string, beforeFloorId: string | null) => void; highlightedFloorId?: string | null; onHoverFloor?: (floorId: string | null) => void }) {
+  const { t, formatNumber } = useI18n()
   const { document } = useDocumentStore()
   const activeIndex = floors.findIndex((floor) => floor.id === activeFloorId)
   const wheelLocked = useRef(false)
@@ -99,16 +101,16 @@ export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructu
     updateDropTarget(event.clientY)
   }
 
-  if (compact) return <div className="floor-navigator is-compact" aria-label="Floor navigation" onWheel={onWheel}>
-    <button type="button" className="floor-compact-name" onClick={() => setCompact(false)} title="Show all floors"><span>{activeFloor?.name ?? 'Floor'}</span><i aria-hidden="true">≡</i></button>
-    <button type="button" className="floor-step-button" disabled={!floorBelow} aria-label={floorBelow ? `Go down to ${floorBelow.name}` : 'No floor below'} title={floorBelow ? `Down to ${floorBelow.name}` : 'No floor below'} onClick={() => { if (floorBelow) onFloor(floorBelow.id) }}><span aria-hidden="true">↓</span></button>
-    <button type="button" className="floor-step-button" disabled={!floorAbove} aria-label={floorAbove ? `Go up to ${floorAbove.name}` : 'No floor above'} title={floorAbove ? `Up to ${floorAbove.name}` : 'No floor above'} onClick={() => { if (floorAbove) onFloor(floorAbove.id) }}><span aria-hidden="true">↑</span></button>
+  if (compact) return <div className="floor-navigator is-compact" aria-label={t('shell.floor.navigation')} onWheel={onWheel}>
+    <button type="button" className="floor-compact-name" onClick={() => setCompact(false)} title={t('shell.floor.showAll')}><span>{activeFloor?.name ?? t('shell.floor.fallback')}</span><i aria-hidden="true">≡</i></button>
+    <button type="button" className="floor-step-button" disabled={!floorBelow} aria-label={floorBelow ? t('shell.floor.goDown', { name: floorBelow.name }) : t('shell.floor.noBelow')} title={floorBelow ? t('shell.floor.goDown', { name: floorBelow.name }) : t('shell.floor.noBelow')} onClick={() => { if (floorBelow) onFloor(floorBelow.id) }}><span aria-hidden="true">↓</span></button>
+    <button type="button" className="floor-step-button" disabled={!floorAbove} aria-label={floorAbove ? t('shell.floor.goUp', { name: floorAbove.name }) : t('shell.floor.noAbove')} title={floorAbove ? t('shell.floor.goUp', { name: floorAbove.name }) : t('shell.floor.noAbove')} onClick={() => { if (floorAbove) onFloor(floorAbove.id) }}><span aria-hidden="true">↑</span></button>
   </div>
 
-  return <div className="floor-navigator" aria-label="Floors" onWheel={onWheel}>
+  return <div className="floor-navigator" aria-label={t('common.floors')} onWheel={onWheel}>
     <div className="floor-navigator-header">
-      <span>Floors</span>
-      <div><button type="button" className="floor-compact-button" aria-label="Minimize floor navigation" title="Minimize floors" onClick={() => setCompact(true)}>−</button>{editable && onAddFloor ? <button type="button" className="floor-add-button" aria-label="Add floor" onClick={onAddFloor}>+</button> : null}</div>
+      <span>{t('common.floors')}</span>
+      <div><button type="button" className="floor-compact-button" aria-label={t('shell.floor.minimize')} title={t('shell.floor.minimizeTitle')} onClick={() => setCompact(true)}>−</button>{editable && onAddFloor ? <button type="button" className="floor-add-button" aria-label={t('shell.floor.add')} onClick={onAddFloor}>+</button> : null}</div>
     </div>
     <div className="floor-navigator-list">
       {displayFloors.map((floor) => {
@@ -132,12 +134,12 @@ export function FloorNavigator({ floors, activeFloorId, view, onFloor, onStructu
           onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}
           onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}
         >
-          <button type="button" className={isActive ? 'is-active' : ''} aria-current={isActive ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span><small className="floor-node-count">• {count}</small></button>
-          {editable && onMoveFloor ? <button type="button" className="floor-drag-handle" aria-label={`Drag ${floor.name} to reorder`} onPointerDown={(event) => startDrag(event, floor.id)} onPointerMove={moveDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}><span aria-hidden="true">⋮⋮</span></button> : null}
+          <button type="button" className={isActive ? 'is-active' : ''} aria-current={isActive ? 'true' : undefined} onClick={() => onFloor(floor.id)}><b>{String(index + 1).padStart(2, '0')}</b><span>{floor.name}</span><small className="floor-node-count">• {formatNumber(count)}</small></button>
+          {editable && onMoveFloor ? <button type="button" className="floor-drag-handle" aria-label={t('shell.floor.drag', { name: floor.name })} onPointerDown={(event) => startDrag(event, floor.id)} onPointerMove={moveDrag} onPointerUp={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(true) }} onPointerCancel={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }} onLostPointerCapture={(event) => { if (dragSession.current?.pointerId === event.pointerId) finishDrag(false) }}><span aria-hidden="true">⋮⋮</span></button> : null}
         </div>
       })}
       {draggingFloorId && dropBeforeFloorId === null ? <div className="floor-drop-end" aria-hidden="true" /> : null}
     </div>
-    <button type="button" className={`structure-view-button ${view === 'structure' ? 'is-active' : ''}`} onClick={onStructure}>Structure view</button>
+    <button type="button" className={`structure-view-button ${view === 'structure' ? 'is-active' : ''}`} onClick={onStructure}>{t('shell.floor.structureView')}</button>
   </div>
 }

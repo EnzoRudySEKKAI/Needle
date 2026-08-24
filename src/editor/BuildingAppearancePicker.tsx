@@ -1,23 +1,24 @@
 import type { Archetype, FaceTexture } from '../domain/types'
 import { buildingFaces } from '../map/core/archetypes'
 import { pointsAttribute } from '../map/core/iso'
+import { useI18n } from '../i18n/useI18n'
 
-const FORMS: { value: Archetype | null; label: string }[] = [
-  { value: null, label: 'Automatic' },
-  { value: 'cube', label: 'Cube' },
-  { value: 'tower', label: 'Tower' },
-  { value: 'low-slab', label: 'Low slab' },
-  { value: 'slab-stack', label: 'Slab stack' },
-  { value: 'fin-row', label: 'Fin row' },
-  { value: 'podium-tower', label: 'Podium tower' },
-  { value: 'twin-towers', label: 'Twin towers' },
-  { value: 'courtyard', label: 'Courtyard' },
-  { value: 'bridge', label: 'Bridge' },
-  { value: 'stepped-pyramid', label: 'Stepped pyramid' },
-  { value: 'server-rack', label: 'Server rack' },
-  { value: 'database', label: 'Database' },
-  { value: 'monitor', label: 'Monitor' },
-]
+const FORMS = [
+  { value: null, key: 'content.formAutomatic' },
+  { value: 'cube', key: 'content.formCube' },
+  { value: 'tower', key: 'content.formTower' },
+  { value: 'low-slab', key: 'content.formLowSlab' },
+  { value: 'slab-stack', key: 'content.formSlabStack' },
+  { value: 'fin-row', key: 'content.formFinRow' },
+  { value: 'podium-tower', key: 'content.formPodiumTower' },
+  { value: 'twin-towers', key: 'content.formTwinTowers' },
+  { value: 'courtyard', key: 'content.formCourtyard' },
+  { value: 'bridge', key: 'content.formBridge' },
+  { value: 'stepped-pyramid', key: 'content.formSteppedPyramid' },
+  { value: 'server-rack', key: 'content.formServerRack' },
+  { value: 'database', key: 'content.formDatabase' },
+  { value: 'monitor', key: 'content.formMonitor' },
+] as const satisfies ReadonlyArray<{ value: Archetype | null; key: string }>
 
 function FormPreview({ archetype }: { archetype: Archetype | null }) {
   const previewHeight = archetype === 'low-slab' ? 0.7 : archetype === 'monitor' ? 1.85 : archetype === 'database' ? 1.6 : 3.2
@@ -31,5 +32,6 @@ function FormPreview({ archetype }: { archetype: Archetype | null }) {
 }
 
 export function BuildingAppearancePicker({ archetype, texture, onArchetype, onTexture }: { archetype?: Archetype; texture: FaceTexture; onArchetype: (value: Archetype | undefined) => void; onTexture: (value: FaceTexture) => void }) {
-  return <div className="appearance-picker"><fieldset className="form-picker"><legend>Building form</legend><div>{FORMS.map((form) => { const selected = (archetype ?? null) === form.value; return <button type="button" key={form.label} className={selected ? 'is-selected' : ''} aria-pressed={selected} title={form.label} onClick={() => onArchetype(form.value ?? undefined)}><FormPreview archetype={form.value} /><span>{form.label}</span></button> })}</div></fieldset><fieldset className="texture-picker"><legend>Face texture</legend><div>{(['auto', 'plain', 'hatched'] as const).map((value) => <button type="button" key={value} className={texture === value ? 'is-selected' : ''} aria-pressed={texture === value} onClick={() => onTexture(value)}>{value}</button>)}</div></fieldset></div>
+  const { t } = useI18n()
+  return <div className="appearance-picker"><fieldset className="form-picker"><legend>{t('content.buildingForm')}</legend><div>{FORMS.map((form) => { const selected = (archetype ?? null) === form.value; const label = t(form.key); return <button type="button" key={form.key} className={selected ? 'is-selected' : ''} aria-pressed={selected} title={label} onClick={() => onArchetype(form.value ?? undefined)}><FormPreview archetype={form.value} /><span>{label}</span></button> })}</div></fieldset><fieldset className="texture-picker"><legend>{t('content.faceTexture')}</legend><div>{(['auto', 'plain', 'hatched'] as const).map((value) => <button type="button" key={value} className={texture === value ? 'is-selected' : ''} aria-pressed={texture === value} onClick={() => onTexture(value)}>{t(value === 'auto' ? 'content.textureAuto' : value === 'plain' ? 'content.texturePlain' : 'content.textureHatched')}</button>)}</div></fieldset></div>
 }

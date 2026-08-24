@@ -99,6 +99,9 @@ export type MapPresence = {
   selection: Selection | null
   activeFloorId: string | null
   activeFlowId: string | null
+  activeFlowStageId: string | null
+  flowPlaying: boolean
+  flowSpeed: number
   presenter: boolean
   displayName: string
 }

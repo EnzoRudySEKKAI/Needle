@@ -5,8 +5,6 @@ import type { Diagnostic } from '../domain/validation'
 
 export { migrateDocument } from '../domain/migration'
 
-const PREFIX = 'needle:map:'
-const INDEX_KEY = 'needle:map-index'
 export type MapSummary = Pick<OntologyDocument, 'id' | 'name' | 'description' | 'updatedAt' | 'structureType'> & { floorCount: number }
 export type HistorySummary = Pick<OntologyDocument, 'name' | 'updatedAt'> & { snapshot: string }
 export type TrashSummary = MapSummary & { deletedAt: string }
@@ -19,15 +17,6 @@ export class MapValidationError extends Error {
   constructor(message: string, readonly diagnostics: Diagnostic[]) {
     super(message)
     this.name = 'MapValidationError'
-  }
-}
-
-function readIndex(): MapSummary[] {
-  try {
-    const value = JSON.parse(localStorage.getItem(INDEX_KEY) ?? '[]') as unknown
-    return Array.isArray(value) ? value as MapSummary[] : []
-  } catch {
-    return []
   }
 }
 
@@ -148,24 +137,6 @@ export async function restoreTrashedMap(id: string): Promise<OntologyDocument> {
 
 export function permanentlyDeleteTrashedMap(id: string): Promise<void> {
   return request(`/api/trash/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
-
-export function listLegacyMaps(): MapSummary[] {
-  return [...readIndex()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-}
-
-function loadLegacyMap(id: string): OntologyDocument | null {
-  try {
-    return migrateDocument(JSON.parse(localStorage.getItem(`${PREFIX}${id}`) ?? 'null') as unknown)
-  } catch {
-    return null
-  }
-}
-
-export async function publishLegacyMaps(): Promise<number> {
-  const documents = listLegacyMaps().map((summary) => loadLegacyMap(summary.id)).filter((document): document is OntologyDocument => document !== null)
-  await Promise.all(documents.map((document) => saveMap(document)))
-  return documents.length
 }
 
 export async function createBlankMap(name = 'Untitled ontology', structureType: StructureType = 'tower'): Promise<OntologyDocument> {

@@ -22,6 +22,7 @@ const PORT_CLEARANCE = 0.8
 const OBSTACLE_PADDING = 0.35
 const BEND_PENALTY = 1.2
 const ALIGNMENT_EPSILON = 1e-9
+const PARALLEL_LANE_GAP = 18
 
 function distance(a: GridPoint, b: GridPoint): number {
   return Math.abs(a.gx - b.gx) + Math.abs(a.gy - b.gy)
@@ -286,18 +287,51 @@ function longestSegmentMidpoint(points: readonly ScreenPoint[]): ScreenPoint {
   return longest.point
 }
 
+function segmentNormal(start: ScreenPoint, end: ScreenPoint): ScreenPoint {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const length = Math.hypot(dx, dy)
+  return length === 0 ? { x: 0, y: 0 } : { x: -dy / length, y: dx / length }
+}
+
+function offsetRoute(points: readonly ScreenPoint[], amount: number): ScreenPoint[] {
+  if (amount === 0 || points.length < 2) return [...points]
+  return points.map((point, index) => {
+    const before = index > 0 ? segmentNormal(points[index - 1]!, point) : segmentNormal(point, points[index + 1]!)
+    const after = index < points.length - 1 ? segmentNormal(point, points[index + 1]!) : before
+    const miterLength = Math.hypot(before.x + after.x, before.y + after.y)
+    if (miterLength < ALIGNMENT_EPSILON) return { x: point.x + after.x * amount, y: point.y + after.y * amount }
+    const miter = { x: (before.x + after.x) / miterLength, y: (before.y + after.y) / miterLength }
+    const projection = miter.x * after.x + miter.y * after.y
+    const scale = Math.abs(projection) < ALIGNMENT_EPSILON ? amount : amount / projection
+    return { x: point.x + miter.x * scale, y: point.y + miter.y * scale }
+  })
+}
+
 export function buildRelationGeometry(nodes: readonly VisualNode[], relations: readonly OntologyRelation[]): ReadonlyMap<string, RelationGeometry> {
   const byId = new Map(nodes.map((node) => [node.id, node]))
   const result = new Map<string, RelationGeometry>()
   if (relations.length === 0) return result
   const graph = buildRoutingGraph(nodes)
+  const parallelGroups = new Map<string, OntologyRelation[]>()
+  for (const relation of relations) {
+    const key = JSON.stringify(relation.from < relation.to ? [relation.from, relation.to] : [relation.to, relation.from])
+    const group = parallelGroups.get(key)
+    if (group) group.push(relation)
+    else parallelGroups.set(key, [relation])
+  }
+  const laneOffsets = new Map<string, number>()
+  for (const group of parallelGroups.values()) group.forEach((relation, index) => {
+    const canonicalDirection = relation.from <= relation.to ? 1 : -1
+    laneOffsets.set(relation.id, (index - (group.length - 1) / 2) * PARALLEL_LANE_GAP * canonicalDirection)
+  })
   for (const relation of relations) {
     const from = byId.get(relation.from)
     const to = byId.get(relation.to)
     if (!from || !to) continue
     const routed = routeFor(from, to, nodes, graph)
     if (!routed) continue
-    const points = gridRouteToScreen(routed.route)
+    const points = offsetRoute(gridRouteToScreen(routed.route), laneOffsets.get(relation.id) ?? 0)
     const { cumulative, total } = polylineLengths(points)
     result.set(relation.id, { points, cumulative, total, fromSide: routed.fromSide, toSide: routed.toSide, labelPoint: longestSegmentMidpoint(points) })
   }

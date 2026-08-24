@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import type { OntologyDocument, Selection } from '../domain/types'
+import { useI18n } from '../i18n/useI18n'
 import { FloorMiniPlan } from '../map/components/FloorMiniPlan'
 
 export type CommandPaletteProps = {
@@ -21,6 +22,7 @@ type PaletteResult = {
 }
 
 export function CommandPalette({ open, document: mapDocument, activeFloorId, onClose, onSelect, onOpenFlow }: CommandPaletteProps) {
+  const { t } = useI18n()
   const listId = useId()
   const inputRef = useRef<HTMLInputElement | null>(null)
   const dialogRef = useRef<HTMLElement | null>(null)
@@ -35,8 +37,8 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
     ...mapDocument.floors.map((floor) => ({
       key: `floor:${floor.id}`,
       label: floor.name,
-      detail: floor.id === activeFloorId ? 'Floor - current' : 'Floor',
-      searchText: `${floor.name} ${floor.id} floor`,
+      detail: floor.id === activeFloorId ? t('tools.palette.floorCurrent') : t('common.floor'),
+      searchText: `${floor.name} ${floor.id} floor ${t('tools.palette.kindFloor')}`,
       selection: { kind: 'floor' as const, id: floor.id },
       floorId: floor.id,
     })),
@@ -45,8 +47,8 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
       return {
         key: `group:${group.id}`,
         label: group.name,
-        detail: `Neighborhood - ${groupNodes.length} concept${groupNodes.length === 1 ? '' : 's'}`,
-        searchText: `${group.name} ${group.description} ${group.id} neighborhood group ${groupNodes.map((node) => `${node.name} ${node.code}`).join(' ')}`,
+        detail: t(groupNodes.length === 1 ? 'tools.palette.neighborhoodCountOne' : 'tools.palette.neighborhoodCountOther', { count: groupNodes.length }),
+        searchText: `${group.name} ${group.description} ${group.id} neighborhood group ${t('tools.palette.kindNeighborhood')} ${groupNodes.map((node) => `${node.name} ${node.code}`).join(' ')}`,
         selection: { kind: 'group' as const, id: group.id },
         floorId: groupNodes.find((node) => node.floorId === activeFloorId)?.floorId ?? groupNodes[0]?.floorId,
       }
@@ -54,8 +56,8 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
     ...mapDocument.nodes.map((node) => ({
       key: `node:${node.id}`,
       label: node.name,
-      detail: `${node.code} - ${groupById.get(node.groupId)?.name ?? 'Unknown neighborhood'} - ${floorById.get(node.floorId)?.name ?? 'Unknown floor'}`,
-      searchText: [node.id, node.code, node.name, node.whatItDoes, node.size, node.archetypeOverride, node.faceTexture, groupById.get(node.groupId)?.name, floorById.get(node.floorId)?.name, ...node.properties.flatMap((property) => [property.id, property.key, property.value])].filter(Boolean).join(' '),
+      detail: `${node.code} - ${groupById.get(node.groupId)?.name ?? t('tools.palette.unknownNeighborhood')} - ${floorById.get(node.floorId)?.name ?? t('tools.palette.unknownFloor')}`,
+      searchText: [node.id, node.code, node.name, node.whatItDoes, node.size, node.archetypeOverride, node.faceTexture, 'concept node', t('tools.palette.kindConcept'), groupById.get(node.groupId)?.name, floorById.get(node.floorId)?.name, ...node.properties.flatMap((property) => [property.id, property.key, property.value])].filter(Boolean).join(' '),
       selection: { kind: 'node' as const, id: node.id },
       floorId: node.floorId,
     })),
@@ -64,9 +66,9 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
       const to = nodeById.get(relation.to)
       return {
         key: `relation:${relation.id}`,
-        label: relation.label || `${from?.name ?? relation.from} to ${to?.name ?? relation.to}`,
-        detail: `Relation - ${from?.name ?? relation.from} to ${to?.name ?? relation.to}`,
-        searchText: `${relation.id} ${relation.label} ${relation.kind} relation ${from?.name ?? ''} ${from?.code ?? ''} ${to?.name ?? ''} ${to?.code ?? ''}`,
+        label: relation.label || t('tools.palette.relationBetween', { from: from?.name ?? relation.from, to: to?.name ?? relation.to }),
+        detail: t('tools.palette.relationDetail', { from: from?.name ?? relation.from, to: to?.name ?? relation.to }),
+        searchText: `${relation.id} ${relation.label} ${relation.kind} relation ${t('tools.palette.kindRelation')} ${from?.name ?? ''} ${from?.code ?? ''} ${to?.name ?? ''} ${to?.code ?? ''}`,
         selection: { kind: 'relation' as const, id: relation.id },
         floorId: from?.floorId ?? to?.floorId,
       }
@@ -81,8 +83,8 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
       return {
         key: `flow:${flow.id}`,
         label: flow.name,
-        detail: `Scenario - ${flow.stages.length} stage${flow.stages.length === 1 ? '' : 's'}`,
-        searchText: `${flow.id} ${flow.name} ${flow.payload} ${flow.summary} scenario flow ${relatedText}`,
+        detail: t(flow.stages.length === 1 ? 'tools.palette.scenarioCountOne' : 'tools.palette.scenarioCountOther', { count: flow.stages.length }),
+        searchText: `${flow.id} ${flow.name} ${flow.payload} ${flow.summary} scenario flow ${t('tools.palette.kindScenario')} ${relatedText}`,
         selection: { kind: 'flow' as const, id: flow.id },
       }
     }),
@@ -130,37 +132,39 @@ export function CommandPalette({ open, document: mapDocument, activeFloorId, onC
   }
 
   return <div className="dialog-backdrop command-palette-backdrop" role="presentation" onMouseDown={onClose}>
-    <section ref={dialogRef} className="command-palette" role="dialog" aria-modal="true" aria-label="Search the map" onMouseDown={(event) => event.stopPropagation()} onKeyDown={onKeyDown}>
+    <section ref={dialogRef} className="command-palette" role="dialog" aria-modal="true" aria-label={t('tools.palette.searchAria')} onMouseDown={(event) => event.stopPropagation()} onKeyDown={onKeyDown}>
       <div className="command-palette-search">
-        <input ref={inputRef} type="search" value={query} placeholder="Search concepts, neighborhoods, floors, relations, and scenarios" aria-label="Search the map" role="combobox" aria-autocomplete="list" aria-controls={listId} aria-expanded="true" aria-activedescendant={filtered[activeIndex] ? `${listId}-${filtered[activeIndex].key}` : undefined} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} />
-        <button type="button" onClick={onClose} aria-label="Close command palette">Esc</button>
+        <input ref={inputRef} type="search" value={query} placeholder={t('tools.palette.searchPlaceholder')} aria-label={t('tools.palette.searchAria')} role="combobox" aria-autocomplete="list" aria-controls={listId} aria-expanded="true" aria-activedescendant={filtered[activeIndex] ? `${listId}-${filtered[activeIndex].key}` : undefined} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} />
+        <button type="button" onClick={onClose} aria-label={t('tools.palette.closeAria')}>Esc</button>
       </div>
       <div className="command-palette-body">
-        <div id={listId} className="command-palette-results" role="listbox" aria-label="Search results">
+        <div id={listId} className="command-palette-results" role="listbox" aria-label={t('tools.palette.resultsAria')}>
           {filtered.map((result, index) => <button id={`${listId}-${result.key}`} key={result.key} type="button" role="option" aria-selected={index === activeIndex} className={index === activeIndex ? 'is-active' : ''} onMouseEnter={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)} onClick={() => choose(result)}><span>{result.label}</span><small>{result.detail}</small></button>)}
-          {filtered.length === 0 ? <p className="command-palette-empty" role="status">No matching items.</p> : null}
+          {filtered.length === 0 ? <p className="command-palette-empty" role="status">{t('tools.palette.noMatches')}</p> : null}
         </div>
         <PalettePreview result={activeResult} document={mapDocument} />
       </div>
-      <p className="command-palette-hint"><kbd>Up</kbd><kbd>Down</kbd> navigate <kbd>Enter</kbd> open <kbd>Esc</kbd> close</p>
+      <p className="command-palette-hint"><kbd>{t('tools.shortcuts.key.up')}</kbd><kbd>{t('tools.shortcuts.key.down')}</kbd> {t('tools.palette.navigate')} <kbd>Enter</kbd> {t('tools.palette.open')} <kbd>Esc</kbd> {t('tools.palette.close')}</p>
     </section>
   </div>
 }
 
 function PalettePreview({ result, document }: { result?: PaletteResult; document: OntologyDocument }) {
-  if (!result) return <aside className="command-palette-preview is-empty"><span>No preview</span></aside>
+  const { t } = useI18n()
+  if (!result) return <aside className="command-palette-preview is-empty"><span>{t('tools.palette.noPreview')}</span></aside>
   const relation = result.selection.kind === 'relation' ? document.relations.find((candidate) => candidate.id === result.selection.id) : null
   const from = relation ? document.nodes.find((node) => node.id === relation.from) : null
   const to = relation ? document.nodes.find((node) => node.id === relation.to) : null
   const floorIds = relation
     ? [...new Set([from?.floorId, to?.floorId].filter((id): id is string => Boolean(id)))]
     : result.floorId ? [result.floorId] : []
+  const kindKey = { floor: 'tools.palette.kindFloor', group: 'tools.palette.kindNeighborhood', node: 'tools.palette.kindConcept', relation: 'tools.palette.kindRelation', flow: 'tools.palette.kindScenario' } as const
   return <aside className="command-palette-preview" aria-live="polite">
-    <div className="command-palette-preview-heading"><span>{result.selection.kind}</span><strong>{result.label}</strong><small>{result.detail}</small></div>
+    <div className="command-palette-preview-heading"><span>{t(kindKey[result.selection.kind])}</span><strong>{result.label}</strong><small>{result.detail}</small></div>
     {relation && from && to ? <div className="command-palette-preview-relation"><span><b>{from.code}</b>{from.name}</span><i aria-hidden="true">→</i><span><b>{to.code}</b>{to.name}</span></div> : null}
     <div className={`command-palette-preview-maps ${floorIds.length > 1 ? 'has-two-floors' : ''}`}>
       {floorIds.map((floorId) => <div className="command-palette-preview-map" key={floorId}><span>{document.floors.find((floor) => floor.id === floorId)?.name}</span><FloorMiniPlan document={document} floorId={floorId} selection={result.selection} width={420} height={floorIds.length > 1 ? 145 : 300} /></div>)}
-      {floorIds.length === 0 ? <p>{result.selection.kind === 'flow' ? document.flows.find((flow) => flow.id === result.selection.id)?.summary : 'No floor context.'}</p> : null}
+      {floorIds.length === 0 ? <p>{result.selection.kind === 'flow' ? document.flows.find((flow) => flow.id === result.selection.id)?.summary : t('tools.palette.noFloorContext')}</p> : null}
     </div>
   </aside>
 }
