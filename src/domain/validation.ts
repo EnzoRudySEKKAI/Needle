@@ -3,6 +3,9 @@ import { SCHEMA_VERSION, STRUCTURE_TYPES, type BuildingSize, type OntologyDocume
 const BUILDING_SIZES = new Set<BuildingSize>(['xs', 's', 'm', 'l', 'xl'])
 const VALID_STRUCTURE_TYPES = new Set<StructureType>(STRUCTURE_TYPES)
 const RELATION_KINDS = new Set(['full', 'dotted'])
+const FLOW_DIRECTIONS = new Set(['forward', 'reverse'])
+const CALLOUT_TONES = new Set(['information', 'attention', 'alert'])
+const CALLOUT_SIDES = new Set(['left', 'right'])
 
 export type Diagnostic = {
   level: 'error' | 'warning'
@@ -48,6 +51,13 @@ export function validateDocument(document: OntologyDocument): Diagnostic[] {
           diagnostics.push({ level: 'error', message: `${flow.name} uses a missing relation.`, target: { kind: 'flow', id: flow.id } })
           continue
         }
+        if (!FLOW_DIRECTIONS.has(traversal.direction)) diagnostics.push({ level: 'error', message: `${flow.name} contains an invalid path direction.`, target: { kind: 'flow', id: flow.id } })
+      }
+      if (stage.advance?.kind === 'auto' && (!Number.isFinite(stage.advance.afterMs) || stage.advance.afterMs < 1200)) diagnostics.push({ level: 'error', message: `${flow.name} contains an invalid shot duration.`, target: { kind: 'flow', id: flow.id } })
+      for (const callout of stage.callouts ?? []) {
+        const anchor = callout.anchor
+        const floorId = anchor.kind === 'point' ? anchor.floorId : document.nodes.find((node) => node.id === anchor.nodeId)?.floorId
+        if (!floorId || !floorIds.has(floorId) || !CALLOUT_TONES.has(callout.tone) || (callout.side !== undefined && !CALLOUT_SIDES.has(callout.side))) diagnostics.push({ level: 'error', message: `${flow.name} contains an invalid annotation.`, target: { kind: 'flow', id: flow.id } })
       }
     }
   }
@@ -74,5 +84,16 @@ export function isOntologyDocument(value: unknown): value is OntologyDocument {
     const node = value as unknown as Record<string, unknown>
     return typeof node.id === 'string' && typeof node.floorId === 'string' && BUILDING_SIZES.has(node.size as BuildingSize) && Array.isArray(node.properties) && !('metric' in node) && !('unit' in node) && !('role' in node) && !('kind' in node)
   })
-  return floorsValid && nodesValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value) && RELATION_KINDS.has((value as { kind?: unknown }).kind as string)))
+  const flowsValid = candidate.flows.every((value) => {
+    if (!value || typeof value !== 'object') return false
+    const flow = value as unknown as Record<string, unknown>
+    if (typeof flow.id !== 'string' || typeof flow.name !== 'string' || typeof flow.payload !== 'string' || typeof flow.summary !== 'string' || !Array.isArray(flow.stages)) return false
+    return flow.stages.every((value) => {
+      if (!value || typeof value !== 'object') return false
+      const stage = value as Record<string, unknown>
+      if (typeof stage.id !== 'string' || !Array.isArray(stage.traversals) || (stage.callouts !== undefined && !Array.isArray(stage.callouts))) return false
+      return stage.traversals.every((value) => Boolean(value && typeof value === 'object' && typeof (value as Record<string, unknown>).id === 'string' && typeof (value as Record<string, unknown>).relationId === 'string' && FLOW_DIRECTIONS.has((value as Record<string, unknown>).direction as string)))
+    })
+  })
+  return floorsValid && nodesValid && flowsValid && candidate.relations.every((value) => Boolean(value && typeof value === 'object' && !('via' in value) && RELATION_KINDS.has((value as { kind?: unknown }).kind as string)))
 }

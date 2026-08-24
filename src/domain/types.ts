@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 9 as const
+export const SCHEMA_VERSION = 10 as const
 export const STRUCTURE_TYPES = ['tower', 'campus', 'cruise-ship'] as const
 
 export type GridPoint = { gx: number; gy: number }
@@ -72,11 +72,36 @@ export type FlowTraversal = {
   direction: FlowDirection
 }
 
+export type ScenarioAnchor =
+  | { kind: 'node'; nodeId: string }
+  | { kind: 'point'; floorId: string; gx: number; gy: number }
+
+export type ScenarioCallout = {
+  id: string
+  anchor: ScenarioAnchor
+  text: string
+  tone: 'information' | 'attention' | 'alert'
+  side?: 'left' | 'right'
+}
+
+export type ScenarioAdvance =
+  | { kind: 'auto'; afterMs: number }
+  | { kind: 'continue' }
+
+export type ScenarioTransition = {
+  kind: 'cut' | 'fade' | 'travel'
+  durationMs: number
+}
+
 export type FlowStage = {
   id: string
   name?: string
   note?: string
   traversals: FlowTraversal[]
+  layout?: 'auto' | 'single' | 'split'
+  advance?: ScenarioAdvance
+  transition?: ScenarioTransition
+  callouts?: ScenarioCallout[]
 }
 
 export type OntologyFlow = {
@@ -85,6 +110,8 @@ export type OntologyFlow = {
   payload: string
   summary: string
   stages: FlowStage[]
+  endBehavior?: 'stop' | 'loop'
+  showGrid?: boolean
 }
 
 export type Selection =
@@ -103,6 +130,8 @@ export type MapPresence = {
   activeFlowStageId: string | null
   flowPlaying: boolean
   flowSpeed: number
+  flowTime: number
+  flowEpoch: number
   presenter: boolean
   displayName: string
 }

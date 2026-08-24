@@ -13,22 +13,48 @@ function migrateRelationKinds(relations: unknown): unknown {
   })
 }
 
+function migrateScenarios(flows: unknown): unknown {
+  if (!Array.isArray(flows)) return flows
+  return flows.map((flow) => {
+    if (!flow || typeof flow !== 'object') return flow
+    const fields = flow as Record<string, unknown>
+    const legacyStages = Array.isArray(fields.stages) ? fields.stages : []
+    const showGrid = typeof fields.showGrid === 'boolean'
+      ? fields.showGrid
+      : legacyStages.every((stage) => !stage || typeof stage !== 'object' || (stage as Record<string, unknown>).showGrid !== false)
+    const stages = legacyStages.map((stage) => {
+      if (!stage || typeof stage !== 'object') return stage
+      const shot = stage as Record<string, unknown>
+      const shotFields = { ...shot }
+      delete shotFields.showGrid
+      return {
+        ...shotFields,
+        layout: shot.layout ?? 'auto',
+        advance: shot.advance ?? { kind: 'auto', afterMs: 3400 },
+        transition: shot.transition ?? { kind: 'travel', durationMs: 520 },
+        callouts: Array.isArray(shot.callouts) ? shot.callouts : [],
+      }
+    })
+    return { ...fields, endBehavior: fields.endBehavior === 'loop' ? 'loop' : 'stop', showGrid, stages }
+  })
+}
+
 export function migrateDocument(value: unknown): OntologyDocument | null {
   if (!value || typeof value !== 'object') return null
   const legacy = value as Record<string, unknown>
   const legacyVersion = legacy.schemaVersion as number
   if (legacyVersion === SCHEMA_VERSION) {
-    const current: Record<string, unknown> = { ...legacy, relations: migrateRelationKinds(legacy.relations) }
+    const current: Record<string, unknown> = { ...legacy, relations: migrateRelationKinds(legacy.relations), flows: migrateScenarios(legacy.flows) }
     delete current.comments
     return isOntologyDocument(current) ? current : null
   }
-  if (legacyVersion === 8) {
-    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, relations: migrateRelationKinds(legacy.relations) }
+  if (legacyVersion === 8 || legacyVersion === 9) {
+    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, relations: migrateRelationKinds(legacy.relations), flows: migrateScenarios(legacy.flows) }
     delete migrated.comments
     return isOntologyDocument(migrated) ? migrated : null
   }
   if (legacyVersion === 7) {
-    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower', relations: migrateRelationKinds(legacy.relations) }
+    const migrated: Record<string, unknown> = { ...legacy, schemaVersion: SCHEMA_VERSION, structureType: 'tower', relations: migrateRelationKinds(legacy.relations), flows: migrateScenarios(legacy.flows) }
     delete migrated.comments
     return isOntologyDocument(migrated) ? migrated : null
   }
@@ -74,7 +100,7 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
       delete relationFields.via
       return relationFields
     }),
-    flows: legacyVersion >= 3 ? legacy.flows : legacy.flows.map((flow, flowIndex) => {
+    flows: migrateScenarios(legacyVersion >= 3 ? legacy.flows : legacy.flows.map((flow, flowIndex) => {
       const legacyFlow = flow as Record<string, unknown>
       const relationIds = Array.isArray(legacyFlow.relationIds) ? legacyFlow.relationIds : []
       const rest = { ...legacyFlow }
@@ -86,7 +112,7 @@ export function migrateDocument(value: unknown): OntologyDocument | null {
           traversals: [{ id: `migrated-${flowIndex}-${stageIndex}-a`, relationId, direction: 'forward' }],
         })),
       }
-    }),
+    })),
   }
   return isOntologyDocument(migrated) ? migrated : null
 }

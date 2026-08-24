@@ -1,5 +1,5 @@
 import { makeId } from './id'
-import type { FlowDirection, GridPoint, OntologyDocument } from './types'
+import type { FlowDirection, GridPoint, OntologyDocument, ScenarioCallout } from './types'
 
 export function addFloor(document: OntologyDocument, afterFloorId: string | null, floorId = makeId('floor')): { document: OntologyDocument; floorId: string } {
   const floor = { id: floorId, name: 'New floor', groupFlagPositions: {} }
@@ -28,7 +28,12 @@ export function deleteFloorCascade(document: OntologyDocument, floorId: string):
   const nodeIds = new Set(document.nodes.filter((node) => node.floorId === floorId).map((node) => node.id))
   const relationIds = new Set(document.relations.filter((relation) => nodeIds.has(relation.from) || nodeIds.has(relation.to)).map((relation) => relation.id))
   const withoutRelations = deleteRelationsCascade(document, relationIds)
-  return { ...withoutRelations, floors: document.floors.filter((floor) => floor.id !== floorId), nodes: document.nodes.filter((node) => !nodeIds.has(node.id)) }
+  return {
+    ...withoutRelations,
+    floors: document.floors.filter((floor) => floor.id !== floorId),
+    nodes: document.nodes.filter((node) => !nodeIds.has(node.id)),
+    flows: withoutRelations.flows.map((flow) => ({ ...flow, stages: flow.stages.map((stage) => ({ ...stage, callouts: (stage.callouts ?? []).filter((callout) => callout.anchor.kind !== 'point' || callout.anchor.floorId !== floorId) })) })),
+  }
 }
 
 export function moveFloorContents(document: OntologyDocument, floorId: string, targetFloorId: string): OntologyDocument {
@@ -38,6 +43,7 @@ export function moveFloorContents(document: OntologyDocument, floorId: string, t
     ...document,
     floors: document.floors.filter((floor) => floor.id !== floorId).map((floor) => floor.id === targetFloorId && source ? { ...floor, groupFlagPositions: { ...source.groupFlagPositions, ...floor.groupFlagPositions } } : floor),
     nodes: document.nodes.map((node) => node.floorId === floorId ? { ...node, floorId: targetFloorId } : node),
+    flows: document.flows.map((flow) => ({ ...flow, stages: flow.stages.map((stage) => ({ ...stage, callouts: (stage.callouts ?? []).map((callout) => callout.anchor.kind === 'point' && callout.anchor.floorId === floorId ? { ...callout, anchor: { ...callout.anchor, floorId: targetFloorId } } : callout) })) })),
   }
 }
 
@@ -46,7 +52,7 @@ export function addFlowTraversal(document: OntologyDocument, flowId: string, sta
   const flow = document.flows.find((candidate) => candidate.id === flowId)
   if (!flow) return document
   if (stageId === null) {
-    const stage = { id: makeId('stage'), traversals: [{ id: makeId('traversal'), relationId, direction }] }
+    const stage = { id: makeId('stage'), traversals: [{ id: makeId('traversal'), relationId, direction }], layout: 'auto' as const, advance: { kind: 'auto' as const, afterMs: 3400 }, transition: { kind: 'travel' as const, durationMs: 520 }, callouts: [] }
     return { ...document, flows: document.flows.map((candidate) => candidate.id === flowId ? { ...candidate, stages: [...candidate.stages, stage] } : candidate) }
   }
   const target = flow.stages.find((stage) => stage.id === stageId)
@@ -57,6 +63,16 @@ export function addFlowTraversal(document: OntologyDocument, flowId: string, sta
       ...candidate,
       stages: candidate.stages.map((stage) => stage.id === stageId ? { ...stage, traversals: [...stage.traversals, { id: makeId('traversal'), relationId, direction }] } : stage),
     } : candidate),
+  }
+}
+
+export function addScenarioCallout(document: OntologyDocument, flowId: string, stageId: string, callout: Omit<ScenarioCallout, 'id'>): OntologyDocument {
+  return {
+    ...document,
+    flows: document.flows.map((flow) => flow.id === flowId ? {
+      ...flow,
+      stages: flow.stages.map((stage) => stage.id === stageId ? { ...stage, callouts: [...(stage.callouts ?? []), { ...callout, id: makeId('callout') }] } : stage),
+    } : flow),
   }
 }
 
@@ -88,7 +104,12 @@ export function deleteRelationsCascade(document: OntologyDocument, relationIds: 
 
 export function deleteNodeCascade(document: OntologyDocument, nodeId: string): OntologyDocument {
   const removedRelationIds = new Set(document.relations.filter((relation) => relation.from === nodeId || relation.to === nodeId).map((relation) => relation.id))
-  return { ...deleteRelationsCascade(document, removedRelationIds), nodes: document.nodes.filter((node) => node.id !== nodeId) }
+  const withoutRelations = deleteRelationsCascade(document, removedRelationIds)
+  return {
+    ...withoutRelations,
+    nodes: document.nodes.filter((node) => node.id !== nodeId),
+    flows: withoutRelations.flows.map((flow) => ({ ...flow, stages: flow.stages.map((stage) => ({ ...stage, callouts: (stage.callouts ?? []).filter((callout) => callout.anchor.kind !== 'node' || callout.anchor.nodeId !== nodeId) })) })),
+  }
 }
 
 export function deleteGroupCascade(document: OntologyDocument, groupId: string): OntologyDocument {

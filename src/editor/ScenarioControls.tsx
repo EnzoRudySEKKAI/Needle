@@ -1,8 +1,8 @@
-import { useEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useRef } from 'react'
 import type { OntologyFlow } from '../domain/types'
 import { activeStageState, type FlowProgram } from '../map/core/program'
 import type { StepDisplayMode } from '../map/core/step-display'
-import { seekFlowStage, setFlowSpeed, stepFlow, toggleFlow, useClockState } from '../map/stores/flow-clock'
+import { continueFlow, seekFlowStage, setFlowSpeed, stepFlow, toggleFlow, useClockState } from '../map/stores/flow-clock'
 import { AppSelect } from './AppSelect'
 import { useI18n } from '../i18n/useI18n'
 
@@ -22,24 +22,25 @@ function StepNavigator({ flow, program, started, time, onOpenStage }: { flow: On
     container.scrollTo({ left: Math.max(0, left), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
   }, [currentStageId])
   if (flow.stages.length === 0) return <div className="step-navigator is-empty"><span>{t('content.steps')}</span><strong>{t('content.noSteps')}</strong></div>
-  return <nav className="step-navigator" aria-label={t('content.stepsInScenario', { name: flow.name })}>
+  return <nav className="step-navigator scenario-storyboard" aria-label={t('content.stepsInScenario', { name: flow.name })}>
     <span className="step-navigator-title">{t('content.steps')}</span>
     <ol ref={track} className="step-navigator-track">{flow.stages.map((stage, index) => {
       const current = stage.id === currentStageId
       const label = stage.name || t('content.stepIndex', { index: index + 1 })
-      return <li key={stage.id}><button ref={current ? currentButton : undefined} type="button" disabled={!program} aria-current={current ? 'step' : undefined} aria-label={t('content.stepPosition', { label, index: index + 1, count: flow.stages.length })} title={label} onClick={() => { if (program) { seekFlowStage(program.id, stage.id); onOpenStage(stage.id) } }}>{String(index + 1).padStart(2, '0')}</button></li>
+      return <li key={stage.id}><button ref={current ? currentButton : undefined} type="button" disabled={!program} aria-current={current ? 'step' : undefined} aria-label={t('content.stepPosition', { label, index: index + 1, count: flow.stages.length })} title={label} onClick={() => { if (program) { seekFlowStage(program.id, stage.id); onOpenStage(stage.id) } }}><span>{String(index + 1).padStart(2, '0')}</span><strong>{label}</strong><small>{stage.advance?.kind === 'continue' ? 'Hold' : `${((stage.advance?.afterMs ?? 3400) / 1000).toFixed(1)}s`} · {stage.layout ?? 'auto'}</small></button></li>
     })}</ol>
     <AppSelect className="step-navigator-select" compact ariaLabel={t('content.chooseStep', { name: flow.name })} value={currentStageId} disabled={!program} options={flow.stages.map((stage, index) => ({ value: stage.id, label: stage.name || t('content.stepIndex', { index: String(index + 1).padStart(2, '0') }) }))} onChange={(stageId) => { if (program && stageId) { seekFlowStage(program.id, stageId); onOpenStage(stageId) } }} />
   </nav>
 }
 
-export function ScenarioControls({ flow, program, stepDisplayMode, onStepDisplayMode, onOpenStage, focusActive = false, onFocusChange }: { flow: OntologyFlow; program: FlowProgram | null; stepDisplayMode: StepDisplayMode; onStepDisplayMode: (mode: StepDisplayMode) => void; onOpenStage: (stageId: string) => void; focusActive?: boolean; onFocusChange?: (value: boolean) => void }) {
+export function ScenarioControls({ flow, program, stepDisplayMode, onStepDisplayMode, onOpenStage, focusActive = false, onFocusChange, onCinema }: { flow: OntologyFlow; program: FlowProgram | null; stepDisplayMode: StepDisplayMode; onStepDisplayMode: (mode: StepDisplayMode) => void; onOpenStage: (stageId: string) => void; focusActive?: boolean; onFocusChange?: (value: boolean) => void; onCinema: () => void }) {
   const { t } = useI18n()
   const clock = useClockState()
   const activeProgram = clock.program?.id === flow.id ? program : null
-  return <section className="scenario-controls" style={{ '--scenario-player-width': `${500 + flow.stages.length * 28}px` } as CSSProperties} aria-label={t('content.scenarioControls', { name: flow.name })}>
+  return <section className="scenario-controls" aria-label={t('content.scenarioControls', { name: flow.name })}>
     <div className="scenario-controls-title"><span>{t('content.scenario')}</span><strong>{flow.name}</strong></div>
-    <button type="button" className="scenario-play" disabled={!activeProgram} onClick={toggleFlow}><svg viewBox="0 0 12 12" aria-hidden="true">{clock.playing ? <><rect x="2.2" y="1.5" width="2.5" height="9" rx=".7" /><rect x="7.3" y="1.5" width="2.5" height="9" rx=".7" /></> : <path d="M3 1.5 10 6 3 10.5Z" />}</svg>{t(clock.playing ? 'content.pause' : 'content.play')}</button>
+    <button type="button" className="scenario-play" disabled={!activeProgram} onClick={clock.waiting ? continueFlow : toggleFlow}><svg viewBox="0 0 12 12" aria-hidden="true">{clock.playing ? <><rect x="2.2" y="1.5" width="2.5" height="9" rx=".7" /><rect x="7.3" y="1.5" width="2.5" height="9" rx=".7" /></> : <path d="M3 1.5 10 6 3 10.5Z" />}</svg>{clock.waiting ? 'Continue' : t(clock.playing ? 'content.pause' : 'content.play')}</button>
+    <button type="button" className="scenario-cinema" disabled={!activeProgram} onClick={onCinema}>Cinema</button>
     <button type="button" disabled={!activeProgram} onClick={stepFlow}>{t('content.stepAction')}</button>
     <StepNavigator flow={flow} program={activeProgram} started={clock.started} time={clock.time} onOpenStage={onOpenStage} />
     <div className="step-display-control"><span>{t('content.labels')}</span><AppSelect compact ariaLabel={t('content.stepLabels')} value={stepDisplayMode} options={[{ value: 'all', label: t('common.all') }, { value: 'current', label: t('common.current') }, { value: 'none', label: t('common.none') }]} onChange={(value) => onStepDisplayMode(value as StepDisplayMode)} /></div>

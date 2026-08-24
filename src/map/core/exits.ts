@@ -1,5 +1,5 @@
 import type { Footprint, OntologyDocument, VisualNode } from '../../domain/types'
-import { portAnchors, type PortSide } from './archetypes'
+import type { PortSide } from './archetypes'
 import { polylineLengths, toScreen, type ScreenPoint } from './iso'
 import type { RelationGeometry } from './routes'
 
@@ -23,11 +23,10 @@ export type ExitGeometry = {
 }
 
 const EXIT_DROP = 96
-const PORT_CLEARANCE = 0.8
+const PORT_CLEARANCE = 20
 const OBSTACLE_PADDING = 0.35
 const LANE_GAP = 14
 
-const DROP_PORTS: Record<ExitDirection, PortSide[]> = { down: ['south', 'east'], up: ['north', 'west'] }
 const EXIT_TO_SIDE: Record<ExitDirection, PortSide> = { down: 'north', up: 'south' }
 
 function longestSegmentMidpoint(points: readonly ScreenPoint[]): ScreenPoint {
@@ -44,33 +43,39 @@ function longestSegmentMidpoint(points: readonly ScreenPoint[]): ScreenPoint {
 function pointBlocked(point: ScreenPoint, localId: string, nodes: readonly VisualNode[]): boolean {
   return nodes.some((node) => {
     if (node.id === localId) return false
-    const corners = [toScreen(node.footprint.gx, node.footprint.gy), toScreen(node.footprint.gx + node.footprint.w, node.footprint.gy + node.footprint.d)]
-    const min = corners[0]!
-    const max = corners[1]!
-    return point.x > min.x - OBSTACLE_PADDING * 24 && point.x < max.x + OBSTACLE_PADDING * 24 && point.y > min.y - OBSTACLE_PADDING * 24 && point.y < max.y + OBSTACLE_PADDING * 24
+    const { gx, gy, w, d } = node.footprint
+    const corners = [toScreen(gx, gy), toScreen(gx + w, gy), toScreen(gx + w, gy + d), toScreen(gx, gy + d)]
+    const minX = Math.min(...corners.map((corner) => corner.x))
+    const maxX = Math.max(...corners.map((corner) => corner.x))
+    const minY = Math.min(...corners.map((corner) => corner.y))
+    const maxY = Math.max(...corners.map((corner) => corner.y))
+    return point.x > minX - OBSTACLE_PADDING * 24 && point.x < maxX + OBSTACLE_PADDING * 24 && point.y > minY - OBSTACLE_PADDING * 24 && point.y < maxY + OBSTACLE_PADDING * 24
   })
 }
 
-export function buildExitRoute(local: VisualNode, direction: ExitDirection, nodes: readonly VisualNode[], lane = 0): { points: ScreenPoint[]; dropStart: ScreenPoint; dropEnd: ScreenPoint; fromSide: PortSide } | null {
-  const ports = portAnchors(local.footprint)
-  const candidates = DROP_PORTS[direction].map((side) => {
-    const anchor = ports[side]
-    const normal = { north: { gx: 0, gy: -1 }, east: { gx: 1, gy: 0 }, south: { gx: 0, gy: 1 }, west: { gx: -1, gy: 0 } }[side]
-    const clearGrid = { gx: anchor.gx + normal.gx * PORT_CLEARANCE, gy: anchor.gy + normal.gy * PORT_CLEARANCE }
-    return { side, anchor: toScreen(anchor.gx, anchor.gy), clear: toScreen(clearGrid.gx, clearGrid.gy) }
-  })
-  const free = candidates.find((candidate) => !pointBlocked(candidate.clear, local.id, nodes)) ?? candidates[0]
-  if (!free) return null
+export function buildExitRoute(local: VisualNode, direction: ExitDirection, nodes: readonly VisualNode[], lane = 0, preferredSide?: 'west' | 'east'): { points: ScreenPoint[]; dropStart: ScreenPoint; dropEnd: ScreenPoint; fromSide: PortSide } | null {
+  const { gx, gy, w, d } = local.footprint
+  const left = toScreen(gx, gy + d)
+  const right = toScreen(gx + w, gy)
   const sign = direction === 'down' ? 1 : -1
-  const dropX = free.clear.x + lane * LANE_GAP * sign
-  const elbow: ScreenPoint = { x: dropX, y: free.clear.y }
+  const depth = PORT_CLEARANCE / 2 * sign
+  const candidates: { side: PortSide; anchor: ScreenPoint; clear: ScreenPoint }[] = [
+    { side: 'west', anchor: left, clear: { x: left.x - PORT_CLEARANCE, y: left.y + depth } },
+    { side: 'east', anchor: right, clear: { x: right.x + PORT_CLEARANCE, y: right.y + depth } },
+  ]
+  if (preferredSide === 'east' || (!preferredSide && lane % 2 === 1)) candidates.reverse()
+  const free = preferredSide ? candidates[0] : candidates.find((candidate) => !pointBlocked(candidate.clear, local.id, nodes)) ?? candidates[0]
+  if (!free) return null
+  const sideSign = free.side === 'west' ? -1 : 1
+  const dropX = free.clear.x + (preferredSide ? lane : Math.floor(lane / 2)) * LANE_GAP * sideSign
+  const elbow: ScreenPoint = { x: dropX, y: free.anchor.y + Math.abs(dropX - free.anchor.x) / 2 * sign }
   const dropStart = elbow
   const dropEnd: ScreenPoint = { x: dropX, y: free.clear.y + EXIT_DROP * sign }
   const points = [free.anchor, elbow, dropEnd]
   return { points, dropStart, dropEnd, fromSide: free.side }
 }
 
-export function buildExitGeometries(document: OntologyDocument, floorId: string, nodes: readonly VisualNode[]): ReadonlyMap<string, ExitGeometry> {
+export function buildExitGeometries(document: OntologyDocument, floorId: string, nodes: readonly VisualNode[], preferredSides?: ReadonlyMap<string, 'west' | 'east'>): ReadonlyMap<string, ExitGeometry> {
   const result = new Map<string, ExitGeometry>()
   const currentIndex = document.floors.findIndex((floor) => floor.id === floorId)
   if (currentIndex < 0) return result
@@ -93,7 +98,7 @@ export function buildExitGeometries(document: OntologyDocument, floorId: string,
     const laneKey = `${local.id}:${direction}`
     const lane = lanes.get(laneKey) ?? 0
     lanes.set(laneKey, lane + 1)
-    const route = buildExitRoute(local, direction, nodes, lane)
+    const route = buildExitRoute(local, direction, nodes, lane, preferredSides?.get(relation.id))
     if (!route) continue
     const { cumulative, total } = polylineLengths(route.points)
     result.set(relation.id, {

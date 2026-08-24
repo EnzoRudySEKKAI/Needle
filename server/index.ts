@@ -4,7 +4,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { WebSocket, WebSocketServer } from 'ws'
 import { createServer as createViteServer, type ViteDevServer } from 'vite'
 import { isOntologyDocument, validateDocument } from '../src/domain/validation'
-import type { MapPresence, OntologyDocument, Selection } from '../src/domain/types'
+import { SCHEMA_VERSION, type MapPresence, type OntologyDocument, type Selection } from '../src/domain/types'
 import { store } from './store.js'
 import { handler as mcpHandler } from './mcp/handler.js'
 import { toNodeHandler } from '@modelcontextprotocol/node'
@@ -59,7 +59,7 @@ app.get('/api/maps/:id', async (request, response) => {
   response.json(document)
 })
 app.put('/api/maps/:id', async (request, response) => {
-  if (!isOntologyDocument(request.body) || request.body.id !== request.params.id) return response.status(400).json({ error: 'Invalid ontology document.', diagnostics: [{ level: 'error', message: 'Document does not match Needle schema v9.' }] })
+  if (!isOntologyDocument(request.body) || request.body.id !== request.params.id) return response.status(400).json({ error: 'Invalid ontology document.', diagnostics: [{ level: 'error', message: `Document does not match Needle schema v${SCHEMA_VERSION}.` }] })
   const diagnostics = validateDocument(request.body)
   if (diagnostics.some((diagnostic) => diagnostic.level === 'error')) return response.status(400).json({ error: 'Ontology document has validation errors.', diagnostics })
   const current = await store.read(request.params.id)
@@ -142,7 +142,7 @@ sockets.on('connection', (socket) => {
       for (const presence of presenceByMap.get(message.mapId)?.values() ?? []) socket.send(JSON.stringify({ type: 'presence', presence }))
       return
     }
-    if (message.type !== 'presence' || typeof message.mapId !== 'string' || typeof message.clientId !== 'string' || (message.selection !== null && !isSelection(message.selection)) || (message.activeFloorId !== null && typeof message.activeFloorId !== 'string') || (message.activeFlowId !== null && typeof message.activeFlowId !== 'string') || (message.activeFlowStageId !== null && typeof message.activeFlowStageId !== 'string') || typeof message.flowPlaying !== 'boolean' || typeof message.flowSpeed !== 'number' || !Number.isFinite(message.flowSpeed) || message.flowSpeed <= 0 || typeof message.presenter !== 'boolean' || typeof message.displayName !== 'string') return
+    if (message.type !== 'presence' || typeof message.mapId !== 'string' || typeof message.clientId !== 'string' || (message.selection !== null && !isSelection(message.selection)) || (message.activeFloorId !== null && typeof message.activeFloorId !== 'string') || (message.activeFlowId !== null && typeof message.activeFlowId !== 'string') || (message.activeFlowStageId !== null && typeof message.activeFlowStageId !== 'string') || typeof message.flowPlaying !== 'boolean' || typeof message.flowSpeed !== 'number' || !Number.isFinite(message.flowSpeed) || message.flowSpeed <= 0 || typeof message.flowTime !== 'number' || !Number.isFinite(message.flowTime) || typeof message.flowEpoch !== 'number' || !Number.isFinite(message.flowEpoch) || typeof message.presenter !== 'boolean' || typeof message.displayName !== 'string') return
     state.mapId = message.mapId
     state.clientId = message.clientId
     const presence: MapPresence = {
@@ -154,6 +154,8 @@ sockets.on('connection', (socket) => {
       activeFlowStageId: message.activeFlowStageId,
       flowPlaying: message.flowPlaying,
       flowSpeed: message.flowSpeed,
+      flowTime: message.flowTime,
+      flowEpoch: message.flowEpoch,
       presenter: message.presenter,
       displayName: message.displayName,
     }

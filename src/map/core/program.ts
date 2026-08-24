@@ -21,6 +21,7 @@ export type ProgramStage = {
   branches: ProgramBranch[]
   sourceIds: string[]
   targetIds: string[]
+  advance: 'auto' | 'continue'
 }
 
 export type FlowProgram = { id: string; total: number; stages: ProgramStage[]; nodeIds: string[] }
@@ -55,16 +56,17 @@ export function buildFlowProgram(flow: OntologyFlow, nodes: readonly VisualNode[
     const start = at
     const travelStart = start + DWELL
     const targetStart = travelStart + duration
-    const end = targetStart + DWELL
-    stages.push({ id: stage.id, start, travelStart, targetStart, end, duration, branches, sourceIds: [...new Set(branches.map((branch) => branch.sourceId))], targetIds: [...new Set(branches.map((branch) => branch.targetId))] })
+    const authoredDuration = stage.advance?.kind === 'auto' ? stage.advance.afterMs : 0
+    const end = Math.max(targetStart + DWELL, start + authoredDuration)
+    stages.push({ id: stage.id, start, travelStart, targetStart, end, duration, branches, sourceIds: [...new Set(branches.map((branch) => branch.sourceId))], targetIds: [...new Set(branches.map((branch) => branch.targetId))], advance: stage.advance?.kind ?? 'auto' })
     at = end
   }
   if (stages.length === 0) return null
-  return { id: flow.id, total: at + 900, stages, nodeIds: [...new Set(stages.flatMap((stage) => [...stage.sourceIds, ...stage.targetIds]))] }
+  return { id: flow.id, total: at, stages, nodeIds: [...new Set(stages.flatMap((stage) => [...stage.sourceIds, ...stage.targetIds]))] }
 }
 
 export function activeStageState(program: FlowProgram, time: number): { index: number; phase: StagePhase } {
-  const wrapped = ((time % program.total) + program.total) % program.total
+  const wrapped = Math.max(0, Math.min(time, program.total))
   let index = 0
   for (let candidate = program.stages.length - 1; candidate >= 0; candidate -= 1) {
     if (wrapped >= program.stages[candidate]!.start) { index = candidate; break }
@@ -88,7 +90,7 @@ export function nodeIdsForStageState(program: FlowProgram, index: number, phase:
 }
 
 export function flowPositions(program: FlowProgram, time: number): ScreenPoint[] {
-  const wrapped = ((time % program.total) + program.total) % program.total
+  const wrapped = Math.max(0, Math.min(time, program.total))
   const { index, phase } = activeStageState(program, wrapped)
   const stage = program.stages[index]!
   return stage.branches.map((branch) => {

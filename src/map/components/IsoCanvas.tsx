@@ -12,7 +12,7 @@ import { nodeIdsForStageState, type FlowProgram } from '../core/program'
 import { buildRelationGeometry, type RelationGeometry } from '../core/routes'
 import { buildScene, fitCamera, zoomAbout, type Camera, type District } from '../core/scene'
 import type { StepDisplayMode } from '../core/step-display'
-import { pointsAttribute, polylineLengths, toScreen } from '../core/iso'
+import { pointsAttribute, polylineLengths, sceneBounds, toScreen } from '../core/iso'
 import { useClockActiveKey } from '../stores/flow-clock'
 import { Building } from './Building'
 import { FlowAnimation } from './FlowAnimation'
@@ -42,8 +42,13 @@ type Props = {
   highlightedFloorId?: string | null
   viewportInsets?: { left: number; right: number; top: number; bottom: number }
   dezoom?: number
+  cameraTransitionMs?: number
   onAddConcept?: () => void
   scenarioFilter?: { relationIds: Set<string>; nodeIds: Set<string> } | null
+  focusNodeIds?: ReadonlySet<string>
+  showGrid?: boolean
+  cinemaSequence?: 'departure' | 'arrival' | 'local'
+  hideNodeLabels?: boolean
 }
 
 function EmptyFloorPrompt({ onAddConcept }: { onAddConcept?: () => void }) {
@@ -118,7 +123,7 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, onAddConcept, scenarioFilter = null }: Props) {
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, cameraTransitionMs, onAddConcept, scenarioFilter = null, focusNodeIds, showGrid = true, cinemaSequence, hideNodeLabels = false }: Props) {
   const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -140,8 +145,27 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const projection = useMemo(() => projectFloor(document, floorId), [document, floorId])
   const positionedNodes = useMemo(() => (projection?.nodes ?? []).map((node) => dragPositions.has(node.id) ? { ...node, position: dragPositions.get(node.id)! } : node), [dragPositions, projection])
   const nodes = useMemo(() => visualiseNodes(positionedNodes), [positionedNodes])
+  const relationById = useMemo(() => new Map(document.relations.map((relation) => [relation.id, relation])), [document.relations])
+  const nodeById = useMemo(() => new Map(document.nodes.map((node) => [node.id, node])), [document.nodes])
+  const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
+  const activeClockKey = useClockActiveKey()
+  const activeClockParts = activeClockKey.split(':')
+  const activeShot = activeFlow && activeClockParts[0] === activeFlow.id ? activeFlow.stages[Number(activeClockParts[1])] : null
+  const preferredExitSides = useMemo(() => {
+    const sides = new Map<string, 'west' | 'east'>()
+    if (!activeShot) return sides
+    for (const traversal of activeShot.traversals) {
+      const relation = relationById.get(traversal.relationId)
+      if (!relation) continue
+      const localId = nodeById.get(relation.from)?.floorId === floorId ? relation.from : nodeById.get(relation.to)?.floorId === floorId ? relation.to : null
+      if (!localId) continue
+      const callout = activeShot.callouts?.find((candidate) => candidate.anchor.kind === 'node' && candidate.anchor.nodeId === localId)
+      if (callout) sides.set(relation.id, callout.side === 'right' ? 'west' : 'east')
+    }
+    return sides
+  }, [activeShot, floorId, nodeById, relationById])
   const flagPositions = useMemo(() => ({ ...projection?.floor.groupFlagPositions, ...Object.fromEntries(dragFlagPositions) }), [dragFlagPositions, projection?.floor.groupFlagPositions])
-  const exits = useMemo(() => buildExitGeometries(document, floorId, nodes), [document, floorId, nodes])
+  const exits = useMemo(() => buildExitGeometries(document, floorId, nodes, preferredExitSides), [document, floorId, nodes, preferredExitSides])
   const exitExtents = useMemo(() => [...exits.values()].map(exitExtent), [exits])
   const scene = useMemo(() => buildScene(projection?.groups ?? [], nodes, `${document.id}:${floorId}:${document.updatedAt}`, flagWidths, flagPositions, exitExtents), [document.id, document.updatedAt, exitExtents, flagPositions, flagWidths, floorId, nodes, projection?.groups])
   const visibleRelations = useMemo(() => {
@@ -189,15 +213,13 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
       if (relation) { previewNodeIds.add(relation.from); previewNodeIds.add(relation.to) }
     }
   }
-  const activeFlow = document.flows.find((flow) => flow.id === activeFlowId) ?? null
-  const relationById = useMemo(() => new Map(document.relations.map((relation) => [relation.id, relation])), [document.relations])
-  const nodeById = useMemo(() => new Map(document.nodes.map((node) => [node.id, node])), [document.nodes])
   const program = useMemo(() => flowProgram ? {
     ...flowProgram,
     stages: flowProgram.stages.map((stage) => ({
-      ...stage,
-      branches: stage.branches.flatMap((branch) => {
-        const route = geometry.get(branch.relationId)
+       ...stage,
+       branches: stage.branches.flatMap((branch) => {
+          if (scenarioFilter && !scenarioFilter.relationIds.has(branch.relationId)) return []
+          const route = geometry.get(branch.relationId)
         const relation = relationById.get(branch.relationId)
         if (route && relation) return [{ ...branch, geometry: orientGeometry(route, branch.sourceId !== relation.from) }]
         const exit = exits.get(branch.relationId)
@@ -205,8 +227,13 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
         return [{ ...branch, geometry: exitRelationGeometry(exit, branch.sourceId !== exit.localNodeId) }]
       }),
     })),
-  } : null, [exits, flowProgram, geometry, relationById])
-  const activeClockKey = useClockActiveKey()
+  } : null, [exits, flowProgram, geometry, relationById, scenarioFilter])
+  const activeCallouts = (activeShot?.callouts ?? []).flatMap((callout) => {
+    const anchor = callout.anchor
+    if (anchor.kind === 'point') return anchor.floorId === floorId ? [{ callout, point: toScreen(anchor.gx, anchor.gy) }] : []
+    const node = nodes.find((candidate) => candidate.id === anchor.nodeId)
+    return node ? [{ callout, point: { ...toScreen(node.position.gx + node.footprint.w / 2, node.position.gy + node.footprint.d / 2), y: toScreen(node.position.gx + node.footprint.w / 2, node.position.gy + node.footprint.d / 2).y - node.height * 14 } }] : []
+  })
   const arrivalIds = useMemo(() => {
     if (!program) return undefined
     const ids = new Set<string>()
@@ -226,8 +253,11 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     return [...map.values()]
   }, [exits])
   const insets = viewportInsets ?? { left: 0, right: 0, top: 0, bottom: 0 }
-  const fitted = size.width > 0 ? fitCamera(size.width, size.height, scene.bounds, insets, dezoom) : null
+  const focusNodes = focusNodeIds ? nodes.filter((node) => focusNodeIds.has(node.id)) : []
+  const cameraBounds = focusNodes.length ? sceneBounds(focusNodes, 96) : scene.bounds
+  const fitted = size.width > 0 ? fitCamera(size.width, size.height, cameraBounds, insets, dezoom) : null
   const camera = cameraOverride ?? fitted
+  const cameraUsesCssTransform = cameraTransitionMs !== undefined
   const relationPicking = relationPickIds !== null
   const updateCamera = (next: Camera | null) => {
     setCameraOverride(next)
@@ -272,9 +302,9 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   }, [camera])
 
   const flowNodeIds = program ? new Set(program.nodeIds) : null
-  const activeParts = activeClockKey.split(':')
+  const activeParts = activeClockParts
   const activeNodeSet = program && activeParts[0] === program.id
-    ? nodeIdsForStageState(program, Number(activeParts[1]), 'travel')
+    ? nodeIdsForStageState(program, Number(activeParts[1]), activeParts[2] === 'source' || activeParts[2] === 'target' ? activeParts[2] : 'travel')
     : new Set<string>()
   const measureFlag = useCallback((id: string, width: number) => setFlagWidths((current) => {
     if (Math.abs((current.get(id) ?? 0) - width) < 0.5) return current
@@ -471,7 +501,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const isScenarioFocus = Boolean(scenarioFilter)
   const scenarioEmpty = isScenarioFocus && nodes.length > 0 && nodes.every((node) => !scenarioFilter!.nodeIds.has(node.id)) && visibleRelations.length === 0
   return (
-    <div className={`canvas-wrap ${relationPicking ? 'is-relation-picking' : ''}`} ref={containerRef}>
+    <div className={`canvas-wrap ${relationPicking ? 'is-relation-picking' : ''} ${hideNodeLabels ? 'hide-node-labels' : ''}`} ref={containerRef}>
       {scenarioEmpty ? <div className="canvas-empty"><span className="empty-floor-readonly">{t('content.noScenarioElementsOnFloor')}</span></div> : nodes.length === 0 ? (
         <EmptyFloorPrompt onAddConcept={editable ? onAddConcept : undefined} />
       ) : null}
@@ -479,6 +509,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
         ref={svgRef}
         id={svgId}
         className="iso-canvas"
+        style={{ '--map-hatch': `url(#${svgId}-map-hatch)` } as CSSProperties}
         tabIndex={0}
         aria-label={t('shell.canvas.label')}
         onKeyDown={(event) => {
@@ -585,22 +616,25 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
         onLostPointerCapture={(event) => { if (interaction.current?.pointerId === event.pointerId) endInteraction(false) }}
       >
         <defs>
-          <pattern id="map-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" className="hatch-line" /></pattern>
+          <pattern id={`${svgId}-map-hatch`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" className="hatch-line" /></pattern>
         </defs>
         {camera ? (
-          <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.k})`}>
-            <g className="floor-grid">{scene.grid.map((line) => <line key={line.key} x1={line.a.x} y1={line.a.y} x2={line.b.x} y2={line.b.y} vectorEffect="non-scaling-stroke" />)}</g>
+          <g
+            transform={cameraUsesCssTransform ? undefined : `translate(${camera.x} ${camera.y}) scale(${camera.k})`}
+            style={cameraUsesCssTransform ? { transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.k})`, transformOrigin: '0 0', transition: cameraTransitionMs ? `transform ${cameraTransitionMs}ms cubic-bezier(.45,0,.55,1)` : 'none' } : undefined}
+          >
+            {showGrid ? <g className="floor-grid">{scene.grid.map((line) => <line key={line.key} x1={line.a.x} y1={line.a.y} x2={line.b.x} y2={line.b.y} vectorEffect="non-scaling-stroke" />)}</g> : null}
             {alignmentGuides && guideExtent ? <g className="floor-grid alignment-guides" aria-hidden="true">
               {alignmentGuides.gx !== undefined ? (() => { const a = toScreen(alignmentGuides.gx, guideExtent.minGy); const b = toScreen(alignmentGuides.gx, guideExtent.maxGy); return <line className="alignment-guide alignment-guide-x" x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={{ stroke: 'var(--accent)', strokeWidth: 1.5 }} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /> })() : null}
               {alignmentGuides.gy !== undefined ? (() => { const a = toScreen(guideExtent.minGx, alignmentGuides.gy); const b = toScreen(guideExtent.maxGx, alignmentGuides.gy); return <line className="alignment-guide alignment-guide-y" x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={{ stroke: 'var(--accent)', strokeWidth: 1.5 }} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /> })() : null}
             </g> : null}
-            <g className="districts">
+            {showGrid ? <g className="districts">
               {scene.districts.filter((district) => !scenarioFilter || district.nodeIds.some((id) => scenarioFilter.nodeIds.has(id))).map((district) => {
                  const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
                    const selected = selection?.kind === 'group' && selection.id === district.id
                    return <g key={district.id} className={`district ${selected ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''} ${draggingFlagId === district.id ? 'is-dragging' : ''}`} role="button" tabIndex={0} aria-label={t('shell.canvas.neighborhood', { name: district.name })} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onPointerDown={(event) => { if (event.button !== 0 || !editable || !selected || connectionDraft || relationPicking) return; event.stopPropagation(); startGroupDrag(event, district) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
               })}
-            </g>
+            </g> : null}
             <g className="relations" onPointerDown={(event) => event.stopPropagation()}>
               {visibleRelations.map((relation) => {
                 const route = geometry.get(relation.id)
@@ -699,11 +733,22 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                 })}
               </g>
             })}</g>
-            {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} arrivalIds={arrivalIds} /> : null}
+             {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} arrivalIds={arrivalIds} cinemaSequence={cinemaSequence} /> : null}
+              {activeCallouts.length ? <g className="scenario-callouts" aria-live="polite">{activeCallouts.map(({ callout, point }, index) => {
+                const side = callout.side === 'right' ? 1 : -1
+               const labelX = point.x + side * 72
+               const labelY = point.y - 56 - index * 8
+               return <g key={callout.id} className={`scenario-callout tone-${callout.tone}`}>
+                 <circle cx={point.x} cy={point.y} r="12" className="scenario-callout-pulse" vectorEffect="non-scaling-stroke" />
+                 <circle cx={point.x} cy={point.y} r="3.5" className="scenario-callout-origin" vectorEffect="non-scaling-stroke" />
+                 <polyline points={`${point.x},${point.y} ${point.x + side * 24},${labelY} ${labelX},${labelY}`} className="scenario-callout-leader" vectorEffect="non-scaling-stroke" />
+                 <foreignObject x={side > 0 ? labelX : labelX - 176} y={labelY - 38} width="176" height="76" className="scenario-callout-card"><div>{callout.text}</div></foreignObject>
+               </g>
+             })}</g> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
-            <g className="district-flags">
+             {showGrid ? <g className="district-flags">
               {scene.districts.filter((district) => !scenarioFilter || district.nodeIds.some((id) => scenarioFilter.nodeIds.has(id))).map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} hovered={hoveredDistrictId === district.id} editable={editable && !connectionDraft && !relationPicking} dragging={draggingFlagId === district.id} onSelect={() => { if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }; if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }} onHover={setHoveredDistrictId} onMeasure={measureFlag} onDragStart={(event) => startFlagDrag(event, district)} />)}
-            </g>
+             </g> : null}
           </g>
         ) : null}
       </svg>

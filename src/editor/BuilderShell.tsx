@@ -20,6 +20,7 @@ import { CommandPalette } from './CommandPalette'
 import { HistoryPanel } from './HistoryPanel'
 import { PresenceBar } from './PresenceBar'
 import { ScenarioControls } from './ScenarioControls'
+import { CinemaMode } from './CinemaMode'
 import { ShortcutHelp } from './ShortcutHelp'
 import type { ConnectionDraft } from './connection'
 import type { RelationPreview } from './RelationCandidatePicker'
@@ -82,6 +83,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [cinema, setCinema] = useState(false)
   const [followingId, setFollowingId] = useState<string | null>(null)
   const [savedDisplayName, setSavedDisplayName] = useState(() => localStorage.getItem('needle:displayName')?.trim() || '')
   const displayName = savedDisplayName || t('common.anonymous')
@@ -115,8 +117,8 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   }, [])
   useEffect(() => {
     const currentPlayback = clockPresence.programId === activeFlowId ? clockPresence : null
-    sendPresence({ selection, activeFloorId: workspaceView === 'floor' ? activeFloorId : null, activeFlowId, activeFlowStageId: currentPlayback?.stageId ?? null, flowPlaying: currentPlayback?.playing ?? false, flowSpeed: currentPlayback?.speed ?? 1, presenter: !editable, displayName })
-  }, [activeFloorId, activeFlowId, clockPresence, displayName, editable, selection, sendPresence, workspaceView])
+    sendPresence({ selection, activeFloorId: workspaceView === 'floor' ? activeFloorId : null, activeFlowId, activeFlowStageId: currentPlayback?.stageId ?? null, flowPlaying: currentPlayback?.playing ?? false, flowSpeed: currentPlayback?.speed ?? 1, flowTime: currentPlayback?.time ?? 0, flowEpoch: currentPlayback?.epoch ?? 0, presenter: !editable || cinema, displayName })
+  }, [activeFloorId, activeFlowId, cinema, clockPresence, displayName, editable, selection, sendPresence, workspaceView])
   const stepDisplayContext = editable ? 'build' : 'present'
   const stepDisplayMode = stepDisplayModes[stepDisplayContext]
   const setStepDisplayMode = (mode: StepDisplayMode) => setStepDisplayModes((current) => ({ ...current, [stepDisplayContext]: mode }))
@@ -148,9 +150,9 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
   useEffect(() => () => window.clearTimeout(structureEnterTimer.current), [])
 
   useEffect(() => {
-    configureFlow(flowProgram, !editable)
+    configureFlow(flowProgram, cinema || !editable, activeFlow?.endBehavior === 'loop')
     return () => configureFlow(null)
-  }, [editable, flowProgram])
+  }, [activeFlow?.endBehavior, cinema, editable, flowProgram])
 
   useEffect(() => {
     const onPlaybackKeyDown = (event: KeyboardEvent) => {
@@ -171,6 +173,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       const target = event.target as HTMLElement | null
       if (!target?.closest('.presence-dock')) setFollowingId(null)
       if (event.key === 'Escape') {
+        if (cinema) { pauseFlow(); setCinema(false); return }
         if (window.document.fullscreenElement) return
         if (relationPickTarget) { setRelationPickTarget(null); setRelationPreview(null) }
         else if (relationPreview) setRelationPreview(null)
@@ -216,7 +219,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeClockKey, activeFloorId, activeFlowId, commit, connectionDraft, document.floors, editable, flowProgram, redo, relationPickTarget, relationPreview, selection, setSelection, t, undo])
+  }, [activeClockKey, activeFloorId, activeFlowId, cinema, commit, connectionDraft, document.floors, editable, flowProgram, redo, relationPickTarget, relationPreview, selection, setSelection, t, undo])
 
   const toggleFullscreen = async () => {
     setFullscreenError(null)
@@ -252,7 +255,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       relations: [...current.relations, ...relations],
       flows: current.flows.map((flow) => flow.id === connectionDraft.flowId ? {
         ...flow,
-        stages: [...flow.stages, { id: makeId('stage'), traversals: relations.map((relation, index) => ({ id: makeId('traversal'), relationId: relation.id, direction: connectionDraft.targets[index]!.direction === 'outbound' ? 'forward' as const : 'reverse' as const })) }],
+        stages: [...flow.stages, { id: makeId('stage'), layout: 'auto' as const, advance: { kind: 'auto' as const, afterMs: 3400 }, transition: { kind: 'travel' as const, durationMs: 520 }, callouts: [], traversals: relations.map((relation, index) => ({ id: makeId('traversal'), relationId: relation.id, direction: connectionDraft.targets[index]!.direction === 'outbound' ? 'forward' as const : 'reverse' as const })) }],
       } : flow),
     }))
     setSelection(connectionDraft.flowId ? { kind: 'flow', id: connectionDraft.flowId } : { kind: 'relation', id: relations[0]!.id })
@@ -365,7 +368,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     if (!followingId || !flowProgram) return
     const followed = presences.find((presence) => presence.clientId === followingId)
     if (!followed || followed.activeFlowId !== flowProgram.id) return
-    const timer = window.setTimeout(() => syncFlowPlayback(flowProgram.id, followed.activeFlowStageId, followed.flowPlaying, followed.flowSpeed), 0)
+    const timer = window.setTimeout(() => syncFlowPlayback(flowProgram.id, followed.activeFlowStageId, followed.flowPlaying, followed.flowSpeed, followed.flowTime, followed.flowEpoch), 0)
     return () => window.clearTimeout(timer)
   }, [followingId, flowProgram, presences])
   const changeFollowing = (presenceId: string | null) => {
@@ -413,7 +416,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
 
   if (!syncReady) return <main className="map-load-state"><span>{t('shell.sync.connecting')}</span></main>
 
-  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || hoveredFloorId || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''} ${headerCollapsed ? 'header-collapsed' : ''}`} onPointerDownCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }} onClickCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }} onWheelCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }}>
+  return <div ref={appRef} className={`map-app ${editable ? 'is-editing' : 'is-presenting'} ${cinema ? 'is-cinema' : ''} ${workspaceView === 'structure' ? 'is-structure-view' : ''} ${selection || connectionDraft || hoveredFloorId || workspaceView === 'structure' ? 'has-inspector' : ''} ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''} ${headerCollapsed ? 'header-collapsed' : ''}`} onPointerDownCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }} onClickCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }} onWheelCapture={(event) => { if (!(event.target as Element).closest('.presence-dock')) setFollowingId(null) }}>
     {persistenceError ? <div className="sync-error" role="alert">{t('shell.sync.error', { error: persistenceError })}</div> : null}
     {conflict ? <div className="sync-error conflict-banner" role="alert"><span>{t('shell.conflict.message')}</span><button type="button" onClick={() => resolveConflict('remote')}>{t('shell.conflict.loadTheirs')}</button><button type="button" onClick={() => resolveConflict('local')}>{t('shell.conflict.keepMine')}</button></div> : null}
     <MapHeader editable={editable} fullscreen={fullscreen} fullscreenError={fullscreenError} historyOpen={historyOpen} onFullscreen={toggleFullscreen} onEditable={presentation ? undefined : setEditorMode} onExport={() => { if (previousFloorId) return; pauseFlow(); setExportScope(workspaceView); setExporting(true) }} onSearch={() => setCommandPaletteOpen(true)} onHistory={() => setHistoryOpen((current) => !current)} onShortcuts={() => setShortcutHelpOpen(true)} leftCollapsed={leftCollapsed} rightCollapsed={rightCollapsed} headerCollapsed={headerCollapsed} onToggleLeft={() => setLeftCollapsed((value) => !value)} onToggleRight={() => setRightCollapsed((value) => !value)} onToggleHeader={() => setHeaderCollapsed((value) => !value)} />
@@ -421,7 +424,7 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
       <PresenceBar entries={presences.map((presence, index) => ({ id: presence.clientId, name: presence.displayName, color: ['#3979d6', '#8267b8', '#3d8c70', '#a4683a'][index % 4]!, floorId: presence.activeFloorId ?? undefined, floorName: document.floors.find((floor) => floor.id === presence.activeFloorId)?.name, selection: presence.selection, presenting: presence.presenter }))} followingId={followingId} onFollow={changeFollowing} />
       <button type="button" className="header-restore" aria-label={t('shell.header.showHeader')} onClick={() => setHeaderCollapsed(false)}><span aria-hidden="true">⌄</span></button>
     </div>
-    {activeFlow ? <ScenarioControls flow={activeFlow} program={flowProgram} stepDisplayMode={stepDisplayMode} onStepDisplayMode={setStepDisplayMode} onOpenStage={openScenarioStage} focusActive={scenarioFocusActive} onFocusChange={setScenarioFocus} /> : null}
+    {activeFlow ? <ScenarioControls flow={activeFlow} program={flowProgram} stepDisplayMode={stepDisplayMode} onStepDisplayMode={setStepDisplayMode} onOpenStage={openScenarioStage} focusActive={scenarioFocusActive} onFocusChange={setScenarioFocus} onCinema={() => setCinema(true)} /> : null}
     <Link to="/" className="brand brand-floating" aria-label={t('shell.home')}><strong>Needle</strong><span>{t('shell.brand.ontology')}</span></Link>
     <main className="map-workspace">
       <LeftRail activeFlowId={activeFlowId} onActiveFlow={changeActiveFlow} activeFloorId={activeFloorId} onActiveFloor={openFloor} editable={editable} onStartConnection={startConnection} onCollapse={() => setLeftCollapsed(true)} scenarioFilter={scenarioFilter} />
@@ -440,5 +443,6 @@ export function BuilderShell({ presentation = false }: { presentation?: boolean 
     {exporting ? <ExportDialog document={document} activeFloorId={activeFloorId} filename={document.name} scope={exportScope} onScope={(scope) => { setExportScope(scope); setPreviousFloorId(null); setWorkspaceView(scope) }} onClose={() => setExporting(false)} /> : null}
     <CommandPalette open={commandPaletteOpen} document={document} activeFloorId={activeFloorId} onClose={() => setCommandPaletteOpen(false)} onSelect={(next, floorId) => { if (floorId) openFloor(floorId, next); else setSelection(next) }} onOpenFlow={(flowId) => { changeActiveFlow(flowId); setSelection({ kind: 'flow', id: flowId }) }} />
     <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+    {cinema && activeFlow && flowProgram ? <CinemaMode document={document} flow={activeFlow} program={flowProgram} onClose={() => { pauseFlow(); setCinema(false) }} /> : null}
   </div>
 }

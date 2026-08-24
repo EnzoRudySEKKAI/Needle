@@ -67,6 +67,16 @@ export const FlowStage = z.object({
   name: z.string().optional(),
   note: z.string().optional(),
   traversals: z.array(FlowTraversal),
+  layout: z.enum(['auto', 'single', 'split']).optional(),
+  advance: z.union([z.object({ kind: z.literal('auto'), afterMs: z.number().min(1200) }), z.object({ kind: z.literal('continue') })]).optional(),
+  transition: z.object({ kind: z.enum(['cut', 'fade', 'travel']), durationMs: z.number().min(0) }).optional(),
+  callouts: z.array(z.object({
+    id: z.string(),
+    anchor: z.union([z.object({ kind: z.literal('node'), nodeId: z.string() }), z.object({ kind: z.literal('point'), floorId: z.string(), gx: z.number(), gy: z.number() })]),
+    text: z.string(),
+    tone: z.enum(['information', 'attention', 'alert']),
+    side: z.enum(['left', 'right']).optional(),
+  })).optional(),
 })
 
 export const OntologyFlow = z.object({
@@ -75,10 +85,12 @@ export const OntologyFlow = z.object({
   payload: z.string(),
   summary: z.string(),
   stages: z.array(FlowStage),
+  endBehavior: z.enum(['stop', 'loop']).optional(),
+  showGrid: z.boolean().optional(),
 })
 
 export const OntologyDocument = z.object({
-  schemaVersion: z.literal(9),
+  schemaVersion: z.literal(10),
   id: z.string(),
   name: z.string(),
   version: z.string(),
