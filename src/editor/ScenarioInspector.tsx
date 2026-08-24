@@ -10,8 +10,9 @@ export type RelationPickTarget = { flowId: string; stageId: string | null }
 export type StagePreviewTarget = { flowId: string; stageId: string }
 type StageDragSession = { pointerId: number; stageId: string; beforeStageId: string | null; startY: number; clientX: number; clientY: number; moved: boolean; frame: number; owner: HTMLElement }
 
-export function ScenarioInspector({ flow, document, commit, editable, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void }) {
+export function ScenarioInspector({ flow, document, commit, editable, relationPickTarget, onRelationPickTarget, onRelationPreview, onStagePreview, focusActive = false, onFocusChange }: { flow: OntologyFlow; document: OntologyDocument; commit: Commit; editable: boolean; relationPickTarget: RelationPickTarget | null; onRelationPickTarget: (target: RelationPickTarget | null) => void; onRelationPreview: (preview: RelationPreview | null) => void; onStagePreview: (target: StagePreviewTarget | null) => void; focusActive?: boolean; onFocusChange?: (value: boolean) => void }) {
   const { t } = useI18n()
+  const focusToggle = onFocusChange ? <label className="scenario-focus-toggle"><input type="checkbox" checked={focusActive} onChange={(event) => onFocusChange(event.target.checked)} /><span>{t('content.scenarioFocus')}</span><small>{t('content.scenarioFocusHint')}</small></label> : null
   const patch = (value: Partial<OntologyFlow>) => commit((current) => ({ ...current, flows: current.flows.map((item) => item.id === flow.id ? { ...item, ...value } : item) }))
   const nodeById = new Map(document.nodes.map((node) => [node.id, node]))
   const relationById = new Map(document.relations.map((relation) => [relation.id, relation]))
@@ -115,7 +116,7 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
     autoScroll()
   }
 
-  if (!editable) return <><span className="eyebrow">{t('content.animatedScenario')}</span><h2>{flow.name}</h2><p className="lede">{t(flow.stages.length === 1 ? 'content.stepCount' : 'content.stepsCount', { count: flow.stages.length })}</p><div className="scenario-stages is-readonly">{flow.stages.map((stage, index) => <section className="scenario-stage" key={stage.id}><header><strong>{stage.name || t('content.stepIndex', { index: String(index + 1).padStart(2, '0') })}</strong></header>{stage.traversals.map((traversal) => { const relation = relationById.get(traversal.relationId); if (!relation) return null; const resolved = resolveTraversal(traversal, relation); return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><span aria-hidden="true">→</span><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span></div> })}</section>)}</div></>
+  if (!editable) return <><span className="eyebrow">{t('content.animatedScenario')}</span><h2>{flow.name}</h2><p className="lede">{t(flow.stages.length === 1 ? 'content.stepCount' : 'content.stepsCount', { count: flow.stages.length })}</p>{focusToggle}<div className="scenario-stages is-readonly">{flow.stages.map((stage, index) => <section className="scenario-stage" key={stage.id}><header><strong>{stage.name || t('content.stepIndex', { index: String(index + 1).padStart(2, '0') })}</strong></header>{stage.traversals.map((traversal) => { const relation = relationById.get(traversal.relationId); if (!relation) return null; const resolved = resolveTraversal(traversal, relation); return <div className="scenario-branch" key={traversal.id}><span className="branch-code">{nodeById.get(resolved.sourceId)?.code}</span><span className="branch-name">{nodeById.get(resolved.sourceId)?.name}</span><span aria-hidden="true">→</span><span className="branch-code">{nodeById.get(resolved.targetId)?.code}</span><span className="branch-name">{nodeById.get(resolved.targetId)?.name}</span></div> })}</section>)}</div></>
 
   const nextStageCandidates = document.relations
 
@@ -123,6 +124,7 @@ export function ScenarioInspector({ flow, document, commit, editable, relationPi
     <span className="eyebrow">{t('content.animatedScenario')}</span>
     <h2>{flow.name}</h2>
     <p className="lede">{t(flow.stages.length === 1 ? 'content.stepCount' : 'content.stepsCount', { count: flow.stages.length })}</p>
+    {focusToggle}
     <div className="form-stack scenario-editor">
       <label className="field"><span>{t('content.name')}</span><input value={flow.name} onChange={(event) => patch({ name: event.target.value })} /></label>
       <div className="scenario-steps-heading"><span>{t('content.steps')}</span><small>{t('content.dragStepInstruction')}</small></div>

@@ -1011,6 +1011,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .scenario-speed-control > span { grid-column: 1 / -1; color: var(--ink-3); font: 500 7px var(--mono); line-height: 1; text-transform: uppercase; }
 .scenario-speed-control input { width: 100%; height: 10px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .scenario-speed-control output { color: var(--ink-2); font: 500 8px var(--mono); text-align: right; white-space: nowrap; }
+.scenario-focus-control { min-width: 108px; display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 8px; background: var(--surface-soft); color: var(--ink-2); font: 500 8px var(--mono); text-transform: uppercase; cursor: pointer; user-select: none; }
+.scenario-focus-control input { width: 28px; height: 16px; flex: 0 0 28px; appearance: none; margin: 0; padding: 2px; border-radius: 8px; background: var(--structure); position: relative; cursor: pointer; transition: background 160ms ease; }
+.scenario-focus-control input::before { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
+.scenario-focus-control input:checked { background: var(--accent); }
+.scenario-focus-control input:checked::before { transform: translateX(12px); }
+.scenario-focus-toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0 14px; padding: 8px 10px; border-radius: 10px; background: var(--surface-soft); color: var(--ink-2); font: 500 9px var(--mono); cursor: pointer; user-select: none; }
+.scenario-focus-toggle input { width: 28px; height: 16px; flex: 0 0 28px; appearance: none; margin: 0; padding: 2px; border-radius: 8px; background: var(--structure); position: relative; cursor: pointer; transition: background 160ms ease; }
+.scenario-focus-toggle input::before { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent); transition: transform 180ms cubic-bezier(.22,1,.36,1); }
+.scenario-focus-toggle input:checked { background: var(--accent); }
+.scenario-focus-toggle input:checked::before { transform: translateX(12px); }
+.scenario-focus-toggle small { margin-left: auto; color: var(--ink-3); font: 8px var(--mono); text-transform: none; }
+
 .utility-panel { position: absolute; top: 72px; right: 364px; bottom: 12px; z-index: 9; width: 340px; overflow: auto; padding: 22px; border-radius: 12px; background: color-mix(in srgb, var(--surface-raised) 96%, transparent); box-shadow: 0 12px 36px color-mix(in srgb, var(--ink) 14%, transparent); backdrop-filter: blur(16px); }
 .map-app.header-collapsed .utility-panel { top: 56px; }
 .map-app.right-collapsed .utility-panel { right: 12px; }

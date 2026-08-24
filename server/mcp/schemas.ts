@@ -9,7 +9,7 @@ export const GridPoint = z.object({
 
 export const BuildingSize = z.enum(['xs', 's', 'm', 'l', 'xl'])
 export const Archetype = z.enum([
-  'cube','tower','low-slab','slab-stack','fin-row','podium-tower','twin-towers','courtyard','bridge','stepped-pyramid','server-rack','monitor','database',
+  'cube','tower','low-slab','slab-stack','fin-row','podium-tower','twin-towers','courtyard','bridge','stepped-pyramid','server-rack','monitor','camera','database',
 ])
 export const FaceTexture = z.enum(['auto','plain','hatched'])
 export const RelationKind = z.enum(['full','dotted'])

@@ -39,10 +39,11 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     return result
   }
   if (archetype === 'fin-row') {
-    const count = Math.max(2, Math.min(7, propertyCount + 1))
+    void propertyCount
+    const count = 4
     const pitch = footprint.w / count
     const result: Face[] = []
-    for (let index = 0; index < count; index += 1) result.push(...boxFaces({ gx: footprint.gx + index * pitch, gy: footprint.gy, w: pitch * 0.58, d: footprint.d }, 0, height, true))
+    for (let index = 0; index < count; index += 1) result.push(...boxFaces({ gx: footprint.gx + index * pitch, gy: footprint.gy, w: pitch * 0.62, d: footprint.d }, 0, height, true))
     return result
   }
   if (archetype === 'podium-tower') {
@@ -143,7 +144,7 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
     const screenH = height - screenBottom - 0.08
     const screenTh = 0.095
     const scale = footprint.w / 2.55
-    const screenFactor = 0.62 + 0.17 * scale
+    const screenFactor = 0.54 + 0.08 * scale
     const screenW = footprint.w * screenFactor
     const screenX = footprint.gx + (footprint.w - screenW) / 2
     const screenY = footprint.gy + (footprint.d - screenTh) / 2
@@ -173,6 +174,29 @@ export function buildingFaces(archetype: Archetype, footprint: Footprint, height
       ...boxFaces({ gx: innerX, gy: innerY, w: innerW, d: innerTh }, screenBottom + 0.04, screenBottom + screenH - 0.04, true),
       ...boxFaces({ gx: camX, gy: screenY + screenTh * 0.38, w: camW, d: camH }, screenBottom + screenH, screenBottom + screenH + 0.07),
       ...boxFaces({ gx: logoX, gy: innerY + innerTh - 0.02, w: logoW, d: logoH }, screenBottom + 0.04, screenBottom + 0.08),
+    ]
+  }
+  if (archetype === 'camera') {
+    const baseH = height * 0.11
+    const bodyH = height * 0.42
+    const bodyW = footprint.w * 0.68
+    const bodyD = footprint.d * 0.52
+    const bodyX = footprint.gx + (footprint.w - bodyW) / 2
+    const bodyY = footprint.gy + (footprint.d - bodyD) / 2
+    const lensW = bodyW * 0.48
+    const lensD = bodyD * 0.26
+    const lensH = bodyH * 0.42
+    const lensX = bodyX + (bodyW - lensW) / 2
+    const lensY = bodyY + bodyD - lensD * 0.55
+    const innerW = lensW * 0.88
+    const innerD = lensD * 0.82
+    const innerX = lensX + (lensW - innerW) / 2
+    const innerY = lensY + (lensD - innerD) / 2
+    return [
+      ...boxFaces({ gx: footprint.gx + footprint.w * 0.04, gy: footprint.gy + footprint.d * 0.04, w: footprint.w * 0.92, d: footprint.d * 0.92 }, 0, baseH),
+      ...boxFaces({ gx: bodyX, gy: bodyY, w: bodyW, d: bodyD }, baseH, baseH + bodyH, true),
+      ...boxFaces({ gx: lensX, gy: lensY, w: lensW, d: lensD }, baseH + bodyH * 0.28, baseH + bodyH * 0.28 + lensH),
+      ...boxFaces({ gx: innerX, gy: innerY, w: innerW, d: innerD }, baseH + bodyH * 0.28 + lensH, baseH + bodyH * 0.28 + lensH + 0.05),
     ]
   }
   if (archetype === 'database') {

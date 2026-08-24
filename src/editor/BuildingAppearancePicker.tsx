@@ -18,10 +18,11 @@ const FORMS = [
   { value: 'server-rack', key: 'content.formServerRack' },
   { value: 'database', key: 'content.formDatabase' },
   { value: 'monitor', key: 'content.formMonitor' },
+  { value: 'camera', key: 'content.formCamera' },
 ] as const satisfies ReadonlyArray<{ value: Archetype | null; key: string }>
 
 function FormPreview({ archetype }: { archetype: Archetype | null }) {
-  const previewHeight = archetype === 'low-slab' ? 0.7 : archetype === 'monitor' ? 1.85 : archetype === 'database' ? 1.6 : 3.2
+  const previewHeight = archetype === 'low-slab' ? 0.7 : archetype === 'monitor' ? 1.85 : archetype === 'camera' ? 1.45 : archetype === 'database' ? 1.6 : 3.2
   const faces = buildingFaces(archetype ?? 'cube', { gx: 0, gy: 0, w: 4, d: 3 }, previewHeight, 4)
   const points = faces.flatMap((face) => face.points)
   const minX = Math.min(...points.map((point) => point.x)) - 8

@@ -43,6 +43,7 @@ type Props = {
   viewportInsets?: { left: number; right: number; top: number; bottom: number }
   dezoom?: number
   onAddConcept?: () => void
+  scenarioFilter?: { relationIds: Set<string>; nodeIds: Set<string> } | null
 }
 
 function EmptyFloorPrompt({ onAddConcept }: { onAddConcept?: () => void }) {
@@ -117,7 +118,7 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, onAddConcept }: Props) {
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, onAddConcept, scenarioFilter = null }: Props) {
   const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -143,7 +144,10 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
   const exits = useMemo(() => buildExitGeometries(document, floorId, nodes), [document, floorId, nodes])
   const exitExtents = useMemo(() => [...exits.values()].map(exitExtent), [exits])
   const scene = useMemo(() => buildScene(projection?.groups ?? [], nodes, `${document.id}:${floorId}:${document.updatedAt}`, flagWidths, flagPositions, exitExtents), [document.id, document.updatedAt, exitExtents, flagPositions, flagWidths, floorId, nodes, projection?.groups])
-  const visibleRelations = useMemo(() => projection?.relations ?? [], [projection])
+  const visibleRelations = useMemo(() => {
+    const base = projection?.relations ?? []
+    return scenarioFilter ? base.filter((relation) => scenarioFilter.relationIds.has(relation.id)) : base
+  }, [projection, scenarioFilter])
   const geometry = useMemo(() => buildRelationGeometry(nodes, visibleRelations), [nodes, visibleRelations])
   const previewRelations = useMemo(() => connectionDraft ? connectionDraft.targets.map((target, index) => ({ id: `preview-${index}`, from: target.direction === 'outbound' ? connectionDraft.sourceId : target.nodeId, to: target.direction === 'outbound' ? target.nodeId : connectionDraft.sourceId, kind: connectionDraft.kind, label: connectionDraft.label })) : [], [connectionDraft])
   const previewGeometry = useMemo(() => buildRelationGeometry(nodes, previewRelations), [nodes, previewRelations])
@@ -446,9 +450,10 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     svg.setPointerCapture(event.pointerId)
   }
 
-  const orderedShapes = draggingNodeId
-    ? [...scene.shapes.filter((node) => node.id !== draggingNodeId), ...scene.shapes.filter((node) => node.id === draggingNodeId)]
-    : scene.shapes
+  const orderedShapes = (() => {
+    const base = draggingNodeId ? [...scene.shapes.filter((node) => node.id !== draggingNodeId), ...scene.shapes.filter((node) => node.id === draggingNodeId)] : scene.shapes
+    return scenarioFilter ? base.filter((node) => scenarioFilter.nodeIds.has(node.id)) : base
+  })()
   const exitFloorHoverClass = (remoteFloorId: string) => {
     const highlightedRemoteFloorId = highlightedFloorId === floorId ? null : highlightedFloorId
     return highlightedRemoteFloorId ? highlightedRemoteFloorId === remoteFloorId ? 'is-floor-hovered' : 'is-floor-hover-dimmed' : ''
@@ -463,9 +468,11 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     }
   }, [nodes])
 
+  const isScenarioFocus = Boolean(scenarioFilter)
+  const scenarioEmpty = isScenarioFocus && nodes.length > 0 && nodes.every((node) => !scenarioFilter!.nodeIds.has(node.id)) && visibleRelations.length === 0
   return (
     <div className={`canvas-wrap ${relationPicking ? 'is-relation-picking' : ''}`} ref={containerRef}>
-      {nodes.length === 0 ? (
+      {scenarioEmpty ? <div className="canvas-empty"><span className="empty-floor-readonly">{t('content.noScenarioElementsOnFloor')}</span></div> : nodes.length === 0 ? (
         <EmptyFloorPrompt onAddConcept={editable ? onAddConcept : undefined} />
       ) : null}
       <svg
@@ -588,7 +595,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
               {alignmentGuides.gy !== undefined ? (() => { const a = toScreen(guideExtent.minGx, alignmentGuides.gy); const b = toScreen(guideExtent.maxGx, alignmentGuides.gy); return <line className="alignment-guide alignment-guide-y" x1={a.x} y1={a.y} x2={b.x} y2={b.y} style={{ stroke: 'var(--accent)', strokeWidth: 1.5 }} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /> })() : null}
             </g> : null}
             <g className="districts">
-              {scene.districts.map((district) => {
+              {scene.districts.filter((district) => !scenarioFilter || district.nodeIds.some((id) => scenarioFilter.nodeIds.has(id))).map((district) => {
                  const corners = [toScreen(district.rect.gx, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy), toScreen(district.rect.gx + district.rect.w, district.rect.gy + district.rect.d), toScreen(district.rect.gx, district.rect.gy + district.rect.d)]
                    const selected = selection?.kind === 'group' && selection.id === district.id
                    return <g key={district.id} className={`district ${selected ? 'is-selected' : ''} ${hoveredDistrictId === district.id ? 'is-hovered' : ''} ${draggingFlagId === district.id ? 'is-dragging' : ''}`} role="button" tabIndex={0} aria-label={t('shell.canvas.neighborhood', { name: district.name })} onPointerEnter={() => setHoveredDistrictId(district.id)} onPointerLeave={() => setHoveredDistrictId(null)} onFocus={() => setHoveredDistrictId(district.id)} onBlur={() => setHoveredDistrictId(null)} onPointerDown={(event) => { if (event.button !== 0 || !editable || !selected || connectionDraft || relationPicking) return; event.stopPropagation(); startGroupDrag(event, district) }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) } }} onClick={(event) => { event.stopPropagation(); if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }}><polygon points={pointsAttribute(corners)} className="district-plate" vectorEffect="non-scaling-stroke" /></g>
@@ -619,7 +626,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                 return <g key={preview.key} className="candidate-relation-preview"><polyline points={pointsAttribute(preview.points)} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -8 4 L -8 -4 Z" transform={`translate(${end.x} ${end.y}) rotate(${angle})`} /></g>
               })}
              </g>
-             <g className="floor-exit-ground-routes">{groupedExits.flatMap((group) => group.exits.map((exit) => {
+             <g className="floor-exit-ground-routes">{groupedExits.flatMap((group) => group.exits.filter((exit) => !scenarioFilter || scenarioFilter.relationIds.has(exit.relationId)).map((exit) => {
                const relation = relationById.get(exit.relationId)
                if (!relation) return null
                const selected = selection?.kind === 'relation' && selection.id === exit.relationId
@@ -664,9 +671,9 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
                  return <g key={exit.relationId} className={`floor-exit relation-${relation.kind} ${isOutgoing ? 'is-outgoing' : 'is-incoming'} is-selected`}><polyline points={pointsAttribute([exit.points[0]!, exit.points[1]!])} className="relation-line" vectorEffect="non-scaling-stroke" /><polyline points={pointsAttribute([exit.dropStart, exit.dropEnd])} className={`relation-line exit-drop ${isOutgoing ? '' : 'is-incoming'}`} style={{ '--exit-stroke': `url(#${gradientId})` } as CSSProperties} vectorEffect="non-scaling-stroke" /><path d="M 0 0 L -7 3.5 L -7 -3.5 Z" transform={`translate(${exit.dropEnd.x} ${exit.dropEnd.y}) rotate(${arrowAngle})`} className="relation-arrow" vectorEffect="non-scaling-stroke" /></g>
                }))}
              </g> : null}
-             <g className="floor-exits" onPointerDown={(event) => event.stopPropagation()}>{groupedExits.map((group) => {
+             <g className="floor-exits" onPointerDown={(event) => event.stopPropagation()}>{groupedExits.filter((group) => !scenarioFilter || group.exits.some((exit) => scenarioFilter.relationIds.has(exit.relationId))).map((group) => {
               return <g key={group.floorId} className="floor-exit-group">
-                {group.exits.map((exit) => {
+                {group.exits.filter((exit) => !scenarioFilter || scenarioFilter.relationIds.has(exit.relationId)).map((exit) => {
                   const relation = relationById.get(exit.relationId)
                   if (!relation) return null
                   const selected = selection?.kind === 'relation' && selection.id === exit.relationId
@@ -695,7 +702,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
             {program && activeFlow ? <FlowAnimation program={program} flow={activeFlow} stepDisplayMode={stepDisplayMode} arrivalIds={arrivalIds} /> : null}
             {connectionDraft ? <g className="connection-ports">{scene.shapes.map((node) => Object.entries(portAnchors(node.footprint)).map(([side, point]) => { const screen = toScreen(point.gx, point.gy); const source = node.id === connectionDraft.sourceId; const target = connectionDraft.targets.some((item) => item.nodeId === node.id); return <circle key={`${node.id}-${side}`} cx={screen.x} cy={screen.y} r={source || target ? 4.5 : 3} className={`${source ? 'is-source' : ''} ${target ? 'is-target' : ''}`} vectorEffect="non-scaling-stroke" onClick={(event) => { event.stopPropagation(); onToggleConnectionTarget(node.id) }} /> }))}</g> : null}
             <g className="district-flags">
-              {scene.districts.map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} hovered={hoveredDistrictId === district.id} editable={editable && !connectionDraft && !relationPicking} dragging={draggingFlagId === district.id} onSelect={() => { if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }; if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }} onHover={setHoveredDistrictId} onMeasure={measureFlag} onDragStart={(event) => startFlagDrag(event, district)} />)}
+              {scene.districts.filter((district) => !scenarioFilter || district.nodeIds.some((id) => scenarioFilter.nodeIds.has(id))).map((district) => <DistrictFlag key={district.id} district={district} selected={selection?.kind === 'group' && selection.id === district.id} hovered={hoveredDistrictId === district.id} editable={editable && !connectionDraft && !relationPicking} dragging={draggingFlagId === district.id} onSelect={() => { if (suppressCanvasClick.current) { suppressCanvasClick.current = false; return }; if (!relationPicking) onSelect({ kind: 'group', id: district.id }) }} onHover={setHoveredDistrictId} onMeasure={measureFlag} onDragStart={(event) => startFlagDrag(event, district)} />)}
             </g>
           </g>
         ) : null}

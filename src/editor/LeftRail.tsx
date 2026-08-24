@@ -18,11 +18,12 @@ type LeftRailProps = {
   editable: boolean
   onCollapse?: () => void
   onStartConnection?: (sourceId: string) => void
+  scenarioFilter?: { relationIds: Set<string>; nodeIds: Set<string> } | null
 }
 
 const tabs: RailTab[] = ['concepts', 'relations', 'scenarios']
 
-export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable, onCollapse, onStartConnection }: LeftRailProps) {
+export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFloor, editable, onCollapse, onStartConnection, scenarioFilter = null }: LeftRailProps) {
   void onActiveFloor
   const { t } = useI18n()
   const { document, selection, setSelection, commit } = useDocumentStore()
@@ -103,7 +104,8 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
     const isCrossFloor = Boolean(from && to && from.floorId !== to.floorId)
     const isInScope = relationScope === 'all' || (relationScope === 'floor' ? isOnFloor : isCrossFloor)
     const matchesSearch = !normalizedSearch || [relation.label, from?.name ?? '', to?.name ?? ''].some((value) => value.toLocaleLowerCase().includes(normalizedSearch))
-    return isInScope && matchesSearch
+    const matchesScenario = !scenarioFilter || scenarioFilter.relationIds.has(relation.id)
+    return isInScope && matchesSearch && matchesScenario
   })
 
   return (
@@ -166,7 +168,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
             const kind = t(relation.kind === 'full' ? 'content.kindFull' : 'content.kindDotted')
             return <div className={`relation-row ${selection?.kind === 'relation' && selection.id === relation.id ? 'is-active' : ''}`} key={relation.id}><button type="button" title={`${direction} · ${kind} · ${relation.label}`} onClick={() => select({ kind: 'relation', id: relation.id })}><span title={from?.name ?? t('content.unknownSource')}>{from?.code ?? '?'}</span><strong title={`${direction} · ${relation.label}`}>{direction} · {relation.label}</strong><span title={t('content.relationKindTitle', { kind })}>{kind}</span></button>{editable ? <button type="button" className="relation-row-delete" aria-label={t('content.deleteNamed', { name: relation.label })} title={t('content.deleteNamed', { name: relation.label })} onClick={() => deleteRelation(relation.id)}>×</button> : null}</div>
           })}
-          {filteredRelations.length === 0 ? <div><p className="rail-empty">{t(document.relations.length === 0 ? 'content.noRelations' : 'content.noMatchingRelations')}</p>{document.relations.length > 0 ? <button type="button" className="add-row" onClick={() => { setSearch(''); setRelationScope('all') }}>{t('content.resetFilters')}</button> : null}{editable && document.nodes.length > 0 ? <button type="button" className="rail-empty-action" onClick={beginRelation}>{t('content.createRelation')}</button> : null}</div> : null}
+          {filteredRelations.length === 0 ? <div><p className="rail-empty">{t(scenarioFilter ? 'content.noScenarioRelations' : document.relations.length === 0 ? 'content.noRelations' : 'content.noMatchingRelations')}</p>{document.relations.length > 0 ? <button type="button" className="add-row" onClick={() => { setSearch(''); setRelationScope('all') }}>{t('content.resetFilters')}</button> : null}{editable && document.nodes.length > 0 ? <button type="button" className="rail-empty-action" onClick={beginRelation}>{t('content.createRelation')}</button> : null}</div> : null}
           {editable && document.nodes.length === 0 ? <div><p className="rail-empty">{t('content.addConceptBeforeRelation')}</p><button type="button" className="add-row" onClick={() => chooseTab('concepts')}>{t('content.goToConcepts')}</button></div> : null}
         </div>
       </section> : null}
@@ -181,7 +183,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
           </div> : <p className="rail-empty">{t('content.addConceptOnFloorBeforeRelation')}</p>}
         </section> : null}
         {(() => {
-          const nodesOnFloor = document.nodes.filter((node) => node.floorId === activeFloorId)
+          const nodesOnFloor = document.nodes.filter((node) => node.floorId === activeFloorId && (!scenarioFilter || scenarioFilter.nodeIds.has(node.id)))
           const matchingNodes = nodesOnFloor.filter((node) => !normalizedSearch || [node.code, node.name, node.whatItDoes, ...node.properties.map((property) => property.value)].some((value) => value.toLocaleLowerCase().includes(normalizedSearch)))
           const groupsWithNodes = document.groups.filter((group) => nodesOnFloor.some((node) => node.groupId === group.id))
           const selectedGroupId = selection?.kind === 'group' ? selection.id : null
@@ -191,7 +193,7 @@ export function LeftRail({ activeFlowId, onActiveFlow, activeFloorId, onActiveFl
           const displayGroups = normalizedSearch ? baseGroups.filter((group) => matchingNodes.some((node) => node.groupId === group.id)) : baseGroups
            if (document.groups.length === 0) return <section className="rail-section"><p className="rail-empty">{t('content.noNeighborhoods')}</p>{editable ? <button type="button" className="add-row" onClick={addGroup}>{t('content.createNeighborhood')}</button> : null}</section>
            if (normalizedSearch && displayGroups.length === 0) return <section className="rail-section"><p className="rail-empty">{t('content.noMatchingConceptsOnFloor')}</p><button type="button" className="add-row" onClick={() => setSearch('')}>{t('content.clearSearch')}</button></section>
-           if (displayGroups.length === 0) return <section className="rail-section"><p className="rail-empty">{t('content.noConceptsOnFloor')}</p>{editable ? <button type="button" className="add-row" onClick={() => addNode(document.groups[0]!.id)}>{t('content.addFirstConcept')}</button> : null}</section>
+           if (displayGroups.length === 0) return <section className="rail-section"><p className="rail-empty">{t(scenarioFilter ? 'content.noScenarioConceptsOnFloor' : 'content.noConceptsOnFloor')}</p>{!scenarioFilter && editable ? <button type="button" className="add-row" onClick={() => addNode(document.groups[0]!.id)}>{t('content.addFirstConcept')}</button> : null}</section>
           const hiddenGroups = document.groups.filter((group) => !baseGroups.some((visibleGroup) => visibleGroup.id === group.id))
           const selectedHiddenGroupId = hiddenGroups.some((group) => group.id === hiddenGroupId) ? hiddenGroupId : hiddenGroups[0]?.id ?? ''
           return (

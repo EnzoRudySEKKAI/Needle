@@ -33,7 +33,7 @@ function StepNavigator({ flow, program, started, time, onOpenStage }: { flow: On
   </nav>
 }
 
-export function ScenarioControls({ flow, program, stepDisplayMode, onStepDisplayMode, onOpenStage }: { flow: OntologyFlow; program: FlowProgram | null; stepDisplayMode: StepDisplayMode; onStepDisplayMode: (mode: StepDisplayMode) => void; onOpenStage: (stageId: string) => void }) {
+export function ScenarioControls({ flow, program, stepDisplayMode, onStepDisplayMode, onOpenStage, focusActive = false, onFocusChange }: { flow: OntologyFlow; program: FlowProgram | null; stepDisplayMode: StepDisplayMode; onStepDisplayMode: (mode: StepDisplayMode) => void; onOpenStage: (stageId: string) => void; focusActive?: boolean; onFocusChange?: (value: boolean) => void }) {
   const { t } = useI18n()
   const clock = useClockState()
   const activeProgram = clock.program?.id === flow.id ? program : null
@@ -44,5 +44,6 @@ export function ScenarioControls({ flow, program, stepDisplayMode, onStepDisplay
     <StepNavigator flow={flow} program={activeProgram} started={clock.started} time={clock.time} onOpenStage={onOpenStage} />
     <div className="step-display-control"><span>{t('content.labels')}</span><AppSelect compact ariaLabel={t('content.stepLabels')} value={stepDisplayMode} options={[{ value: 'all', label: t('common.all') }, { value: 'current', label: t('common.current') }, { value: 'none', label: t('common.none') }]} onChange={(value) => onStepDisplayMode(value as StepDisplayMode)} /></div>
     <label className="scenario-speed-control"><span>{t('content.speed')}</span><input type="range" min="0.25" max="2" step="0.25" value={clock.speed} aria-label={t('content.playbackSpeed')} onChange={(event) => setFlowSpeed(Number(event.target.value))} /><output>{clock.speed.toFixed(clock.speed % 1 === 0 ? 0 : 2).replace(/0$/, '')}x</output></label>
+    {onFocusChange ? <label className="scenario-focus-control"><input type="checkbox" checked={focusActive} onChange={(event) => onFocusChange(event.target.checked)} /><span>{t('content.scenarioFocus')}</span></label> : null}
   </section>
 }

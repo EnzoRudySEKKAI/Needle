@@ -16,6 +16,7 @@ export type Archetype =
   | 'stepped-pyramid'
   | 'server-rack'
   | 'monitor'
+  | 'camera'
   | 'database'
 export type FaceTexture = 'auto' | 'plain' | 'hatched'
 export type RelationKind = 'full' | 'dotted'
