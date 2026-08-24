@@ -8,20 +8,46 @@ import { continueFlow, toggleFlow, useClockActiveKey, useClockState } from '../m
 
 const noop = () => {}
 const singleInsets = { left: 34, right: 34, top: 76, bottom: 34 }
-const stackedTopInsets = { left: 34, right: 34, top: 76, bottom: 18 }
-const stackedBottomInsets = { left: 34, right: 34, top: 48, bottom: 24 }
 
-type CinemaViewSnapshot = { floorIds: string[]; focusNodeIds: Set<string> }
+type CinemaLayout = 'single' | 'two' | 'three-vertical' | 'three-top' | 'three-bottom'
+type CinemaSlot = 'full' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'vertical-top' | 'vertical-middle' | 'vertical-bottom'
+type CinemaViewSnapshot = { floorIds: string[]; views: { floorId: string; slot: CinemaSlot }[]; layout: CinemaLayout; focusNodeIds: Set<string> }
 
 function cinemaViewSnapshot(document: OntologyDocument, nodeById: ReadonlyMap<string, OntologyNode>, runtimeShot: ProgramStage, shot: FlowStage): CinemaViewSnapshot & { scenarioFilter: { relationIds: Set<string>; nodeIds: Set<string> } } {
-  const floorIds = [...new Set([...runtimeShot.sourceIds, ...runtimeShot.targetIds].map((id) => nodeById.get(id)?.floorId).filter((id): id is string => Boolean(id)))]
-  const visibleFloorIds = shot.layout === 'single' ? floorIds.slice(0, 1) : floorIds
-    .slice()
-    .sort((a, b) => document.floors.findIndex((floor) => floor.id === b) - document.floors.findIndex((floor) => floor.id === a))
-    .slice(0, 2)
+  const floorIndex = (floorId: string) => document.floors.findIndex((floor) => floor.id === floorId)
+  const ordered = (floorIds: string[]) => floorIds.slice().sort((a, b) => floorIndex(b) - floorIndex(a))
+  const sourceFloorIds = [...new Set(runtimeShot.sourceIds.map((id) => nodeById.get(id)?.floorId).filter((id): id is string => Boolean(id)))]
+  const targetFloorIds = [...new Set(runtimeShot.targetIds.map((id) => nodeById.get(id)?.floorId).filter((id): id is string => Boolean(id)))]
+  const floorIds = ordered([...new Set([...sourceFloorIds, ...targetFloorIds])])
+  let layout: CinemaLayout = floorIds.length > 1 ? 'two' : 'single'
+  let views: { floorId: string; slot: CinemaSlot }[] = floorIds.length === 1 ? [{ floorId: floorIds[0]!, slot: 'full' }] : floorIds.slice(0, 2).map((floorId, index) => ({ floorId, slot: index === 0 ? 'top' : 'bottom' }))
+
+  if (shot.layout === 'single') {
+    views = floorIds.length ? [{ floorId: floorIds[0]!, slot: 'full' }] : []
+    layout = 'single'
+  } else if (floorIds.length >= 3) {
+    const destinationFloorId = targetFloorIds.length === 1 ? targetFloorIds[0]! : null
+    const originFloorIds = destinationFloorId ? ordered(sourceFloorIds.filter((floorId) => floorId !== destinationFloorId)) : []
+    if (destinationFloorId && originFloorIds.length === 2) {
+      const destinationIndex = floorIndex(destinationFloorId)
+      if (originFloorIds.every((floorId) => floorIndex(floorId) < destinationIndex)) {
+        layout = 'three-bottom'
+        views = [{ floorId: destinationFloorId, slot: 'top' }, { floorId: originFloorIds[0]!, slot: 'bottom-left' }, { floorId: originFloorIds[1]!, slot: 'bottom-right' }]
+      } else if (originFloorIds.every((floorId) => floorIndex(floorId) > destinationIndex)) {
+        layout = 'three-top'
+        views = [{ floorId: originFloorIds[0]!, slot: 'top-left' }, { floorId: originFloorIds[1]!, slot: 'top-right' }, { floorId: destinationFloorId, slot: 'bottom' }]
+      } else {
+        layout = 'three-vertical'
+        views = floorIds.slice(0, 3).map((floorId, index) => ({ floorId, slot: index === 0 ? 'vertical-top' : index === 1 ? 'vertical-middle' : 'vertical-bottom' }))
+      }
+    } else {
+      layout = 'three-vertical'
+      views = floorIds.slice(0, 3).map((floorId, index) => ({ floorId, slot: index === 0 ? 'vertical-top' : index === 1 ? 'vertical-middle' : 'vertical-bottom' }))
+    }
+  }
   const relationIds = new Set(shot.traversals.map((traversal) => traversal.relationId))
   const focusNodeIds = new Set([...runtimeShot.sourceIds, ...runtimeShot.targetIds])
-  return { floorIds: visibleFloorIds, focusNodeIds, scenarioFilter: { relationIds, nodeIds: focusNodeIds } }
+  return { floorIds: views.map((view) => view.floorId), views, layout, focusNodeIds, scenarioFilter: { relationIds, nodeIds: focusNodeIds } }
 }
 
 function CinemaHeader({ flow, program, onClose }: { flow: OntologyFlow; program: FlowProgram; onClose: () => void }) {
@@ -34,11 +60,9 @@ function CinemaHeader({ flow, program, onClose }: { flow: OntologyFlow; program:
   </header>
 }
 
-function CinemaFooter({ flow, shotIndex }: { flow: OntologyFlow; shotIndex: number }) {
+function CinemaFooter() {
   const clock = useClockState()
-  const shot = flow.stages[shotIndex]!
-  return <footer className="cinema-caption">
-    <div className="cinema-caption-copy"><span>Plan {String(shotIndex + 1).padStart(2, '0')} / {String(flow.stages.length).padStart(2, '0')}</span><h2>{shot.name || `Plan ${shotIndex + 1}`}</h2>{shot.note ? <p className="cinema-shot-note">{shot.note}</p> : null}{flow.summary ? <p className="cinema-scenario-summary">{flow.summary}</p> : null}</div>
+  return <footer className="cinema-transport">
     {clock.waiting ? <button type="button" className="cinema-continue" onClick={continueFlow}>Continue</button> : <button type="button" className="cinema-playback" onClick={toggleFlow}>{clock.playing ? 'Pause' : clock.ended ? 'Replay' : 'Play'}</button>}
   </footer>
 }
@@ -67,11 +91,12 @@ export function CinemaMode({ document, flow, program, onClose }: { document: Ont
   const viewModel = useMemo(() => cinemaViewSnapshot(document, nodeById, runtimeShot, shot), [document, nodeById, runtimeShot, shot])
   const previousView = useMemo(() => shotIndex > 0 ? cinemaViewSnapshot(document, nodeById, program.stages[shotIndex - 1]!, flow.stages[shotIndex - 1]!) : null, [document, flow.stages, nodeById, program.stages, shotIndex])
   const transitionDurationMs = shot.transition?.durationMs ?? 520
+  const layoutTransitionMs = Math.max(900, transitionDurationMs * 1.5)
 
-  return <section className={`cinema-mode ${viewModel.floorIds.length > 1 ? 'is-stack' : 'is-single'} transition-${shot.transition?.kind ?? 'travel'}`} style={{ '--cinema-transition': `${transitionDurationMs}ms` } as CSSProperties} aria-label={`Cinema: ${flow.name}`}>
+  return <section className={`cinema-mode ${viewModel.floorIds.length > 1 ? 'is-stack' : 'is-single'} layout-${viewModel.layout} transition-${shot.transition?.kind ?? 'travel'}`} style={{ '--cinema-transition': `${transitionDurationMs}ms`, '--cinema-layout-transition': `${layoutTransitionMs}ms` } as CSSProperties} aria-label={`Cinema: ${flow.name}`}>
     <CinemaHeader flow={flow} program={program} onClose={onClose} />
     <div className="cinema-views">
-      {viewModel.floorIds.map((floorId, index) => {
+      {viewModel.views.map(({ floorId, slot }, index) => {
         const floorIndex = document.floors.findIndex((floor) => floor.id === floorId)
         const floor = document.floors[floorIndex]
         const hasSource = runtimeShot.sourceIds.some((id) => nodeById.get(id)?.floorId === floorId)
@@ -83,18 +108,20 @@ export function CinemaMode({ document, flow, program, onClose }: { document: Ont
         const sameFloor = previousFloorIndex >= 0
         const variant = shotIndex % 2 === 0 ? 'a' : 'b'
         const expands = sameFloor && previousView!.floorIds.length > 1 && viewModel.floorIds.length === 1
+        const contracts = sameFloor && previousView!.floorIds.length === 1 && viewModel.floorIds.length > 1
         const transitionClass = shot.transition?.kind === 'cut' ? ''
           : shot.transition?.kind === 'fade' || !sameFloor ? `is-fade-${variant}`
             : expands ? `is-expand-${previousFloorIndex === 0 ? 'top' : 'bottom'}`
+              : contracts ? `is-contract-${index === 0 ? 'top' : 'bottom'}`
               : 'is-pan'
-        const cameraTransitionMs = transitionClass === 'is-pan' ? Math.max(900, transitionDurationMs * 1.5) : transitionClass.startsWith('is-expand-') ? transitionDurationMs : 0
-        return <article className={`cinema-view ${transitionClass}`} key={floorId} aria-label={`${role}: ${floor?.name ?? floorId}`}>
+        const cameraTransitionMs = transitionClass === 'is-pan' || transitionClass.startsWith('is-expand-') || transitionClass.startsWith('is-contract-') ? layoutTransitionMs : 0
+        return <article className={`cinema-view slot-${slot} ${transitionClass}`} key={floorId} aria-label={`${role}: ${floor?.name ?? floorId}`}>
           <CinemaFloorLocator document={document} floorId={floorId} role={role} />
           <div className="cinema-concept-details">{concepts.map((concept) => concept ? <section key={concept.id}><span>{concept.code}</span><h3>{concept.name}</h3>{concept.whatItDoes ? <p>{concept.whatItDoes}</p> : null}{concept.howItsBuilt ? <small>{concept.howItsBuilt}</small> : null}</section> : null)}</div>
-          <IsoCanvas document={document} floorId={floorId} svgId={`cinema-${index}-${floorId}`} selection={null} activeFlowId={flow.id} flowProgram={program} editable={false} stepDisplayMode="current" relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={noop} onSelect={noop} onMoveNode={noop} onMoveGroup={noop} onMoveGroupFlag={noop} connectionDraft={null} onToggleConnectionTarget={noop} viewportInsets={viewModel.floorIds.length > 1 ? index === 0 ? stackedTopInsets : stackedBottomInsets : singleInsets} dezoom={viewModel.floorIds.length > 1 ? 1.2 : 1} cameraTransitionMs={cameraTransitionMs} scenarioFilter={viewModel.scenarioFilter} focusNodeIds={viewModel.focusNodeIds} showGrid={flow.showGrid !== false} cinemaSequence={sequence} hideNodeLabels />
+          <IsoCanvas document={document} floorId={floorId} svgId={`cinema-${index}-${floorId}`} selection={null} activeFlowId={flow.id} flowProgram={program} editable={false} stepDisplayMode="current" relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={noop} onSelect={noop} onMoveNode={noop} onMoveGroup={noop} onMoveGroupFlag={noop} connectionDraft={null} onToggleConnectionTarget={noop} viewportInsets={singleInsets} dezoom={viewModel.floorIds.length > 1 ? 1.2 : 1} cameraTransitionMs={cameraTransitionMs} scenarioFilter={viewModel.scenarioFilter} focusNodeIds={viewModel.focusNodeIds} showGrid={flow.showGrid !== false} cinemaSequence={sequence} hideNodeLabels />
         </article>
       })}
     </div>
-    <CinemaFooter flow={flow} shotIndex={shotIndex} />
+    <CinemaFooter />
   </section>
 }
