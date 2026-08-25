@@ -4,7 +4,7 @@ import { pointAtLength, pointsAttribute } from '../core/iso'
 import type { StepDisplayMode } from '../core/step-display'
 import { useClockState } from '../stores/flow-clock'
 
-export function FlowAnimation({ program, flow, stepDisplayMode, arrivalIds, cinemaSequence }: { program: FlowProgram; flow: OntologyFlow; stepDisplayMode: StepDisplayMode; arrivalIds?: ReadonlySet<string>; cinemaSequence?: 'departure' | 'arrival' | 'local' }) {
+export function FlowAnimation({ program, flow, stepDisplayMode, arrivalIds, cinemaSequence, fadedRelationIds }: { program: FlowProgram; flow: OntologyFlow; stepDisplayMode: StepDisplayMode; arrivalIds?: ReadonlySet<string>; cinemaSequence?: 'departure' | 'arrival' | 'local'; fadedRelationIds?: ReadonlySet<string> }) {
   const clock = useClockState()
   const time = clock.program?.id === program.id ? clock.time : 0
   const started = clock.program?.id === program.id && clock.started
@@ -55,7 +55,7 @@ export function FlowAnimation({ program, flow, stepDisplayMode, arrivalIds, cine
   return (
     <g className="flow-animation" aria-hidden="true">
       {program.stages.map((stage, index) => stage.branches.map((branch) => (
-        <g key={branch.traversalId} className={`${index === activeIndex ? 'is-current' : index < activeIndex ? 'is-visited' : 'is-upcoming'} ${index === activeIndex && !sequenceVisible ? 'is-sequence-hidden' : ''}`}>
+        <g key={branch.traversalId} className={`${index === activeIndex ? 'is-current' : index < activeIndex ? 'is-visited' : 'is-upcoming'} ${index === activeIndex && !sequenceVisible ? 'is-sequence-hidden' : ''} ${fadedRelationIds?.has(branch.relationId) ? 'is-cinema-previous' : ''}`}>
           <polyline points={pointsAttribute(branch.geometry.points)} className="flow-trace" vectorEffect="non-scaling-stroke" />
           <path d="M 0 0 L -7 3.5 L -7 -3.5 Z" className="flow-arrow" transform={`translate(${branch.geometry.points[branch.geometry.points.length - 1]!.x} ${branch.geometry.points[branch.geometry.points.length - 1]!.y}) rotate(${Math.atan2(branch.geometry.points[branch.geometry.points.length - 1]!.y - (branch.geometry.points[branch.geometry.points.length - 2] ?? branch.geometry.points[branch.geometry.points.length - 1]!).y, branch.geometry.points[branch.geometry.points.length - 1]!.x - (branch.geometry.points[branch.geometry.points.length - 2] ?? branch.geometry.points[branch.geometry.points.length - 1]!).x) * 180 / Math.PI})`} />
         </g>

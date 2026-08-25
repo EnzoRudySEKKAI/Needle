@@ -92,6 +92,7 @@ export function CinemaMode({ document, flow, program, onClose }: { document: Ont
   const previousView = useMemo(() => shotIndex > 0 ? cinemaViewSnapshot(document, nodeById, program.stages[shotIndex - 1]!, flow.stages[shotIndex - 1]!) : null, [document, flow.stages, nodeById, program.stages, shotIndex])
   const transitionDurationMs = shot.transition?.durationMs ?? 520
   const layoutTransitionMs = Math.max(900, transitionDurationMs * 1.5)
+  const outgoingViews = previousView && shot.transition?.kind !== 'cut' ? previousView.views.filter(({ floorId }) => !viewModel.floorIds.includes(floorId)) : []
 
   return <section className={`cinema-mode ${viewModel.floorIds.length > 1 ? 'is-stack' : 'is-single'} layout-${viewModel.layout} transition-${shot.transition?.kind ?? 'travel'}`} style={{ '--cinema-transition': `${transitionDurationMs}ms`, '--cinema-layout-transition': `${layoutTransitionMs}ms` } as CSSProperties} aria-label={`Cinema: ${flow.name}`}>
     <CinemaHeader flow={flow} program={program} onClose={onClose} />
@@ -106,6 +107,12 @@ export function CinemaMode({ document, flow, program, onClose }: { document: Ont
         const concepts = [...viewModel.focusNodeIds].map((id) => nodeById.get(id)).filter((node) => node?.floorId === floorId)
         const previousFloorIndex = previousView?.floorIds.indexOf(floorId) ?? -1
         const sameFloor = previousFloorIndex >= 0
+        const previousRelationIds = sameFloor ? new Set([...previousView!.scenarioFilter.relationIds].filter((id) => !viewModel.scenarioFilter.relationIds.has(id))) : undefined
+        const previousNodeIds = sameFloor ? new Set([...previousView!.scenarioFilter.nodeIds].filter((id) => !viewModel.scenarioFilter.nodeIds.has(id))) : undefined
+        const scenarioFilter = sameFloor ? {
+          relationIds: new Set([...viewModel.scenarioFilter.relationIds, ...previousRelationIds!]),
+          nodeIds: new Set([...viewModel.scenarioFilter.nodeIds, ...previousNodeIds!]),
+        } : viewModel.scenarioFilter
         const variant = shotIndex % 2 === 0 ? 'a' : 'b'
         const expands = sameFloor && previousView!.floorIds.length > 1 && viewModel.floorIds.length === 1
         const contracts = sameFloor && previousView!.floorIds.length === 1 && viewModel.floorIds.length > 1
@@ -118,9 +125,21 @@ export function CinemaMode({ document, flow, program, onClose }: { document: Ont
         return <article className={`cinema-view slot-${slot} ${transitionClass}`} key={floorId} aria-label={`${role}: ${floor?.name ?? floorId}`}>
           <CinemaFloorLocator document={document} floorId={floorId} role={role} />
           <div className="cinema-concept-details">{concepts.map((concept) => concept ? <section key={concept.id}><span>{concept.code}</span><h3>{concept.name}</h3>{concept.whatItDoes ? <p>{concept.whatItDoes}</p> : null}{concept.howItsBuilt ? <small>{concept.howItsBuilt}</small> : null}</section> : null)}</div>
-          <IsoCanvas document={document} floorId={floorId} svgId={`cinema-${index}-${floorId}`} selection={null} activeFlowId={flow.id} flowProgram={program} editable={false} stepDisplayMode="current" relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={noop} onSelect={noop} onMoveNode={noop} onMoveGroup={noop} onMoveGroupFlag={noop} connectionDraft={null} onToggleConnectionTarget={noop} viewportInsets={singleInsets} dezoom={viewModel.floorIds.length > 1 ? 1.2 : 1} cameraTransitionMs={cameraTransitionMs} scenarioFilter={viewModel.scenarioFilter} focusNodeIds={viewModel.focusNodeIds} showGrid={flow.showGrid !== false} cinemaSequence={sequence} hideNodeLabels />
+          <IsoCanvas document={document} floorId={floorId} svgId={`cinema-${index}-${floorId}`} selection={null} activeFlowId={flow.id} flowProgram={program} editable={false} stepDisplayMode="current" relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={noop} onSelect={noop} onMoveNode={noop} onMoveGroup={noop} onMoveGroupFlag={noop} connectionDraft={null} onToggleConnectionTarget={noop} viewportInsets={singleInsets} dezoom={viewModel.floorIds.length > 1 ? 1.2 : 1} cameraTransitionMs={cameraTransitionMs} scenarioFilter={scenarioFilter} fadedRelationIds={previousRelationIds} fadedNodeIds={previousNodeIds} focusNodeIds={viewModel.focusNodeIds} showGrid={flow.showGrid !== false} cinemaSequence={sequence} hideNodeLabels />
         </article>
       })}
+      {previousView ? outgoingViews.map(({ floorId, slot }, index) => {
+        const previousRuntimeShot = program.stages[shotIndex - 1]!
+        const hasSource = previousRuntimeShot.sourceIds.some((id) => nodeById.get(id)?.floorId === floorId)
+        const hasTarget = previousRuntimeShot.targetIds.some((id) => nodeById.get(id)?.floorId === floorId)
+        const role = hasSource && hasTarget ? 'Local path' : hasSource ? 'Departure' : 'Arrival'
+        const concepts = [...previousView.focusNodeIds].map((id) => nodeById.get(id)).filter((node) => node?.floorId === floorId)
+        return <article className={`cinema-view is-exiting from-layout-${previousView.layout} slot-${slot}`} key={`outgoing-${shotIndex}-${floorId}`} aria-hidden="true">
+          <CinemaFloorLocator document={document} floorId={floorId} role={role} />
+          <div className="cinema-concept-details">{concepts.map((concept) => concept ? <section key={concept.id}><span>{concept.code}</span><h3>{concept.name}</h3>{concept.whatItDoes ? <p>{concept.whatItDoes}</p> : null}{concept.howItsBuilt ? <small>{concept.howItsBuilt}</small> : null}</section> : null)}</div>
+          <IsoCanvas document={document} floorId={floorId} svgId={`cinema-outgoing-${index}-${floorId}`} selection={null} activeFlowId={null} flowProgram={null} editable={false} stepDisplayMode="none" relationPreview={null} stagePreviewTarget={null} relationPickIds={null} onPickRelation={noop} onSelect={noop} onMoveNode={noop} onMoveGroup={noop} onMoveGroupFlag={noop} connectionDraft={null} onToggleConnectionTarget={noop} viewportInsets={singleInsets} dezoom={previousView.floorIds.length > 1 ? 1.2 : 1} cameraTransitionMs={0} scenarioFilter={previousView.scenarioFilter} focusNodeIds={previousView.focusNodeIds} showGrid={flow.showGrid !== false} hideNodeLabels />
+        </article>
+      }) : null}
     </div>
     <CinemaFooter />
   </section>
