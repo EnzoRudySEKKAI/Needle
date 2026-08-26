@@ -13,8 +13,10 @@ export function StructureView({ document, activeFloorId, hoveredFloorId, onHover
   const resolvedPreviewIndex = previewIndex >= 0 ? previewIndex : null
   const previewFloor = resolvedPreviewIndex === null ? null : document.floors[resolvedPreviewIndex] ?? null
   const previewSlot = resolvedPreviewIndex === null ? null : geometry.floors[resolvedPreviewIndex] ?? null
+  const previewWidth = 330
+  const previewX = Math.min(geometry.previewX, geometry.viewBox.x + geometry.viewBox.width - previewWidth - 20)
   const previewY = previewSlot
-    ? Math.max(geometry.viewBox.y + 88, Math.min(previewSlot.centerY - 82, geometry.viewBox.y + geometry.viewBox.height - 250))
+    ? Math.max(geometry.viewBox.y + geometry.viewBox.height * .45, Math.min(previewSlot.centerY - 82, geometry.viewBox.y + geometry.viewBox.height - 250))
     : 0
   const conceptCount = previewFloor ? document.nodes.filter((node) => node.floorId === previewFloor.id).length : 0
   const structureName = t(document.structureType === 'tower' ? 'structure.tower' : document.structureType === 'campus' ? 'structure.campus' : document.structureType === 'cruise-ship' ? 'structure.ship' : 'structure.expoPark')
@@ -34,16 +36,16 @@ export function StructureView({ document, activeFloorId, hoveredFloorId, onHover
       </defs>
       <StructureSilhouette geometry={geometry} previewIndex={resolvedPreviewIndex} currentIndex={currentIndex} floorNames={document.floors.map((floor) => floor.name)} onPreview={handlePreview} onEnter={(index) => { const floor = document.floors[index]; if (floor) onOpenFloor(floor.id) }} />
       {previewFloor && previewSlot ? <g className="structure-preview" aria-live="polite">
-        <text x={geometry.previewX} y={previewY - 26} className="structure-preview-index">{t('shell.structure.floorIndex', { number: String(resolvedPreviewIndex! + 1).padStart(2, '0') })}</text>
-        <text x={geometry.previewX} y={previewY - 4} className="structure-preview-name">{previewFloor.name}</text>
-        <text x={geometry.previewX} y={previewY + 15} className="structure-preview-count">{t(conceptCount === 1 ? 'shell.structure.oneConcept' : 'shell.structure.manyConcepts', { count: formatNumber(conceptCount) })}</text>
-        <FloorMiniPlan document={document} floorId={previewFloor.id} x={geometry.previewX} y={previewY + 28} />
+        <text x={previewX} y={previewY - 26} className="structure-preview-index">{t('shell.structure.floorIndex', { number: String(resolvedPreviewIndex! + 1).padStart(2, '0') })}</text>
+        <text x={previewX} y={previewY - 4} className="structure-preview-name">{previewFloor.name}</text>
+        <text x={previewX} y={previewY + 15} className="structure-preview-count">{t(conceptCount === 1 ? 'shell.structure.oneConcept' : 'shell.structure.manyConcepts', { count: formatNumber(conceptCount) })}</text>
+        <FloorMiniPlan document={document} floorId={previewFloor.id} x={previewX} y={previewY + 28} width={previewWidth} />
       </g> : <g className="structure-rest-copy">
-        <text x={geometry.previewX} y={-12} className="structure-preview-index">{t('shell.floor.structureView')}</text>
-        <text x={geometry.previewX} y={16} className="structure-preview-name">{structureName}</text>
-        <text x={geometry.previewX} y={40} className="structure-preview-count">{t(document.floors.length === 1 ? 'shell.structure.oneFloor' : 'shell.structure.manyFloors', { count: formatNumber(document.floors.length) })}</text>
-        <text x={geometry.previewX} y={80} className="structure-preview-hint">{t('shell.structure.hoverHint')}</text>
-        <text x={geometry.previewX} y={98} className="structure-preview-hint">{t('shell.structure.enterHint')}</text>
+        <text x={previewX} y={-12} className="structure-preview-index">{t('shell.floor.structureView')}</text>
+        <text x={previewX} y={16} className="structure-preview-name">{structureName}</text>
+        <text x={previewX} y={40} className="structure-preview-count">{t(document.floors.length === 1 ? 'shell.structure.oneFloor' : 'shell.structure.manyFloors', { count: formatNumber(document.floors.length) })}</text>
+        <text x={previewX} y={80} className="structure-preview-hint">{t('shell.structure.hoverHint')}</text>
+        <text x={previewX} y={98} className="structure-preview-hint">{t('shell.structure.enterHint')}</text>
       </g>}
     </svg>
   </div>

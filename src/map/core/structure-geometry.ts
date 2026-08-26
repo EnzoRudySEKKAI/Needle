@@ -389,18 +389,34 @@ function shipGeometry(count: number): StructureGeometry {
 const expoParkProject: Project = (x, y, elevation) => ({ x: (x - y) * .82, y: (x + y) * .34 - elevation })
 
 function expoParkGeometry(count: number): StructureGeometry {
-  const hangarW = 78
-  const hangarD = 52
-  const gapX = 32
-  const gapY = 32
-  const alley = 26
-  const hallHeight = 26
-  const roofHeight = 7
+  let hangarW = 72
+  let hangarD = 48
+  let gapX = 32
+  let gapY = 32
+  let alley = 24
+  let hallHeight = 24
+  let roofHeight = 6
   const cols = Math.ceil(Math.sqrt(count))
   const rows = Math.ceil(count / cols)
+  const MAX_W = 360
+  const MAX_D = 240
+  const rawW = cols * hangarW + (cols - 1) * gapX
+  const rawD = rows * hangarD + (rows - 1) * gapY + (rows > 1 ? alley : 0)
+  let scale = 1
+  if (rawW > MAX_W) scale = Math.min(scale, MAX_W / rawW)
+  if (rawD > MAX_D) scale = Math.min(scale, MAX_D / rawD)
+  if (scale < 1) {
+    hangarW *= scale
+    hangarD *= scale
+    gapX *= scale
+    gapY *= scale
+    alley *= scale
+    hallHeight *= scale
+    roofHeight *= scale
+  }
   const totalW = cols * hangarW + (cols - 1) * gapX
   const totalD = rows * hangarD + (rows - 1) * gapY + (rows > 1 ? alley : 0)
-  const leftOffset = 26
+  const leftOffset = 18
   const x0 = -totalW / 2 - leftOffset
   const y0 = -totalD / 2
   const hangars: PlanRect[] = []
@@ -411,7 +427,7 @@ function expoParkGeometry(count: number): StructureGeometry {
     const y = y0 + row * (hangarD + gapY) + (row > 0 && rows > 1 ? alley : 0)
     hangars.push({ x, y, w: hangarW, d: hangarD })
   }
-  const siteMargin = 42
+  const siteMargin = 36
   const siteRect = { x: x0 - siteMargin, y: y0 - siteMargin, w: totalW + siteMargin * 2, d: totalD + siteMargin * 2 }
   const floors: StructureFloorSlot[] = []
   const layers: StructurePaintLayer[] = [layer('expo-site', shellOwner, [], [
@@ -422,15 +438,15 @@ function expoParkGeometry(count: number): StructureGeometry {
   hangars.forEach((rect, index) => {
     const bottom = contour(rect, 0, expoParkProject)
     const top = contour(rect, hallHeight, expoParkProject)
-    const roofBase = { x: rect.x + 8, y: rect.y + 8, w: rect.w - 16, d: rect.d - 16 }
-    const roofRidge = { x: rect.x + rect.w / 2 - 2, y: rect.y + 8, w: 4, d: rect.d - 16 }
+    const roofBase = { x: rect.x + 6, y: rect.y + 6, w: rect.w - 12, d: rect.d - 12 }
+    const roofRidge = { x: rect.x + rect.w / 2 - 1.5, y: rect.y + 6, w: 3, d: rect.d - 12 }
     const roofBottom = contour(roofBase, hallHeight, expoParkProject)
     const roofTop = contour(roofRidge, hallHeight + roofHeight, expoParkProject)
-    const doorW = 24
-    const doorH = 13
+    const doorW = 18
+    const doorH = 10
     const doorX = rect.x + rect.w / 2 - doorW / 2
-    const doorY = rect.y + rect.d - 3
-    const doorRect = { x: doorX, y: doorY, w: doorW, d: 5 }
+    const doorY = rect.y + rect.d - 2
+    const doorRect = { x: doorX, y: doorY, w: doorW, d: 4 }
     const faces = rectFaces(bottom, top)
     const centerY = (Math.min(...top.map((p) => p.y)) + Math.max(...bottom.map((p) => p.y))) / 2
     floors.push({ index, centerY, hitAreas: faces })
@@ -445,12 +461,11 @@ function expoParkGeometry(count: number): StructureGeometry {
       path(closed(roofTop), 'primary'),
       path(`${move(roofTop[1]!)} ${line(roofBottom[1]!)}`, 'detail'),
       path(`${move(roofTop[2]!)} ${line(roofBottom[2]!)}`, 'detail'),
-      ...facadeGrid(rect, 0, hallHeight, expoParkProject, 28),
+      ...facadeGrid(rect, 0, hallHeight, expoParkProject, 24),
       path(closed(doorTop), 'secondary'),
     ]))
   })
 
-  // Accurate bounds from all projected points
   const allPoints: ScreenPoint[] = []
   for (const r of [siteRect, ...hangars]) {
     for (const elev of [0, hallHeight + roofHeight]) allPoints.push(...contour(r, elev, expoParkProject))
@@ -459,14 +474,14 @@ function expoParkGeometry(count: number): StructureGeometry {
   const maxPx = Math.max(...allPoints.map((p) => p.x))
   const minPy = Math.min(...allPoints.map((p) => p.y))
   const maxPy = Math.max(...allPoints.map((p) => p.y))
-  const pad = 36
-  const dezoomView = Math.max(1, Math.sqrt(count) / 1.85)
+  const pad = 44
+  const dezoomView = Math.max(1, Math.sqrt(count) / 1.7)
   const bounds = { x: minPx - pad * dezoomView, y: minPy - pad * dezoomView, width: (maxPx - minPx + pad * 2) * dezoomView, height: (maxPy - minPy + pad * 2) * dezoomView }
   return {
     type: 'expo-park',
     structureBounds: bounds,
-    viewBox: { x: bounds.x - 24 * dezoomView, y: bounds.y - 24 * dezoomView, width: bounds.width + 48 * dezoomView, height: bounds.height + 48 * dezoomView },
-    previewX: bounds.x + bounds.width * 0.62,
+    viewBox: { x: bounds.x - 28 * dezoomView, y: bounds.y - 28 * dezoomView, width: bounds.width + 56 * dezoomView, height: bounds.height + 56 * dezoomView },
+    previewX: bounds.x + bounds.width * 0.72,
     floors,
     layers,
   }

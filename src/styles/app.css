@@ -1264,7 +1264,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .header-actions { margin-left: 0; padding-right: 8px; }
   .step-display-control > span { display: none; }
   .step-display-control .app-select { min-width: 64px; }
-  .map-workspace { position: relative; display: block; }
+  .map-workspace { position: relative; height: 100%; display: block; }
   .stage-column { height: 100%; }
   .left-rail { position: absolute; left: 8px; right: 8px; bottom: 40px; height: 190px; z-index: 8; overflow-y: auto; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--surface-raised) 92%, transparent); backdrop-filter: blur(16px); box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 15%, transparent); }
   .rail-tabs { padding: 6px; }
@@ -1285,7 +1285,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .map-app.is-structure-view .inspector > :not(.map-settings) { display: none; }
   .map-app.is-structure-view .map-settings { margin: 0; padding: 0; border: 0; }
   .map-app.is-structure-view .map-settings > .field { display: none; }
-  .map-app.is-structure-view .structure-view-svg { width: 120%; height: 120%; transform: translate(-8%, -5%); }
+  :is(.structure-stage, .map-app.is-structure-view .floor-layer.is-structure > div:first-child) { padding-right: 0 !important; padding-bottom: 156px !important; padding-left: 0 !important; }
+  .map-app.right-collapsed :is(.structure-stage, .floor-layer.is-structure > div:first-child) { padding-bottom: 12px !important; }
+  .map-app.is-structure-view .structure-view-svg { width: 100%; height: 100%; transform: none; }
   .map-app.is-structure-view .structure-type-picker button { height: 76px; }
   .map-app.is-structure-view .structure-type-picker svg { height: 51px; }
   .camera-controls { bottom: 174px; }
