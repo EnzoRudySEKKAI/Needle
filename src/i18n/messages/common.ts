@@ -25,6 +25,7 @@ export const enCommon = {
   'structure.tower': 'Tower',
   'structure.campus': 'Campus',
   'structure.ship': 'Cruise ship',
+  'structure.expoPark': 'Expo Park',
 } as const
 
 export const zhCommon = {
@@ -54,4 +55,5 @@ export const zhCommon = {
   'structure.tower': '塔楼',
   'structure.campus': '园区',
   'structure.ship': '邮轮',
+  'structure.expoPark': '展览园区',
 } satisfies Record<keyof typeof enCommon, string>

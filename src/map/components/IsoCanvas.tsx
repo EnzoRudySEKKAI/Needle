@@ -51,6 +51,7 @@ type Props = {
   showGrid?: boolean
   cinemaSequence?: 'departure' | 'arrival' | 'local'
   hideNodeLabels?: boolean
+  cinema?: boolean
 }
 
 function EmptyFloorPrompt({ onAddConcept }: { onAddConcept?: () => void }) {
@@ -125,7 +126,7 @@ function orientGeometry(geometry: RelationGeometry, reverse: boolean): RelationG
   return { ...geometry, points, cumulative, total, fromSide: geometry.toSide, toSide: geometry.fromSide }
 }
 
-export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, cameraTransitionMs, onAddConcept, scenarioFilter = null, fadedRelationIds, fadedNodeIds, focusNodeIds, showGrid = true, cinemaSequence, hideNodeLabels = false }: Props) {
+export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initialCamera = null, onCameraChange, selection, activeFlowId, flowProgram, editable, stepDisplayMode, relationPreview, stagePreviewTarget, relationPickIds, onPickRelation, onSelect, onOpenFloor, onMoveNode, onMoveGroup, onMoveGroupFlag, connectionDraft, onToggleConnectionTarget, highlightedFloorId, viewportInsets, dezoom, cameraTransitionMs, onAddConcept, scenarioFilter = null, fadedRelationIds, fadedNodeIds, focusNodeIds, showGrid = true, cinemaSequence, hideNodeLabels = false, cinema = false }: Props) {
   const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -167,7 +168,7 @@ export function IsoCanvas({ document, floorId, svgId = 'ontology-map-svg', initi
     return sides
   }, [activeShot, floorId, nodeById, relationById])
   const flagPositions = useMemo(() => ({ ...projection?.floor.groupFlagPositions, ...Object.fromEntries(dragFlagPositions) }), [dragFlagPositions, projection?.floor.groupFlagPositions])
-  const exits = useMemo(() => buildExitGeometries(document, floorId, nodes, preferredExitSides), [document, floorId, nodes, preferredExitSides])
+  const exits = useMemo(() => buildExitGeometries(document, floorId, nodes, preferredExitSides, cinema), [cinema, document, floorId, nodes, preferredExitSides])
   const exitExtents = useMemo(() => [...exits.values()].map(exitExtent), [exits])
   const scene = useMemo(() => buildScene(projection?.groups ?? [], nodes, `${document.id}:${floorId}:${document.updatedAt}`, flagWidths, flagPositions, exitExtents), [document.id, document.updatedAt, exitExtents, flagPositions, flagWidths, floorId, nodes, projection?.groups])
   const visibleRelations = useMemo(() => {

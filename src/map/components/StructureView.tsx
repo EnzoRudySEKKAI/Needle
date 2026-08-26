@@ -17,7 +17,7 @@ export function StructureView({ document, activeFloorId, hoveredFloorId, onHover
     ? Math.max(geometry.viewBox.y + 88, Math.min(previewSlot.centerY - 82, geometry.viewBox.y + geometry.viewBox.height - 250))
     : 0
   const conceptCount = previewFloor ? document.nodes.filter((node) => node.floorId === previewFloor.id).length : 0
-  const structureName = t(document.structureType === 'tower' ? 'structure.tower' : document.structureType === 'campus' ? 'structure.campus' : 'structure.ship')
+  const structureName = t(document.structureType === 'tower' ? 'structure.tower' : document.structureType === 'campus' ? 'structure.campus' : document.structureType === 'cruise-ship' ? 'structure.ship' : 'structure.expoPark')
   const handlePreview = (index: number | null) => {
     if (!onHoverFloor) return
     if (index === null) onHoverFloor(null)

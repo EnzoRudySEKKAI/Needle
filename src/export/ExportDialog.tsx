@@ -93,7 +93,7 @@ export function ExportDialog({ filename, scope, onScope, onClose, document, acti
           relations: t('tools.export.reportRelations'),
           noRelations: t('tools.export.reportNoRelations'),
           title: t('tools.export.reportAllFloors', { name: value.name }),
-          structureTypes: { tower: t('structure.tower'), campus: t('structure.campus'), 'cruise-ship': t('structure.ship') },
+          structureTypes: { tower: t('structure.tower'), campus: t('structure.campus'), 'cruise-ship': t('structure.ship'), 'expo-park': t('structure.expoPark') },
           relationKinds: { full: t('tools.export.reportFullRelation'), dotted: t('tools.export.reportDottedRelation') },
         })))}><strong>{t('tools.export.allFloorsPdf')}</strong><span>{t('tools.export.floorReport')}</span></button>
       </div>

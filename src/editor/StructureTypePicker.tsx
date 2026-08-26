@@ -8,7 +8,7 @@ export function StructureTypePicker({ value, onChange }: { value: StructureType;
   return <fieldset className="structure-type-picker"><legend>{t('shell.structure.type')}</legend><div>{STRUCTURE_TYPES.map((type) => {
     const geometry = structureGeometry(type, 4)
     const bounds = geometry.structureBounds
-    const label = t(type === 'tower' ? 'structure.tower' : type === 'campus' ? 'structure.campus' : 'structure.ship')
+    const label = t(type === 'tower' ? 'structure.tower' : type === 'campus' ? 'structure.campus' : type === 'cruise-ship' ? 'structure.ship' : 'structure.expoPark')
     return <button key={type} type="button" className={value === type ? 'is-selected' : ''} aria-pressed={value === type} onClick={() => onChange(type)}>
       <svg viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`} aria-hidden="true"><StructureSilhouette geometry={geometry} /></svg>
       <span>{label}</span>

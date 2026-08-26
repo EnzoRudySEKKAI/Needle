@@ -385,9 +385,97 @@ function shipGeometry(count: number): StructureGeometry {
   }
 }
 
+
+const expoParkProject: Project = (x, y, elevation) => ({ x: (x - y) * .82, y: (x + y) * .34 - elevation })
+
+function expoParkGeometry(count: number): StructureGeometry {
+  const hangarW = 78
+  const hangarD = 52
+  const gapX = 32
+  const gapY = 32
+  const alley = 26
+  const hallHeight = 26
+  const roofHeight = 7
+  const cols = Math.ceil(Math.sqrt(count))
+  const rows = Math.ceil(count / cols)
+  const totalW = cols * hangarW + (cols - 1) * gapX
+  const totalD = rows * hangarD + (rows - 1) * gapY + (rows > 1 ? alley : 0)
+  const leftOffset = 26
+  const x0 = -totalW / 2 - leftOffset
+  const y0 = -totalD / 2
+  const hangars: PlanRect[] = []
+  for (let index = 0; index < count; index += 1) {
+    const col = index % cols
+    const row = Math.floor(index / cols)
+    const x = x0 + col * (hangarW + gapX)
+    const y = y0 + row * (hangarD + gapY) + (row > 0 && rows > 1 ? alley : 0)
+    hangars.push({ x, y, w: hangarW, d: hangarD })
+  }
+  const siteMargin = 42
+  const siteRect = { x: x0 - siteMargin, y: y0 - siteMargin, w: totalW + siteMargin * 2, d: totalD + siteMargin * 2 }
+  const floors: StructureFloorSlot[] = []
+  const layers: StructurePaintLayer[] = [layer('expo-site', shellOwner, [], [
+    path(closed(contour(siteRect, 0, expoParkProject)), 'secondary'),
+    ...(rows > 1 ? [path(open([expoParkProject(siteRect.x + 14, siteRect.y + totalD / 2 + siteMargin / 2, 0.5), expoParkProject(siteRect.x + siteRect.w - 14, siteRect.y + totalD / 2 + siteMargin / 2, 0.5)]), 'detail')] : []),
+  ])]
+
+  hangars.forEach((rect, index) => {
+    const bottom = contour(rect, 0, expoParkProject)
+    const top = contour(rect, hallHeight, expoParkProject)
+    const roofBase = { x: rect.x + 8, y: rect.y + 8, w: rect.w - 16, d: rect.d - 16 }
+    const roofRidge = { x: rect.x + rect.w / 2 - 2, y: rect.y + 8, w: 4, d: rect.d - 16 }
+    const roofBottom = contour(roofBase, hallHeight, expoParkProject)
+    const roofTop = contour(roofRidge, hallHeight + roofHeight, expoParkProject)
+    const doorW = 24
+    const doorH = 13
+    const doorX = rect.x + rect.w / 2 - doorW / 2
+    const doorY = rect.y + rect.d - 3
+    const doorRect = { x: doorX, y: doorY, w: doorW, d: 5 }
+    const faces = rectFaces(bottom, top)
+    const centerY = (Math.min(...top.map((p) => p.y)) + Math.max(...bottom.map((p) => p.y))) / 2
+    floors.push({ index, centerY, hitAreas: faces })
+    const doorBottom = contour(doorRect, 0, expoParkProject)
+    const doorTop = contour(doorRect, doorH, expoParkProject)
+    const doorFaces = rectFaces(doorBottom, doorTop)
+    layers.push(layer(`expo-hangar-${index}`, floorOwner(index), [...faces, closed(roofBottom), ...doorFaces], [
+      path(closed(top), 'primary'),
+      path(`${move(top[1]!)} ${line(bottom[1]!)} ${line(bottom[2]!)} ${line(bottom[3]!)} ${line(top[3]!)}`, 'secondary'),
+      path(`${move(top[2]!)} ${line(bottom[2]!)}`, 'primary'),
+      path(closed(roofBottom), 'secondary'),
+      path(closed(roofTop), 'primary'),
+      path(`${move(roofTop[1]!)} ${line(roofBottom[1]!)}`, 'detail'),
+      path(`${move(roofTop[2]!)} ${line(roofBottom[2]!)}`, 'detail'),
+      ...facadeGrid(rect, 0, hallHeight, expoParkProject, 28),
+      path(closed(doorTop), 'secondary'),
+    ]))
+  })
+
+  // Accurate bounds from all projected points
+  const allPoints: ScreenPoint[] = []
+  for (const r of [siteRect, ...hangars]) {
+    for (const elev of [0, hallHeight + roofHeight]) allPoints.push(...contour(r, elev, expoParkProject))
+  }
+  const minPx = Math.min(...allPoints.map((p) => p.x))
+  const maxPx = Math.max(...allPoints.map((p) => p.x))
+  const minPy = Math.min(...allPoints.map((p) => p.y))
+  const maxPy = Math.max(...allPoints.map((p) => p.y))
+  const pad = 36
+  const dezoomView = Math.max(1, Math.sqrt(count) / 1.85)
+  const bounds = { x: minPx - pad * dezoomView, y: minPy - pad * dezoomView, width: (maxPx - minPx + pad * 2) * dezoomView, height: (maxPy - minPy + pad * 2) * dezoomView }
+  return {
+    type: 'expo-park',
+    structureBounds: bounds,
+    viewBox: { x: bounds.x - 24 * dezoomView, y: bounds.y - 24 * dezoomView, width: bounds.width + 48 * dezoomView, height: bounds.height + 48 * dezoomView },
+    previewX: bounds.x + bounds.width * 0.62,
+    floors,
+    layers,
+  }
+}
+
 export function structureGeometry(type: StructureType, floorCount: number): StructureGeometry {
   const count = Math.max(1, floorCount)
   if (type === 'campus') return campusGeometry(count)
   if (type === 'cruise-ship') return shipGeometry(count)
+  if (type === 'expo-park') return expoParkGeometry(count)
   return towerGeometry(count)
 }

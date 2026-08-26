@@ -1,5 +1,5 @@
 export const SCHEMA_VERSION = 10 as const
-export const STRUCTURE_TYPES = ['tower', 'campus', 'cruise-ship'] as const
+export const STRUCTURE_TYPES = ['tower', 'campus', 'cruise-ship', 'expo-park'] as const
 
 export type GridPoint = { gx: number; gy: number }
 export type Footprint = GridPoint & { w: number; d: number }

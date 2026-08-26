@@ -26,7 +26,7 @@ function StructurePreview({ structureType, floorCount, className = '' }: { struc
   const { t } = useI18n()
   const geometry = structureGeometry(structureType, floorCount)
   const bounds = geometry.structureBounds
-  const structure = t(structureType === 'tower' ? 'structure.tower' : structureType === 'campus' ? 'structure.campus' : 'structure.ship')
+  const structure = t(structureType === 'tower' ? 'structure.tower' : structureType === 'campus' ? 'structure.campus' : structureType === 'cruise-ship' ? 'structure.ship' : 'structure.expoPark')
   return <span className={`map-card-structure ${className}`}><svg viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`} preserveAspectRatio="xMidYMid meet" aria-label={t('home.structure.aria', { structure })}><StructureSilhouette geometry={geometry} /></svg><span>{t(floorCount === 1 ? 'home.structure.summaryOne' : 'home.structure.summaryMany', { structure, count: floorCount })}</span></span>
 }
 
@@ -258,7 +258,7 @@ export function HomePage() {
           <div className="blank-setup-preview"><StructurePreview structureType={blankStructureType} floorCount={1} className="template-card-structure" /></div>
           <div className="blank-setup-form">
             <label><span>{t('home.creation.mapName')}</span><input autoFocus value={mapName} onChange={(event) => setMapName(event.target.value)} placeholder={t('home.creation.mapNamePlaceholder')} /></label>
-            <fieldset><legend>{t('home.creation.structureType')}</legend><div>{STRUCTURE_TYPES.map((structureType) => <button key={structureType} type="button" className={blankStructureType === structureType ? 'is-selected' : ''} aria-pressed={blankStructureType === structureType} onClick={() => setBlankStructureType(structureType)}><StructurePreview structureType={structureType} floorCount={1} className="blank-type-preview" /><span>{t(structureType === 'tower' ? 'structure.tower' : structureType === 'campus' ? 'structure.campus' : 'structure.ship')}</span></button>)}</div></fieldset>
+            <fieldset><legend>{t('home.creation.structureType')}</legend><div>{STRUCTURE_TYPES.map((structureType) => <button key={structureType} type="button" className={blankStructureType === structureType ? 'is-selected' : ''} aria-pressed={blankStructureType === structureType} onClick={() => setBlankStructureType(structureType)}><StructurePreview structureType={structureType} floorCount={1} className="blank-type-preview" /><span>{t(structureType === 'tower' ? 'structure.tower' : structureType === 'campus' ? 'structure.campus' : structureType === 'cruise-ship' ? 'structure.ship' : 'structure.expoPark')}</span></button>)}</div></fieldset>
             <button type="button" className="blank-create-button" disabled={working !== null || !mapName.trim()} onClick={() => void createMap()}>{t(working === 'blank' ? 'home.creation.creating' : 'home.creation.create')}</button>
           </div>
         </div>
@@ -266,7 +266,7 @@ export function HomePage() {
       {creationMode === 'templates' ? <div className="template-selection">
         <button type="button" className="creation-back" onClick={() => setCreationMode(null)}>{t('home.creation.back')}</button>
         <div className="template-grid">{EXAMPLE_MAPS.map((template, index) => <article className="template-card" key={template.id}>
-          <div className="template-card-heading"><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span>{t(template.structureType === 'tower' ? 'structure.tower' : template.structureType === 'campus' ? 'structure.campus' : 'structure.ship')}</span></div>
+          <div className="template-card-heading"><span className="card-index">{String(index + 1).padStart(2, '0')}</span><span>{t(template.structureType === 'tower' ? 'structure.tower' : template.structureType === 'campus' ? 'structure.campus' : template.structureType === 'cruise-ship' ? 'structure.ship' : 'structure.expoPark')}</span></div>
           <StructurePreview structureType={template.structureType} floorCount={template.floors.length} className="template-card-structure" />
           <div className="template-card-copy"><h3>{template.name}</h3><p>{template.description}</p></div>
           <div className="template-card-footer"><span>{t(template.floors.length === 1 ? template.nodes.length === 1 ? 'home.creation.metadataOneOne' : 'home.creation.metadataOneMany' : template.nodes.length === 1 ? 'home.creation.metadataManyOne' : 'home.creation.metadataManyMany', { floors: template.floors.length, concepts: template.nodes.length })}</span><button type="button" disabled={working !== null} onClick={() => void createMap(template.id)}>{t('home.creation.useTemplate')}</button></div>

@@ -1,5 +1,5 @@
 import type { Footprint, OntologyDocument, VisualNode } from '../../domain/types'
-import type { PortSide } from './archetypes'
+import { portAnchors, type PortSide } from './archetypes'
 import { polylineLengths, toScreen, type ScreenPoint } from './iso'
 import type { RelationGeometry } from './routes'
 
@@ -24,9 +24,11 @@ export type ExitGeometry = {
 
 const EXIT_DROP = 96
 const PORT_CLEARANCE = 20
+const PORT_CLEARANCE_SHALLOW = 0.8
 const OBSTACLE_PADDING = 0.35
 const LANE_GAP = 14
 
+const DROP_PORTS: Record<ExitDirection, PortSide[]> = { down: ['south', 'east'], up: ['north', 'west'] }
 const EXIT_TO_SIDE: Record<ExitDirection, PortSide> = { down: 'north', up: 'south' }
 
 function longestSegmentMidpoint(points: readonly ScreenPoint[]): ScreenPoint {
@@ -53,7 +55,25 @@ function pointBlocked(point: ScreenPoint, localId: string, nodes: readonly Visua
   })
 }
 
-export function buildExitRoute(local: VisualNode, direction: ExitDirection, nodes: readonly VisualNode[], lane = 0, preferredSide?: 'west' | 'east'): { points: ScreenPoint[]; dropStart: ScreenPoint; dropEnd: ScreenPoint; fromSide: PortSide } | null {
+export function buildExitRoute(local: VisualNode, direction: ExitDirection, nodes: readonly VisualNode[], lane = 0, preferredSide?: 'west' | 'east', cinema = false): { points: ScreenPoint[]; dropStart: ScreenPoint; dropEnd: ScreenPoint; fromSide: PortSide } | null {
+  if (!cinema) {
+    const ports = portAnchors(local.footprint)
+    const candidates = DROP_PORTS[direction].map((side) => {
+      const anchor = ports[side]
+      const normal = { north: { gx: 0, gy: -1 }, east: { gx: 1, gy: 0 }, south: { gx: 0, gy: 1 }, west: { gx: -1, gy: 0 } }[side]
+      const clearGrid = { gx: anchor.gx + normal.gx * PORT_CLEARANCE_SHALLOW, gy: anchor.gy + normal.gy * PORT_CLEARANCE_SHALLOW }
+      return { side, anchor: toScreen(anchor.gx, anchor.gy), clear: toScreen(clearGrid.gx, clearGrid.gy) }
+    })
+    const free = candidates.find((candidate) => !pointBlocked(candidate.clear, local.id, nodes)) ?? candidates[0]
+    if (!free) return null
+    const sign = direction === 'down' ? 1 : -1
+    const dropX = free.clear.x + lane * LANE_GAP * sign
+    const elbow: ScreenPoint = { x: dropX, y: free.clear.y }
+    const dropStart = elbow
+    const dropEnd: ScreenPoint = { x: dropX, y: free.clear.y + EXIT_DROP * sign }
+    const points = [free.anchor, elbow, dropEnd]
+    return { points, dropStart, dropEnd, fromSide: free.side }
+  }
   const { gx, gy, w, d } = local.footprint
   const left = toScreen(gx, gy + d)
   const right = toScreen(gx + w, gy)
@@ -75,7 +95,7 @@ export function buildExitRoute(local: VisualNode, direction: ExitDirection, node
   return { points, dropStart, dropEnd, fromSide: free.side }
 }
 
-export function buildExitGeometries(document: OntologyDocument, floorId: string, nodes: readonly VisualNode[], preferredSides?: ReadonlyMap<string, 'west' | 'east'>): ReadonlyMap<string, ExitGeometry> {
+export function buildExitGeometries(document: OntologyDocument, floorId: string, nodes: readonly VisualNode[], preferredSides?: ReadonlyMap<string, 'west' | 'east'>, cinema = false): ReadonlyMap<string, ExitGeometry> {
   const result = new Map<string, ExitGeometry>()
   const currentIndex = document.floors.findIndex((floor) => floor.id === floorId)
   if (currentIndex < 0) return result
@@ -98,7 +118,7 @@ export function buildExitGeometries(document: OntologyDocument, floorId: string,
     const laneKey = `${local.id}:${direction}`
     const lane = lanes.get(laneKey) ?? 0
     lanes.set(laneKey, lane + 1)
-    const route = buildExitRoute(local, direction, nodes, lane, preferredSides?.get(relation.id))
+    const route = buildExitRoute(local, direction, nodes, lane, preferredSides?.get(relation.id), cinema)
     if (!route) continue
     const { cumulative, total } = polylineLengths(route.points)
     result.set(relation.id, {
